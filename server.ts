@@ -102,17 +102,6 @@ app.get("/", async (req: any, res) => {
   });
 });
 
-// ========== HEALTH CHECK ENDPOINTS (Prevents 502 Bad Gateway Proxy Errors) ==========
-app.get(["/api/health", "/health", "/ping"], (req: any, res: any) => {
-  res.status(200).json({
-    status: "ok",
-    healthy: true,
-    message: "TecnoRexa API Server is healthy and operational",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
-});
-
 // ========== CONVENIENCE & FEATURE ROUTES ==========
 app.get("/api/wallet/transactions", authenticateToken,async (req: any, res) => {
   try {
@@ -125,67 +114,32 @@ app.get("/api/wallet/transactions", authenticateToken,async (req: any, res) => {
 
 app.get("/api/analytics", async (req, res) => {
   try {
-    const period = (req.query.period as string) || 'week';
-    let dateFilter = "";
-    if (period === 'week') {
-      dateFilter = "AND createdAt >= datetime('now', '-7 days')";
-    } else if (period === 'month') {
-      dateFilter = "AND createdAt >= datetime('now', '-30 days')";
-    } else if (period === 'year') {
-      dateFilter = "AND createdAt >= datetime('now', '-365 days')";
-    }
-
-    const totalUsers = (db.prepare(`SELECT COUNT(*) as count FROM users WHERE 1=1 ${dateFilter}`).get() as any)?.count || 0;
-    const newUsers = (db.prepare(`SELECT COUNT(*) as count FROM users WHERE createdAt >= datetime('now', '-7 days')`).get() as any)?.count || 0;
-    const activeUsers = (db.prepare(`SELECT COUNT(*) as count FROM users WHERE status = 'active'`).get() as any)?.count || 0;
-
-    const totalOrders = (db.prepare(`SELECT COUNT(*) as count FROM orders WHERE 1=1 ${dateFilter}`).get() as any)?.count || 0;
-    const pendingOrders = (db.prepare(`SELECT COUNT(*) as count FROM orders WHERE status = 'pending' ${dateFilter}`).get() as any)?.count || 0;
-    const completedOrders = (db.prepare(`SELECT COUNT(*) as count FROM orders WHERE status = 'completed' ${dateFilter}`).get() as any)?.count || 0;
-
-    const openTickets = (db.prepare(`SELECT COUNT(*) as count FROM support_tickets WHERE status = 'open' ${dateFilter}`).get() as any)?.count || 0;
-    const resolvedTickets = (db.prepare(`SELECT COUNT(*) as count FROM support_tickets WHERE (status = 'closed' OR status = 'resolved') ${dateFilter}`).get() as any)?.count || 0;
-
-    const topTechs = db.prepare("SELECT name, specialty, COALESCE(rating, 5.0) as rating, COALESCE(jobs, 0) as jobs FROM users WHERE role = 'technician' ORDER BY rating DESC, jobs DESC LIMIT 5").all();
+    const totalUsers = (db.prepare("SELECT COUNT(*) as count FROM users").get() as any)?.count || 0;
+    const totalOrders = (db.prepare("SELECT COUNT(*) as count FROM orders").get() as any)?.count || 0;
+    const pendingOrders = (db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'").get() as any)?.count || 0;
+    const completedOrders = (db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'completed'").get() as any)?.count || 0;
+    const openTickets = (db.prepare("SELECT COUNT(*) as count FROM support_tickets WHERE status = 'open'").get() as any)?.count || 0;
+    const resolvedTickets = (db.prepare("SELECT COUNT(*) as count FROM support_tickets WHERE status = 'closed'").get() as any)?.count || 0;
+    const topTechs = db.prepare("SELECT name, specialty, COALESCE(rating, 0) as rating, COALESCE(jobs, 0) as jobs FROM users WHERE role = 'technician' LIMIT 5").all();
     const activeTechs = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'technician' AND status = 'active'").get() as any)?.count || 0;
     const totalTechs = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'technician'").get() as any)?.count || 0;
-
-    const completedRevenue = (db.prepare(`SELECT COALESCE(SUM(total), 0) as s FROM orders WHERE status = 'completed' ${dateFilter}`).get() as any)?.s || 0;
-    const marketplaceRevenue = (db.prepare(`SELECT COALESCE(SUM(total), 0) as s FROM orders WHERE status = 'completed' AND (type = 'shop' OR type = 'product') ${dateFilter}`).get() as any)?.s || 0;
-    const maintenanceRevenue = (db.prepare(`SELECT COALESCE(SUM(total), 0) as s FROM orders WHERE status = 'completed' AND type = 'maintenance' ${dateFilter}`).get() as any)?.s || 0;
-    const subscriptionsRevenue = (db.prepare(`SELECT COALESCE(SUM(feePaid), 0) as s FROM upgrade_requests WHERE status = 'approved' ${dateFilter}`).get() as any)?.s || 0;
-    const coursesRevenue = (db.prepare(`SELECT COALESCE(SUM(pricePaid), 0) as s FROM course_purchases WHERE 1=1 ${dateFilter}`).get() as any)?.s || 0;
-
-    const weeklyChart = [
-      { day: 'السبت', amount: Math.round(completedRevenue * 0.15) },
-      { day: 'الأحد', amount: Math.round(completedRevenue * 0.18) },
-      { day: 'الإثنين', amount: Math.round(completedRevenue * 0.12) },
-      { day: 'الثلاثاء', amount: Math.round(completedRevenue * 0.20) },
-      { day: 'الأربعاء', amount: Math.round(completedRevenue * 0.15) },
-      { day: 'الخميس', amount: Math.round(completedRevenue * 0.10) },
-      { day: 'الجمعة', amount: Math.round(completedRevenue * 0.10) },
-    ];
+    const completedRevenue = (db.prepare("SELECT COALESCE(SUM(total), 0) as s FROM orders WHERE status = 'completed'").get() as any)?.s || 0;
 
     res.json({
       revenue: {
         total: completedRevenue,
-        growth: completedRevenue > 0 ? 12 : 0,
-        breakdown: {
-          marketplace: marketplaceRevenue || completedRevenue,
-          subscriptions: subscriptionsRevenue,
-          courses: coursesRevenue,
-          maintenance: maintenanceRevenue,
-        },
-        weekly: weeklyChart,
+        growth: 0,
+        breakdown: { marketplace: completedRevenue, subscriptions: 0, courses: 0 },
+        weekly: [],
       },
-      users: { total: totalUsers, new: newUsers, active: activeUsers, growth: totalUsers > 0 ? 8 : 0, byRole: [] },
-      orders: { total: totalOrders, pending: pendingOrders, completed: completedOrders, growth: totalOrders > 0 ? 15 : 0, byType: [] },
+      users: { total: totalUsers, new: 0, active: totalUsers, growth: 0, byRole: [] },
+      orders: { total: totalOrders, pending: pendingOrders, completed: completedOrders, growth: 0, byType: [] },
       technicians: {
         total: totalTechs,
         active: activeTechs,
         top: topTechs,
       },
-      tickets: { open: openTickets, resolved: resolvedTickets, avgResponseTime: 15 },
+      tickets: { open: openTickets, resolved: resolvedTickets, avgResponseTime: 0 },
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -354,43 +308,39 @@ app.use((req: any, res: any, next: any) => {
       )
       .get() as any;
     if (isMaintenance && isMaintenance.value === "true") {
-      // Exclude static assets/uploads or health check
-      if (req.path.startsWith("/uploads") || req.path === "/api/health") {
-        return next();
-      }
-
-      // Extract and verify user token
-      let userRole = '';
-      try {
-        const authHeader = req.headers.authorization || "";
-        if (authHeader.startsWith("Bearer ")) {
-          const token = authHeader.slice(7);
-          const decoded = jwt.verify(token, JWT_SECRET) as any;
-          userRole = normalizeRoleShared(decoded?.role || "");
+      // Always allow these paths (auth, admin, health)
+      const allowedPaths = [
+        "/api/auth",
+        "/api/admin",
+        "/api/settings",
+        "/api/ops",
+        "/api/me",
+        "/api/health",
+        "/api/owner",
+        "/api/notifications",
+        "/uploads",
+      ];
+      if (!allowedPaths.some((p) => req.path.startsWith(p))) {
+        // Check if user is owner or programmer (allow them through)
+        try {
+          const authHeader = req.headers.authorization || "";
+          if (authHeader.startsWith("Bearer ")) {
+            const token = authHeader.slice(7);
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as any;
+            const role = normalizeRoleShared(decoded?.role || "");
+            if (role === "owner" || role === "programmer") {
+              return next(); // Owner/programmer bypass maintenance mode
+            }
+          }
+        } catch (_jwtErr) {
+          // Invalid token - fall through to maintenance error
         }
-      } catch (_e) {}
-
-      // ONLY Owner and Programmer can access system during Maintenance Mode
-      if (userRole === "owner" || userRole === "programmer") {
-        return next();
+        return res.status(503).json({
+          error:
+            "الموقع حالياً في وضع الصيانة المباشرة للتحديث والترقية. يرجى المحاولة لاحقاً.",
+          maintenance: true,
+        });
       }
-
-      // Allow login and maintenance setting endpoints so Owner/Programmer can authenticate and toggle maintenance mode
-      if (
-        req.path === "/api/auth/login" ||
-        req.path === "/api/settings/maintenance" ||
-        req.path === "/api/owner/system/maintenance" ||
-        req.path === "/api/settings"
-      ) {
-        return next();
-      }
-
-      // Block ALL other users and endpoints with 503 Service Unavailable
-      return res.status(503).json({
-        error: "🛠️ المنظومة حالياً في وضع الصيانة الفنية والتحديث البرمجي الأمني. يرجى العودة لاحقاً.",
-        maintenance: true,
-        maintenanceMode: true,
-      });
     }
   } catch (e) {
     // Ignore during boot
@@ -423,7 +373,10 @@ const io = new Server(httpServer, {
 });
 
 // ========== 2. CONFIG & DB ==========
-const JWT_SECRET = process.env.JWT_SECRET || "tecnorexa_production_secret_key_2026_jwt_master";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET must be configured in the environment");
+}
 
 // PostgreSQL Enterprise High-Availability Pool
 export let pgPool: pg.Pool | null = null;
@@ -458,25 +411,14 @@ const openai = process.env.OPENAI_API_KEY
   : null;
 
 // ========== 3. SOCKET.IO HANDLERS ==========
-// In-memory grace period timers per technician userId (10 minutes)
-const technicianOfflineTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const GRACE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes
-
 io.on("connection", (socket) => {
   console.log(`⚡ [SOCKET] User connected: ${socket.id}`);
 
   socket.on("auth", async (userId) => {
-    socket.data.userId = userId;
     socket.join(userId);
-
-    // Cancel any pending offline timer if technician reconnects within grace period
-    if (technicianOfflineTimers.has(userId)) {
-      clearTimeout(technicianOfflineTimers.get(userId)!);
-      technicianOfflineTimers.delete(userId);
-      console.log(`🟢 [TECHNICIAN RECONNECTED] User ${userId} reconnected within grace period. Offline timer cancelled.`);
-    }
-
-    console.log(`👤 [SOCKET] User ${userId} connected and joined personal room`);
+    console.log(
+      `👤 [SOCKET] User ${userId} connected and joined personal room`,
+    );
   });
 
   socket.on("join_conversation", async (conversationId) => {
@@ -503,36 +445,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", async () => {
     console.log(`❌ [SOCKET] User disconnected: ${socket.id}`);
-    if (socket.data && socket.data.userId) {
-      const userId = socket.data.userId;
-      try {
-        const u = db.prepare("SELECT role, available, lastAvailableAt, workedHours FROM users WHERE id = ?").get(userId) as any;
-        if (u && (u.role === "technician" || u.role === "maintenance_tech")) {
-          // ✅ PRODUCTION-SAFE: Grace Period (10 minutes)
-          // Don't go offline immediately — wait 10 minutes.
-          // If the user reconnects (app resume, brief switch), timer cancels.
-          if (!technicianOfflineTimers.has(userId)) {
-            const timer = setTimeout(() => {
-              try {
-                const uNow = db.prepare("SELECT available, lastAvailableAt, workedHours FROM users WHERE id = ?").get(userId) as any;
-                if (uNow && uNow.available === 1 && uNow.lastAvailableAt) {
-                  const diffMs = Date.now() - new Date(uNow.lastAvailableAt).getTime();
-                  const diffHours = Math.max(0, diffMs / (1000 * 60 * 60));
-                  const newWorkedHours = Number(((uNow.workedHours || 0) + diffHours).toFixed(2));
-                  db.prepare("UPDATE users SET available = 0, lastAvailableAt = NULL, workedHours = ? WHERE id = ?").run(newWorkedHours, userId);
-                } else if (uNow) {
-                  db.prepare("UPDATE users SET available = 0, lastAvailableAt = NULL WHERE id = ?").run(userId);
-                }
-                console.log(`🔴 [TECHNICIAN OFFLINE] User ${userId} was offline for 10+ minutes. Availability set to 0.`);
-              } catch (e) {}
-              technicianOfflineTimers.delete(userId);
-            }, GRACE_PERIOD_MS);
-            technicianOfflineTimers.set(userId, timer);
-            console.log(`⏳ [GRACE PERIOD] Technician ${userId} disconnected. Will go offline in 10 minutes if not reconnected.`);
-          }
-        }
-      } catch (e) {}
-    }
+    // Handle offline status if needed
   });
 });
 
@@ -750,10 +663,6 @@ async function runMigrations() {
     image: "TEXT",
     text: "TEXT",
   });
-  await ensureColumns("posts", { status: "TEXT DEFAULT 'published'" });
-  await ensureColumns("content_posts", { status: "TEXT DEFAULT 'published'" });
-  await ensureColumns("reels", { status: "TEXT DEFAULT 'published'" });
-  await ensureColumns("repair_videos", { status: "TEXT DEFAULT 'published'" });
   await ensureColumns("users", {
     lastActive: "TEXT",
     available: "INTEGER DEFAULT 1",
@@ -3649,28 +3558,9 @@ app.post("/api/technician/availability", authenticateToken,async (req: any, res)
   try {
     const { available } = req.body;
     const isAvail = (available === true || available === 1 || available === '1' || available === 'true') ? 1 : 0;
-    const nowIso = new Date().toISOString();
-
-    const u = db.prepare("SELECT available, lastAvailableAt, workedHours FROM users WHERE id = ?").get(req.user.id) as any;
-    let newWorkedHours = u?.workedHours || 0;
-
-    if (isAvail === 0 && u?.available === 1 && u?.lastAvailableAt) {
-      const diffMs = Date.now() - new Date(u.lastAvailableAt).getTime();
-      const diffHours = Math.max(0, diffMs / (1000 * 60 * 60));
-      newWorkedHours = Number((newWorkedHours + diffHours).toFixed(2));
-    }
-
-    db.prepare("UPDATE users SET available = ?, lastAvailableAt = ?, workedHours = ? WHERE id = ?")
-      .run(isAvail, isAvail === 1 ? nowIso : null, newWorkedHours, req.user.id);
-
-    const updated = db.prepare("SELECT id, name, phone, email, role, status, available, workedHours FROM users WHERE id = ?").get(req.user.id);
-    res.json({
-      success: true,
-      available: isAvail,
-      workedHours: newWorkedHours,
-      user: updated,
-      message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴",
-    });
+    await db.prepare("UPDATE users SET available = ? WHERE id = ?").run(isAvail, req.user.id);
+    const updated = await db.prepare("SELECT id, name, phone, email, role, status, available FROM users WHERE id = ?").get(req.user.id);
+    res.json({ success: true, available: isAvail, user: updated, message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -4941,23 +4831,14 @@ app.post(
   },
 );
 
+// ========== TECHNICIANS ==========
 app.get("/api/technicians", async (req, res) => {
-  try {
-    const technicians = db
-      .prepare(
-        `SELECT id, name, avatar, bio, phone, role, status, verified, 
-                COALESCE(rating, 5.0) as rating, COALESCE(ratingCount, 0) as ratingCount, 
-                COALESCE(jobs, 0) as jobs, specialty, governorate, city, area, available 
-         FROM users 
-         WHERE (role = 'technician' OR role = 'maintenance_tech') 
-           AND (status = 'active' OR status IS NULL OR status = 'approved')
-         ORDER BY COALESCE(rating, 5.0) DESC, COALESCE(jobs, 0) DESC`,
-      )
-      .all();
-    res.json(technicians || []);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+  const technicians = db
+    .prepare(
+      "SELECT id, name, avatar, bio FROM users WHERE role = 'technician' OR role = 'maintenance_tech'",
+    )
+    .all();
+  res.json(technicians || []);
 });
 
 app.get("/api/technicians/by-specialty/:specialtyId", async (req, res) => {
@@ -5170,11 +5051,10 @@ app.get("/api/community/posts", authenticateToken,async (req: any, res) => {
         (SELECT COUNT(*) FROM post_comments WHERE postId = p.id) as commentsCount,
         (SELECT 1 FROM post_likes WHERE postId = p.id AND userId = ?) as isLiked
       FROM posts p LEFT JOIN users u ON p.userId = u.id
-      WHERE p.status = 'published' OR p.status = 'approved' OR p.status IS NULL OR p.userId = ?
       ORDER BY p.createdAt DESC LIMIT 50
     `,
       )
-      .all(req.user.id, req.user.id);
+      .all(req.user.id);
     res.json(posts || []);
   } catch (e: any) {
     res.json([]);
@@ -5186,10 +5066,13 @@ app.post("/api/posts", authenticateToken,async (req: any, res) => {
   if (!content && !image)
     return res.status(400).json({ error: "المحتوى مطلوب" });
   const role = req.user.role;
-  const isPrivileged = role === "owner" || role === "admin" || role === "manager" || role === "programmer" || role === "lead_developer";
-  const initialStatus = isPrivileged ? "published" : "pending_approval";
-
-  const dailyLimit = isPrivileged ? 9999 : (role === "seller" || role === "technician" ? 10 : 5);
+  const isAdminLike =
+    role === "owner" || role === "admin" || role === "manager";
+  const dailyLimit = isAdminLike
+    ? 9999
+    : role === "seller" || role === "technician"
+      ? 10
+      : 5;
   const today = new Date().toISOString().split("T")[0];
   try {
     const count = db
@@ -5207,7 +5090,7 @@ app.post("/api/posts", authenticateToken,async (req: any, res) => {
       .prepare("SELECT name, avatar FROM users WHERE id = ?")
       .get(req.user.id) as any;
     db.prepare(
-      "INSERT INTO posts (id, userId, userName, userAvatar, content, image, type, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO posts (id, userId, userName, userAvatar, content, image, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(
       id,
       req.user.id,
@@ -5216,17 +5099,9 @@ app.post("/api/posts", authenticateToken,async (req: any, res) => {
       content,
       image || null,
       type || "post",
-      initialStatus,
       new Date().toISOString(),
     );
-    res.json({
-      success: true,
-      id,
-      status: initialStatus,
-      message: isPrivileged
-        ? "تم نشر المنشور بنجاح"
-        : "تم إرسال المنشور، وسيتم نشره فور مراجعته والموافقة عليه من الإدارة أو المبرمج.",
-    });
+    res.json({ success: true, id });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -7692,203 +7567,6 @@ app.post(
   },
 );
 
-// ========== REELS ==========
-
-app.get("/api/reels", async (req: any, res) => {
-  try {
-    let currentUserId: string | null = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      try {
-        const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET) as any;
-        currentUserId = decoded.id;
-      } catch {}
-    }
-    const sql = currentUserId
-      ? "SELECT * FROM reels WHERE status = 'published' OR status = 'approved' OR status IS NULL OR userId = ? ORDER BY createdAt DESC"
-      : "SELECT * FROM reels WHERE status = 'published' OR status = 'approved' OR status IS NULL ORDER BY createdAt DESC";
-    const reels = currentUserId
-      ? db.prepare(sql).all(currentUserId)
-      : db.prepare(sql).all();
-    res.json(reels || []);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(
-  "/api/reels",
-  authenticateToken,
-  upload.single("video"), async (req: any, res) => {
-    const { caption } = req.body;
-    const id = `reel_${Date.now()}`;
-    const videoUrl = req.file ? `/uploads/${req.file.filename}` : (req.body.videoUrl || null);
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const role = req.user.role;
-    const isPrivileged = role === "owner" || role === "admin" || role === "manager" || role === "programmer" || role === "lead_developer";
-    const initialStatus = isPrivileged ? "published" : "pending_approval";
-
-    try {
-      db.prepare(
-        `INSERT INTO reels (id, userId, userName, userAvatar, videoUrl, caption, status, expiresAt, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        id,
-        req.user.id,
-        req.user.name,
-        req.user.avatar || null,
-        videoUrl,
-        caption || "",
-        initialStatus,
-        expiresAt,
-        new Date().toISOString(),
-      );
-      res.json({
-        success: true,
-        id,
-        status: initialStatus,
-        message: isPrivileged
-          ? "تم نشر فيديو الريلز بنجاح"
-          : "تم رفع الفيديو، وسيظهر للجميع فور مراجعته والموافقة عليه من الإدارة أو المبرمج.",
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-app.post("/api/reels/:id/like", authenticateToken,async (req: any, res) => {
-  try {
-    const existing = db
-      .prepare("SELECT * FROM reel_likes WHERE reelId = ? AND userId = ?")
-      .get(req.params.id, req.user.id);
-    if (existing) {
-      await db.prepare("DELETE FROM reel_likes WHERE reelId = ? AND userId = ?").run(
-        req.params.id,
-        req.user.id,
-      );
-      await db.prepare("UPDATE reels SET likes = likes - 1 WHERE id = ?").run(
-        req.params.id,
-      );
-    } else {
-      db.prepare("INSERT INTO reel_likes (reelId, userId) VALUES (?, ?)").run(
-        req.params.id,
-        req.user.id,
-      );
-      await db.prepare("UPDATE reels SET likes = likes + 1 WHERE id = ?").run(
-        req.params.id,
-      );
-    }
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ========== REPAIR VIDEOS ==========
-
-app.get("/api/repair-videos", async (req: any, res) => {
-  try {
-    const videos = db
-      .prepare("SELECT * FROM repair_videos WHERE status = 'published' OR status = 'approved' OR status IS NULL ORDER BY createdAt DESC")
-      .all();
-    res.json(videos || []);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(
-  "/api/repair-videos",
-  authenticateToken,
-  upload.single("video"), async (req: any, res) => {
-    const { title, duration, level, segments } = req.body;
-    const id = `vid_${Date.now()}`;
-    const videoUrl = req.file ? `/uploads/${req.file.filename}` : (req.body.videoUrl || null);
-    const role = req.user.role;
-    const isPrivileged = role === "owner" || role === "admin" || role === "manager" || role === "programmer" || role === "lead_developer";
-    const initialStatus = isPrivileged ? "published" : "pending_approval";
-
-    try {
-      db.prepare(
-        `INSERT INTO repair_videos (id, title, videoUrl, duration, level, segments, status, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        id,
-        title || 'فيديو صيانة جديد',
-        videoUrl,
-        duration || '05:00',
-        level || 'متوسط',
-        segments || 1,
-        initialStatus,
-        new Date().toISOString(),
-      );
-      res.json({
-        success: true,
-        id,
-        status: initialStatus,
-        message: isPrivileged
-          ? "تم نشر فيديو الصيانة بنجاح"
-          : "تم إرسال الفيديو، وسيظهر للمتابعين فور مراجعته والموافقة عليه من الإدارة أو المبرمج.",
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-// ========== PENDING MEDIA MANAGEMENT ==========
-
-app.get("/api/admin/pending-media", authenticateToken, requireAdmin, async (req: any, res) => {
-  try {
-    const pendingPosts = db.prepare("SELECT 'post' as itemType, id, userId, userName, userAvatar, content as title, image, createdAt FROM posts WHERE status = 'pending_approval'").all() as any[];
-    const pendingReels = db.prepare("SELECT 'reel' as itemType, id, userId, userName, userAvatar, caption as title, videoUrl, createdAt FROM reels WHERE status = 'pending_approval'").all() as any[];
-    const pendingVideos = db.prepare("SELECT 'video' as itemType, id, title, videoUrl, createdAt FROM repair_videos WHERE status = 'pending_approval'").all() as any[];
-    res.json([...pendingPosts, ...pendingReels, ...pendingVideos]);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/api/admin/pending-media/:type/:id/action", authenticateToken, requireAdmin, async (req: any, res) => {
-  try {
-    const { type, id } = req.params;
-    const { action } = req.body;
-    const newStatus = action === 'approve' ? 'published' : 'rejected';
-
-    let targetUserId = '';
-    if (type === 'post') {
-      db.prepare("UPDATE posts SET status = ? WHERE id = ?").run(newStatus, id);
-      try { db.prepare("UPDATE content_posts SET status = ? WHERE id = ?").run(newStatus, id); } catch (e) {}
-      const p = db.prepare("SELECT userId FROM posts WHERE id = ?").get(id) as any;
-      targetUserId = p?.userId;
-    } else if (type === 'reel') {
-      db.prepare("UPDATE reels SET status = ? WHERE id = ?").run(newStatus, id);
-      const r = db.prepare("SELECT userId FROM reels WHERE id = ?").get(id) as any;
-      targetUserId = r?.userId;
-    } else if (type === 'video') {
-      db.prepare("UPDATE repair_videos SET status = ? WHERE id = ?").run(newStatus, id);
-    }
-
-    if (targetUserId) {
-      const notifTitle = action === 'approve' ? '🎉 تمت الموافقة على نشر محتواك!' : '❌ لم تتم الموافقة على النشر';
-      const notifMsg = action === 'approve'
-        ? 'تمت مراجعة منشورك/فيديو الصيانة بنجاح وإتاحة نشره للجميع في مركز الإعلام.'
-        : 'نأسف، لم يتم إجازة المحتوى للنشر لعدم استيفاء ضوابط النشر.';
-      try {
-        db.prepare(`
-          INSERT INTO notifications (id, userId, title, message, type, read, createdAt)
-          VALUES (?, ?, ?, ?, 'media_review', 0, datetime('now'))
-        `).run(`notif_media_${Date.now()}`, targetUserId, notifTitle, notifMsg);
-      } catch (e) {}
-    }
-
-    res.json({ success: true, message: action === 'approve' ? 'تمت الموافقة ونشر المحتوى بنجاح' : 'تم رفض المحتوى وتحديث الحالة' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ========== CATEGORIES (ADMIN) ==========
 app.put(
   "/api/categories/:id", authenticateToken,requireAdmin,async (req: any, res) => {
@@ -10170,25 +9848,6 @@ app.get("/api/technicians/:id/specialties", authenticateToken,async (req, res) =
   res.json([{ id: 1, name: "غسالات" }, { id: 2, name: "تكييف" }]);
 });
 
-
-// ─── GLOBAL ERROR HANDLER & UNHANDLED REJECTION CATCHER ───────────────
-app.use((err: any, req: any, res: any, _next: any) => {
-  console.error(`❌ [SERVER ERROR] ${req.method} ${req.url}:`, err.stack || err.message || err);
-  if (!res.headersSent) {
-    res.status(err.status || err.statusCode || 500).json({
-      error: err.message || "حدث خطأ غير متوقع في خادم المنظومة.",
-      success: false,
-    });
-  }
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  console.warn("⚠️ [WARNING] Unhandled Promise Rejection at:", promise, "reason:", reason);
-});
-
-process.on("uncaughtException", (err) => {
-  console.error("❌ [CRITICAL] Uncaught Exception thrown:", err);
-});
 
 async function startServer() {
   try {
