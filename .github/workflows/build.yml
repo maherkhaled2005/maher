@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  EXPO_PUBLIC_API_URL: https://sunshine-hereby-ski-category.trycloudflare.com/api
+  EXPO_PUBLIC_SOCKET_URL: https://sunshine-hereby-ski-category.trycloudflare.com
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,6 +36,9 @@ jobs:
           npm install
 
       - name: Prebuild Android
+        env:
+          EXPO_PUBLIC_API_URL: https://sunshine-hereby-ski-category.trycloudflare.com/api
+          EXPO_PUBLIC_SOCKET_URL: https://sunshine-hereby-ski-category.trycloudflare.com
         run: |
           cd mobile
           npx expo prebuild --platform android --clean
@@ -45,6 +52,9 @@ jobs:
         run: chmod +x mobile/android/gradlew
 
       - name: Build APK
+        env:
+          EXPO_PUBLIC_API_URL: https://sunshine-hereby-ski-category.trycloudflare.com/api
+          EXPO_PUBLIC_SOCKET_URL: https://sunshine-hereby-ski-category.trycloudflare.com
         run: |
           cd mobile/android
           ./gradlew assembleRelease --no-daemon

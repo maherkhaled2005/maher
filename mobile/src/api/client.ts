@@ -7,20 +7,28 @@ const getBaseURL = () => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
     return 'http://' + window.location.hostname + ':5000/api';
   }
-  return process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5000/api';
+  return (
+    process.env.EXPO_PUBLIC_API_URL ||
+    'https://sunshine-hereby-ski-category.trycloudflare.com/api' ||
+    'http://10.128.200.45:5000/api'
+  );
 };
 
 export const SOCKET_URL = (() => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
     return 'http://' + window.location.hostname + ':5000';
   }
-  return process.env.EXPO_PUBLIC_SOCKET_URL || 'http://10.0.2.2:5000';
+  return (
+    process.env.EXPO_PUBLIC_SOCKET_URL ||
+    'https://sunshine-hereby-ski-category.trycloudflare.com' ||
+    'http://10.128.200.45:5000'
+  );
 })();
 
 export const api = axios.create({
   baseURL: getBaseURL(),
   headers: { 'Content-Type': 'application/json' },
-  timeout: 35000,
+  timeout: 7000, // 7 seconds fast timeout to prevent infinite spinner hanging
 });
 
 // Interceptor: إضافة الـ Token (يقرأ من tr_token أو auth-storage)
@@ -42,21 +50,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor: معالجة 401 و 403 (الحظر) + إعادة المحاولة عند انقطاع الشبكة المؤقت
+// Interceptor: معالجة 401 و 403 (الحظر) + إعادة محاولة سريعة واحدة فقط
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const config = error.config;
     
-    // إعادة محاولة تلقائية في حالة انقطاع الاتصال المؤقت (حتى 2 محاولة)
+    // إعادة محاولة سريعة واحدة عند حدوث خطأ شبكة لتجنب الانتظار الطويل
     if (error.code === 'ECONNABORTED' || error.message?.includes('Network Error') || !error.response) {
       if (!config._retryCount) {
         config._retryCount = 1;
-        await new Promise((res) => setTimeout(res, 1000));
-        return api(config);
-      } else if (config._retryCount < 2) {
-        config._retryCount += 1;
-        await new Promise((res) => setTimeout(res, 2000));
+        await new Promise((res) => setTimeout(res, 500));
         return api(config);
       }
     }
@@ -99,4 +103,5 @@ export const uploadFile = async (endpoint: string, file: any) => {
 };
 
 export default api;
+
 
