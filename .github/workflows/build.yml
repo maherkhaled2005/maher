@@ -1,0 +1,57 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Install dependencies
+        run: |
+          cd mobile
+          npm install
+
+      - name: Prebuild Android
+        run: |
+          cd mobile
+          npx expo prebuild --platform android --clean
+
+      - name: Optimize Build Config & Memory
+        run: |
+          sed -i 's/reactNativeArchitectures=.*/reactNativeArchitectures=arm64-v8a,armeabi-v7a/g' mobile/android/gradle.properties
+          sed -i 's/org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=768m -XX:+UseG1GC/g' mobile/android/gradle.properties
+
+      - name: Make gradlew executable
+        run: chmod +x mobile/android/gradlew
+
+      - name: Build APK
+        run: |
+          cd mobile/android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
