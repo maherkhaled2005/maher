@@ -458,15 +458,25 @@ const openai = process.env.OPENAI_API_KEY
   : null;
 
 // ========== 3. SOCKET.IO HANDLERS ==========
+// In-memory grace period timers per technician userId (10 minutes)
+const technicianOfflineTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const GRACE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes
+
 io.on("connection", (socket) => {
   console.log(`⚡ [SOCKET] User connected: ${socket.id}`);
 
   socket.on("auth", async (userId) => {
     socket.data.userId = userId;
     socket.join(userId);
-    console.log(
-      `👤 [SOCKET] User ${userId} connected and joined personal room`,
-    );
+
+    // Cancel any pending offline timer if technician reconnects within grace period
+    if (technicianOfflineTimers.has(userId)) {
+      clearTimeout(technicianOfflineTimers.get(userId)!);
+      technicianOfflineTimers.delete(userId);
+      console.log(`🟢 [TECHNICIAN RECONNECTED] User ${userId} reconnected within grace period. Offline timer cancelled.`);
+    }
+
+    console.log(`👤 [SOCKET] User ${userId} connected and joined personal room`);
   });
 
   socket.on("join_conversation", async (conversationId) => {
@@ -493,9 +503,36 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", async () => {
     console.log(`❌ [SOCKET] User disconnected: ${socket.id}`);
-    // NOTE: Auto-offline on socket disconnect has been DISABLED.
-    // Technician availability is persistent and only changes manually via the toggle switch.
-    // This prevents "Network Error" and session reset when the user temporarily leaves the app.
+    if (socket.data && socket.data.userId) {
+      const userId = socket.data.userId;
+      try {
+        const u = db.prepare("SELECT role, available, lastAvailableAt, workedHours FROM users WHERE id = ?").get(userId) as any;
+        if (u && (u.role === "technician" || u.role === "maintenance_tech")) {
+          // ✅ PRODUCTION-SAFE: Grace Period (10 minutes)
+          // Don't go offline immediately — wait 10 minutes.
+          // If the user reconnects (app resume, brief switch), timer cancels.
+          if (!technicianOfflineTimers.has(userId)) {
+            const timer = setTimeout(() => {
+              try {
+                const uNow = db.prepare("SELECT available, lastAvailableAt, workedHours FROM users WHERE id = ?").get(userId) as any;
+                if (uNow && uNow.available === 1 && uNow.lastAvailableAt) {
+                  const diffMs = Date.now() - new Date(uNow.lastAvailableAt).getTime();
+                  const diffHours = Math.max(0, diffMs / (1000 * 60 * 60));
+                  const newWorkedHours = Number(((uNow.workedHours || 0) + diffHours).toFixed(2));
+                  db.prepare("UPDATE users SET available = 0, lastAvailableAt = NULL, workedHours = ? WHERE id = ?").run(newWorkedHours, userId);
+                } else if (uNow) {
+                  db.prepare("UPDATE users SET available = 0, lastAvailableAt = NULL WHERE id = ?").run(userId);
+                }
+                console.log(`🔴 [TECHNICIAN OFFLINE] User ${userId} was offline for 10+ minutes. Availability set to 0.`);
+              } catch (e) {}
+              technicianOfflineTimers.delete(userId);
+            }, GRACE_PERIOD_MS);
+            technicianOfflineTimers.set(userId, timer);
+            console.log(`⏳ [GRACE PERIOD] Technician ${userId} disconnected. Will go offline in 10 minutes if not reconnected.`);
+          }
+        }
+      } catch (e) {}
+    }
   });
 });
 
