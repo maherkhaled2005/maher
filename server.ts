@@ -4882,14 +4882,23 @@ app.post(
   },
 );
 
-// ========== TECHNICIANS ==========
 app.get("/api/technicians", async (req, res) => {
-  const technicians = db
-    .prepare(
-      "SELECT id, name, avatar, bio FROM users WHERE role = 'technician' OR role = 'maintenance_tech'",
-    )
-    .all();
-  res.json(technicians || []);
+  try {
+    const technicians = db
+      .prepare(
+        `SELECT id, name, avatar, bio, phone, role, status, verified, 
+                COALESCE(rating, 5.0) as rating, COALESCE(ratingCount, 0) as ratingCount, 
+                COALESCE(jobs, 0) as jobs, specialty, governorate, city, area, available 
+         FROM users 
+         WHERE (role = 'technician' OR role = 'maintenance_tech') 
+           AND (status = 'active' OR status IS NULL OR status = 'approved')
+         ORDER BY COALESCE(rating, 5.0) DESC, COALESCE(jobs, 0) DESC`,
+      )
+      .all();
+    res.json(technicians || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/technicians/by-specialty/:specialtyId", async (req, res) => {
