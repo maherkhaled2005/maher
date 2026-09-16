@@ -3608,6 +3608,162 @@ app.post("/api/technician/reels", authenticateToken,async (req: any, res) => {
   }
 });
 
+// ─── REELS INTERACTIONS ─────────────────────────────────────────────
+app.post("/api/reels", authenticateToken, async (req: any, res) => {
+  try {
+    const { videoUrl, description, title } = req.body;
+    if (!videoUrl) return res.status(400).json({ error: "رابط الفيديو مطلوب" });
+    const id = `reel_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO reels (id, userId, userName, videoUrl, description, createdAt)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `).run(id, req.user.id, req.user.name || 'مستخدم', videoUrl, description || title || '');
+    res.json({ success: true, id, message: "تم نشر فيديو الريلز بنجاح! 🚀" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/reels/:id/like", authenticateToken, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare("SELECT * FROM reel_likes WHERE reelId = ? AND userId = ?").get(id, req.user.id);
+    if (existing) {
+      db.prepare("DELETE FROM reel_likes WHERE reelId = ? AND userId = ?").run(id, req.user.id);
+      db.prepare("UPDATE reels SET likesCount = MAX(0, COALESCE(likesCount, 0) - 1) WHERE id = ?").run(id);
+      res.json({ liked: false });
+    } else {
+      db.prepare("INSERT INTO reel_likes (reelId, userId, createdAt) VALUES (?, ?, datetime('now'))").run(id, req.user.id);
+      db.prepare("UPDATE reels SET likesCount = COALESCE(likesCount, 0) + 1 WHERE id = ?").run(id);
+      res.json({ liked: true });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── COURSE ENROLLMENT (80% AUTHOR / 20% PLATFORM SPLIT) ─────────────
+app.post("/api/courses/:id/enroll", authenticateToken, async (req: any, res) => {
+  try {
+    const courseId = req.params.id;
+    const userId = req.user.id;
+
+    // 1. Check if already purchased
+    const existing = db.prepare("SELECT * FROM course_purchases WHERE courseId = ? AND userId = ?").get(courseId, userId);
+    if (existing) {
+      return res.json({ success: true, enrolled: true, message: "أنت مشترك بالفعل في هذا الكورس" });
+    }
+
+    // 2. Fetch Course & Buyer
+    const course = db.prepare("SELECT * FROM courses WHERE id = ?").get(courseId) as any;
+    if (!course) return res.status(404).json({ error: "الكورس غير موجود" });
+
+    const buyer = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+    const price = Number(course.price || 0);
+
+    if (price > 0) {
+      const buyerBalance = Number(buyer?.balance || 0);
+      if (buyerBalance < price) {
+        return res.status(400).json({ error: `رصيد المحفظة (${buyerBalance} ج.م) غير كافٍ للاشتراك في الكورس (${price} ج.م)` });
+      }
+
+      // Deduct from buyer
+      db.prepare("UPDATE users SET balance = MAX(0, balance - ?) WHERE id = ?").run(price, userId);
+
+      // Record buyer transaction
+      db.prepare(`
+        INSERT INTO transactions (id, userId, type, amount, description, referenceId, status, createdAt)
+        VALUES (?, ?, 'payment', ?, ?, ?, 'completed', datetime('now'))
+      `).run(`tx_${Date.now()}`, userId, price, `شراء كورس تعليمي: ${course.title}`, courseId);
+
+      // 80% to Instructor / 20% to Platform
+      const instructorId = course.instructorId;
+      if (instructorId) {
+        const instructorShare = Math.round(price * 0.80);
+        db.prepare("UPDATE users SET balance = COALESCE(balance, 0) + ? WHERE id = ?").run(instructorShare, instructorId);
+        db.prepare(`
+          INSERT INTO transactions (id, userId, type, amount, description, referenceId, status, createdAt)
+          VALUES (?, ?, 'earning', ?, ?, ?, 'completed', datetime('now'))
+        `).run(`tx_inst_${Date.now()}`, instructorId, instructorShare, `أرباح كورس (80%): ${course.title}`, courseId);
+      }
+    }
+
+    // Insert course purchase
+    db.prepare(`
+      INSERT INTO course_purchases (id, courseId, userId, pricePaid, createdAt)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run(`cp_${Date.now()}`, courseId, userId, price);
+
+    // Update enrolledCount
+    db.prepare("UPDATE courses SET enrolledCount = COALESCE(enrolledCount, 0) + 1 WHERE id = ?").run(courseId);
+
+    res.json({ success: true, enrolled: true, message: "تم الاشتراك في الكورس بنجاح! 🚀" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── OFFLINE VIDEOS (48-HOUR EXPIRED LIBRARY) ─────────────────────────
+app.get("/api/user/offline-videos", authenticateToken, async (req: any, res) => {
+  try {
+    // Automatically purge videos downloaded > 48 hours ago
+    db.prepare(`
+      DELETE FROM saved_offline_videos 
+      WHERE userId = ? AND (
+        expiresAt < datetime('now') 
+        OR strftime('%s', 'now') - strftime('%s', downloadedAt) > 172800
+      )
+    `).run(req.user.id);
+
+    const rows = db.prepare("SELECT * FROM saved_offline_videos WHERE userId = ? ORDER BY downloadedAt DESC").all(req.user.id);
+    res.json(rows || []);
+  } catch (err: any) {
+    res.json([]);
+  }
+});
+
+app.post("/api/user/offline-videos", authenticateToken, async (req: any, res) => {
+  try {
+    const { videoId, videoTitle, localUri, fileSizeMb } = req.body;
+    if (!videoId || !videoTitle) return res.status(400).json({ error: "بيانات الفيديو غير مكتملة" });
+
+    // Check if already saved
+    const existing = db.prepare("SELECT * FROM saved_offline_videos WHERE userId = ? AND videoId = ?").get(req.user.id, videoId);
+    if (existing) {
+      return res.json({ success: true, message: "الفيديو متاح بالفعل في مكتبتك بدون إنترنت ⚡" });
+    }
+
+    const id = `off_${Date.now()}`;
+    const downloadedAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(); // 48 hours
+    const size = Number(fileSizeMb) || 45.2;
+
+    db.prepare(`
+      INSERT INTO saved_offline_videos (id, userId, videoId, videoTitle, localUri, fileSizeMb, downloadedAt, expiresAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, req.user.id, videoId, videoTitle, localUri || 'offline_cached.mp4', size, downloadedAt, expiresAt);
+
+    res.json({ 
+      success: true, 
+      id, 
+      expiresAt, 
+      fileSizeMb: size, 
+      message: "تم حفظ الفيديو للمشاهدة بدون إنترنت لمدة 48 ساعة! ⚡" 
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/user/offline-videos/:id", authenticateToken, async (req: any, res) => {
+  try {
+    db.prepare("DELETE FROM saved_offline_videos WHERE id = ? AND userId = ?").run(req.params.id, req.user.id);
+    res.json({ success: true, message: "تم حذف الفيديو من المكتبة" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // ─── CUSTOMER ENDPOINTS ────────────────────────────────────────────────
 
