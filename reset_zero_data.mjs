@@ -4,23 +4,49 @@ const db = new Database("tecnorexa.db");
 
 console.log("🧹 Resetting transient test data for zero-mock production state...");
 
-// Clear transient test tables
-db.prepare("DELETE FROM transactions").run();
-db.prepare("DELETE FROM orders").run();
-db.prepare("DELETE FROM order_items").run();
-db.prepare("DELETE FROM support_tickets").run();
-db.prepare("DELETE FROM support_messages").run();
-db.prepare("DELETE FROM support_requests").run();
-db.prepare("DELETE FROM subscriptions").run();
-db.prepare("DELETE FROM notifications").run();
-db.prepare("DELETE FROM content_posts").run();
-db.prepare("DELETE FROM reels").run();
-db.prepare("DELETE FROM reel_likes").run();
-db.prepare("DELETE FROM audit_logs").run();
-db.prepare("DELETE FROM upgrade_requests").run();
-db.prepare("DELETE FROM approval_requests").run();
+try {
+  // Clear transient test tables
+  const tablesToClear = [
+    "transactions",
+    "orders",
+    "order_items",
+    "support_tickets",
+    "support_messages",
+    "support_requests",
+    "subscriptions",
+    "notifications",
+    "content_posts",
+    "reels",
+    "reel_likes",
+    "audit_logs",
+    "upgrade_requests",
+    "approval_requests",
+    "trade_requests",
+    "repair_orders",
+    "wallet_transactions",
+    "cash_withdrawals",
+    "merchant_subscriptions",
+    "developer_bugs",
+    "saved_offline_videos",
+    "developer_banned_users",
+    "technician_specialties"
+  ];
 
-// Reset balances and jobs for core users
-db.prepare("UPDATE users SET balance = 0, jobs = 0, points = 0").run();
+  for (const tbl of tablesToClear) {
+    try {
+      db.prepare(`DELETE FROM ${tbl}`).run();
+    } catch (e) {
+      // Table might not exist yet
+    }
+  }
 
-console.log("✅ Zero-data reset complete! All revenue, subscriptions, orders, and balances are reset to 0.");
+  // Remove non-essential technician users so initial technician count is 0
+  db.prepare("DELETE FROM users WHERE role = 'technician'").run();
+
+  // Reset balances, jobs, ratings, and ban status for remaining core users
+  db.prepare("UPDATE users SET balance = 0, jobs = 0, points = 0, banned = 0, status = 'active', banReason = NULL").run();
+
+  console.log("✅ Zero-data reset complete! All revenue, subscriptions, orders, logs, and technician list reset to 0.");
+} catch (err) {
+  console.error("Error during reset:", err);
+}

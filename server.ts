@@ -3244,6 +3244,10 @@ app.post("/api/programmer/ban-user", authenticateToken,async (req: any, res) => 
       return res.status(403).json({ error: 'صلاحية الحظر المباشر مقتصرة على القائد ماهر أو إدارة المنصة.' });
     }
     const { userId, reason } = req.body;
+    const targetUser = await db.prepare("SELECT id, role FROM users WHERE id = ?").get(userId) as any;
+    if (targetUser && (targetUser.role === 'owner' || userId === req.user.id || userId === 'owner_master')) {
+      return res.status(400).json({ error: 'لا يمكن حظر حساب المالك الرئيسي للمنظومة 🛡️' });
+    }
     await db.prepare("UPDATE users SET status = 'banned', banned = 1, banReason = ? WHERE id = ?").run(reason || 'مخالفة أمنية برمجية', userId);
     const banId = `ban_${Date.now()}`;
     db.prepare("INSERT INTO developer_banned_users (id, userId, bannedBy, reason, createdAt) VALUES (?, ?, ?, ?, datetime('now'))").run(
@@ -4638,9 +4642,13 @@ app.put(
           .json({ error: "لا يمكنك تعديل صلاحيات المدير أو المالك" });
       }
 
-      await db.prepare("UPDATE users SET role = ?, status = ? WHERE id = ?").run(
+      const finalStatus = status || oldUser.status;
+      const isBannedFlag = (finalStatus === 'banned' || finalStatus === 'suspended') ? 1 : 0;
+      await db.prepare("UPDATE users SET role = ?, status = ?, banned = ?, banReason = ? WHERE id = ?").run(
         normalizedTargetRole,
-        status || oldUser.status,
+        finalStatus,
+        isBannedFlag,
+        isBannedFlag === 1 ? 'حظر إداري' : null,
         targetId,
       );
       const logId = `audit_${Date.now()}`;
@@ -9647,10 +9655,10 @@ app.put("/api/owner/users/:id/ban", authenticateToken, requireOwner, async (req:
     const targetId = req.params.id;
     const targetUser = await db.prepare("SELECT id, role, name FROM users WHERE id = ?").get(targetId) as any;
     if (!targetUser) return res.status(404).json({ error: "المستخدم غير موجود" });
-    if (targetUser.role === 'owner' || targetId === req.user.id) {
+    if (targetUser.role === 'owner' || targetId === req.user.id || targetId === 'owner_master') {
       return res.status(400).json({ error: "لا يمكن حظر حساب المالك الرئيسي للمنظومة 🛡️" });
     }
-    await db.prepare("UPDATE users SET status = 'banned' WHERE id = ?").run(targetId);
+    await db.prepare("UPDATE users SET status = 'banned', banned = 1, banReason = 'حظر إداري' WHERE id = ?").run(targetId);
     res.json({ success: true, message: `تم حظر حساب (${targetUser.name}) بنجاح` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -9663,8 +9671,27 @@ app.put("/api/owner/users/:id/unban", authenticateToken, requireOwner, async (re
     const targetId = req.params.id;
     const targetUser = await db.prepare("SELECT id, name FROM users WHERE id = ?").get(targetId) as any;
     if (!targetUser) return res.status(404).json({ error: "المستخدم غير موجود" });
-    await db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(targetId);
+    await db.prepare("UPDATE users SET status = 'active', banned = 0, banReason = NULL WHERE id = ?").run(targetId);
     res.json({ success: true, message: `تم فك حظر حساب (${targetUser.name}) بنجاح` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Self account deletion
+app.delete("/api/user/account", authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = normalizeRoleServer(req.user.role);
+    if (userRole === 'owner' || userId === 'owner_master') {
+      return res.status(400).json({ error: "لا يمكن حذف حساب المالك الرئيسي للمنظومة" });
+    }
+    await db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+    const logId = `audit_${Date.now()}`;
+    db.prepare(
+      "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'SELF_ACCOUNT_DELETE', ?, ?, '{}', ?)"
+    ).run(logId, userId, userId, new Date().toISOString());
+    res.json({ success: true, message: "تم حذف الحساب بنجاح" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
