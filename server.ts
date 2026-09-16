@@ -343,39 +343,43 @@ app.use((req: any, res: any, next: any) => {
       )
       .get() as any;
     if (isMaintenance && isMaintenance.value === "true") {
-      // Always allow these paths (auth, admin, health)
-      const allowedPaths = [
-        "/api/auth",
-        "/api/admin",
-        "/api/settings",
-        "/api/ops",
-        "/api/me",
-        "/api/health",
-        "/api/owner",
-        "/api/notifications",
-        "/uploads",
-      ];
-      if (!allowedPaths.some((p) => req.path.startsWith(p))) {
-        // Check if user is owner or programmer (allow them through)
-        try {
-          const authHeader = req.headers.authorization || "";
-          if (authHeader.startsWith("Bearer ")) {
-            const token = authHeader.slice(7);
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as any;
-            const role = normalizeRoleShared(decoded?.role || "");
-            if (role === "owner" || role === "programmer") {
-              return next(); // Owner/programmer bypass maintenance mode
-            }
-          }
-        } catch (_jwtErr) {
-          // Invalid token - fall through to maintenance error
-        }
-        return res.status(503).json({
-          error:
-            "الموقع حالياً في وضع الصيانة المباشرة للتحديث والترقية. يرجى المحاولة لاحقاً.",
-          maintenance: true,
-        });
+      // Exclude static assets/uploads or health check
+      if (req.path.startsWith("/uploads") || req.path === "/api/health") {
+        return next();
       }
+
+      // Extract and verify user token
+      let userRole = '';
+      try {
+        const authHeader = req.headers.authorization || "";
+        if (authHeader.startsWith("Bearer ")) {
+          const token = authHeader.slice(7);
+          const decoded = jwt.verify(token, JWT_SECRET) as any;
+          userRole = normalizeRoleShared(decoded?.role || "");
+        }
+      } catch (_e) {}
+
+      // ONLY Owner and Programmer can access system during Maintenance Mode
+      if (userRole === "owner" || userRole === "programmer") {
+        return next();
+      }
+
+      // Allow login and maintenance setting endpoints so Owner/Programmer can authenticate and toggle maintenance mode
+      if (
+        req.path === "/api/auth/login" ||
+        req.path === "/api/settings/maintenance" ||
+        req.path === "/api/owner/system/maintenance" ||
+        req.path === "/api/settings"
+      ) {
+        return next();
+      }
+
+      // Block ALL other users and endpoints with 503 Service Unavailable
+      return res.status(503).json({
+        error: "🛠️ المنظومة حالياً في وضع الصيانة الفنية والتحديث البرمجي الأمني. يرجى العودة لاحقاً.",
+        maintenance: true,
+        maintenanceMode: true,
+      });
     }
   } catch (e) {
     // Ignore during boot
