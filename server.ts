@@ -70,6 +70,13 @@ const authLimiter = rateLimit({
 
 app.use("/api/auth", authLimiter);
 
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
+});
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
+});
+
 // Root portal & Auto-redirect to Frontend UI
 app.get("/", async (req: any, res) => {
   if (req.accepts("html")) {
