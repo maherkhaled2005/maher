@@ -493,22 +493,9 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", async () => {
     console.log(`❌ [SOCKET] User disconnected: ${socket.id}`);
-    if (socket.data && socket.data.userId) {
-      try {
-        const u = db.prepare("SELECT role, available, lastAvailableAt, workedHours FROM users WHERE id = ?").get(socket.data.userId) as any;
-        if (u && (u.role === "technician" || u.role === "maintenance_tech")) {
-          if (u.available === 1 && u.lastAvailableAt) {
-            const diffMs = Date.now() - new Date(u.lastAvailableAt).getTime();
-            const diffHours = Math.max(0, diffMs / (1000 * 60 * 60));
-            const newWorkedHours = Number(((u.workedHours || 0) + diffHours).toFixed(2));
-            db.prepare("UPDATE users SET available = 0, lastAvailableAt = NULL, workedHours = ? WHERE id = ?").run(newWorkedHours, socket.data.userId);
-          } else {
-            db.prepare("UPDATE users SET available = 0, lastAvailableAt = NULL WHERE id = ?").run(socket.data.userId);
-          }
-          console.log(`🔴 [TECHNICIAN AUTO-OFFLINE] User ${socket.data.userId} closed app/disconnected. Availability set to 0.`);
-        }
-      } catch (e) {}
-    }
+    // NOTE: Auto-offline on socket disconnect has been DISABLED.
+    // Technician availability is persistent and only changes manually via the toggle switch.
+    // This prevents "Network Error" and session reset when the user temporarily leaves the app.
   });
 });
 
