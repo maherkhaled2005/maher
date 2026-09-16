@@ -1249,12 +1249,6 @@ app.post("/api/auth/login", async (req, res) => {
         isBanned: true,
       });
     }
-    if (user.role === 'technician' && (user.status === 'pending_approval' || user.status === 'pending' || user.verified === 0)) {
-      return res.status(403).json({
-        error: "⏳ حساب الفني قيد المراجعة والاعتماد من قبل إدارة المنصة. سيتم إخطارك وتفعيل دخولك فور موافقة المدير.",
-        isPending: true,
-      });
-    }
     const { password: _pw, otp: _otp, otpExpires: _e, ...safeUser } = user;
     const frontendUser = { ...safeUser, verified: safeUser.verified === 1 };
     const token = jwt.sign(
@@ -1708,18 +1702,12 @@ const handleTechUpgradeAction = async (req: any, res: any) => {
     const performerRole = req.user?.role || 'owner';
     const user = await db.prepare("SELECT name FROM users WHERE id = ?").get(userId) as any;
     if (action === 'approve') {
-      await db.prepare("UPDATE users SET role = 'technician', status = 'active', verified = 1, specialtyPending = 0 WHERE id = ?").run(userId);
+      await db.prepare("UPDATE users SET role = 'technician', specialtyPending = 0 WHERE id = ?").run(userId);
       try {
-        const notifId = `notif_${Date.now()}`;
-        db.prepare(`
-          INSERT INTO notifications (id, userId, title, message, type, read, createdAt)
-          VALUES (?, ?, '🎉 تم القبول والاعتماد!', 'تهانينا! تم قبول وتوثيق طلبك كفني معتمد على منصة TecnoRexa. يمكنك الآن الدخول وتخصيص إعدادات حسابك واستقبال طلبات الصيانة.', 'upgrade_approved', 0, datetime('now'))
-        `).run(notifId, userId);
-
         db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
           .run(`audit_${Date.now()}`, 'ترقية فني 300 ج.م', userId, performerRole, `الموافقة على ترقية ${user?.name || userId} إلى فني معتمد واستلام رسوم 300 ج.م`, new Date().toISOString());
       } catch (e) {}
-      res.json({ success: true, message: `تمت ترقية ${user?.name || 'المستخدم'} إلى كادر الفنيين المعتمدين بنجاح` });
+      res.json({ success: true, message: `تمت ترقية ${user?.name || 'المستخدم'} إلى كادر الفنيين بنجاح` });
     } else {
       await db.prepare("UPDATE users SET specialtyPending = 0 WHERE id = ?").run(userId);
       try {
