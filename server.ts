@@ -462,6 +462,7 @@ io.on("connection", (socket) => {
   console.log(`⚡ [SOCKET] User connected: ${socket.id}`);
 
   socket.on("auth", async (userId) => {
+    socket.data.userId = userId;
     socket.join(userId);
     console.log(
       `👤 [SOCKET] User ${userId} connected and joined personal room`,
@@ -492,7 +493,22 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", async () => {
     console.log(`❌ [SOCKET] User disconnected: ${socket.id}`);
-    // Handle offline status if needed
+    if (socket.data && socket.data.userId) {
+      try {
+        const u = db.prepare("SELECT role, available, lastAvailableAt, workedHours FROM users WHERE id = ?").get(socket.data.userId) as any;
+        if (u && (u.role === "technician" || u.role === "maintenance_tech")) {
+          if (u.available === 1 && u.lastAvailableAt) {
+            const diffMs = Date.now() - new Date(u.lastAvailableAt).getTime();
+            const diffHours = Math.max(0, diffMs / (1000 * 60 * 60));
+            const newWorkedHours = Number(((u.workedHours || 0) + diffHours).toFixed(2));
+            db.prepare("UPDATE users SET available = 0, lastAvailableAt = NULL, workedHours = ? WHERE id = ?").run(newWorkedHours, socket.data.userId);
+          } else {
+            db.prepare("UPDATE users SET available = 0, lastAvailableAt = NULL WHERE id = ?").run(socket.data.userId);
+          }
+          console.log(`🔴 [TECHNICIAN AUTO-OFFLINE] User ${socket.data.userId} closed app/disconnected. Availability set to 0.`);
+        }
+      } catch (e) {}
+    }
   });
 });
 
@@ -3609,9 +3625,28 @@ app.post("/api/technician/availability", authenticateToken,async (req: any, res)
   try {
     const { available } = req.body;
     const isAvail = (available === true || available === 1 || available === '1' || available === 'true') ? 1 : 0;
-    await db.prepare("UPDATE users SET available = ? WHERE id = ?").run(isAvail, req.user.id);
-    const updated = await db.prepare("SELECT id, name, phone, email, role, status, available FROM users WHERE id = ?").get(req.user.id);
-    res.json({ success: true, available: isAvail, user: updated, message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴" });
+    const nowIso = new Date().toISOString();
+
+    const u = db.prepare("SELECT available, lastAvailableAt, workedHours FROM users WHERE id = ?").get(req.user.id) as any;
+    let newWorkedHours = u?.workedHours || 0;
+
+    if (isAvail === 0 && u?.available === 1 && u?.lastAvailableAt) {
+      const diffMs = Date.now() - new Date(u.lastAvailableAt).getTime();
+      const diffHours = Math.max(0, diffMs / (1000 * 60 * 60));
+      newWorkedHours = Number((newWorkedHours + diffHours).toFixed(2));
+    }
+
+    db.prepare("UPDATE users SET available = ?, lastAvailableAt = ?, workedHours = ? WHERE id = ?")
+      .run(isAvail, isAvail === 1 ? nowIso : null, newWorkedHours, req.user.id);
+
+    const updated = db.prepare("SELECT id, name, phone, email, role, status, available, workedHours FROM users WHERE id = ?").get(req.user.id);
+    res.json({
+      success: true,
+      available: isAvail,
+      workedHours: newWorkedHours,
+      user: updated,
+      message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴",
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
