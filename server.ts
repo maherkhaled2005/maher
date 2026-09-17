@@ -725,6 +725,8 @@ async function runMigrations() {
     updatedAt: "TEXT",
   });
   await ensureColumns("orders", {
+    technicianName: "TEXT",
+    technicianPhone: "TEXT",
     trackingNumber: "TEXT",
     report: "TEXT",
     serviceReport: "TEXT",
@@ -3574,8 +3576,7 @@ app.get("/api/technician/overview", authenticateToken, async (req: any, res) => 
     const ratingCount = ratingRow?.cnt ? Number(ratingRow.cnt) : (user.ratingCount ? Number(user.ratingCount) : 0);
     const workedHours = Number(user.workedHours || (completedOrders * 1.5) || 0);
 
-    res.json({
-      success: true,
+    const kpis = {
       pendingRequests,
       activeOrders,
       completedOrders,
@@ -3585,6 +3586,12 @@ app.get("/api/technician/overview", authenticateToken, async (req: any, res) => 
       overallRating,
       ratingCount,
       workedHours,
+    };
+
+    res.json({
+      success: true,
+      ...kpis,
+      kpis,
       available: Boolean(user.available !== undefined ? user.available : 1),
       availabilityStatus: user.availabilityStatus || (user.available ? 'available' : 'unavailable'),
       specialty: user.specialty || 'صيانة أجهزة منزلية',
@@ -5359,10 +5366,32 @@ app.delete(
 
 // User wallet endpoint (must precede /api/user/:id)
 app.get("/api/user/wallet", authenticateToken,async (req: any, res) => {
-  const u = db
-    .prepare("SELECT balance FROM users WHERE id = ?")
-    .get(req.user.id) as any;
-  res.json({ balance: u?.balance || 0 });
+  try {
+    const u = db
+      .prepare("SELECT balance FROM users WHERE id = ?")
+      .get(req.user.id) as any;
+    const txs = db
+      .prepare("SELECT * FROM transactions WHERE userId = ? ORDER BY createdAt DESC LIMIT 50")
+      .all(req.user.id);
+    res.json({ balance: Number(u?.balance || 0), transactions: txs || [] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Topup wallet
+app.post("/api/user/wallet/topup", authenticateToken, async (req: any, res) => {
+  const amount = Number(req.body.amount);
+  if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: "المبلغ غير صالح" });
+  try {
+    db.prepare("UPDATE users SET balance = COALESCE(balance, 0) + ? WHERE id = ?").run(amount, req.user.id);
+    const txnId = `tx_topup_${Date.now()}`;
+    db.prepare("INSERT INTO transactions (id, userId, type, amount, description, status, createdAt) VALUES (?, ?, 'topup', ?, 'شحن رصيد المحفظة', 'completed', datetime('now'))").run(txnId, req.user.id, amount);
+    const u = db.prepare("SELECT balance FROM users WHERE id = ?").get(req.user.id) as any;
+    res.json({ success: true, balance: Number(u?.balance || 0), message: "تم شحن المحفظة بنجاح" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Legacy admin user routes (keep for compatibility)
@@ -9709,7 +9738,10 @@ app.get("/api/user/wallet", authenticateToken,async (req: any, res) => {
     const user = db
       .prepare("SELECT balance FROM users WHERE id = ?")
       .get(req.user.id) as any;
-    res.json({ balance: user?.balance || 0 });
+    const txs = db
+      .prepare("SELECT * FROM transactions WHERE userId = ? ORDER BY createdAt DESC LIMIT 50")
+      .all(req.user.id);
+    res.json({ balance: Number(user?.balance || 0), transactions: txs || [] });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
