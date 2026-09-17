@@ -2,10 +2,10 @@ const BASE_URL = `http://localhost:${process.env.PORT || 5000}/api`;
 
 const ROLES = [
   { role: 'owner', phone: '01000000001', pass: 'Owner@123456' },
-  { role: 'programmer', phone: '01000000002', pass: 'Maher@123456' },
+  { role: 'programmer', phone: '01064739664', pass: 'Maher@123456' },
   { role: 'manager', phone: '01000000003', pass: 'Manager@123456' },
   { role: 'customer_support', phone: '01000000004', pass: 'Support@123456' },
-  { role: 'technician', phone: '01011112222', pass: 'Password123' },
+  { role: 'technician', phone: '01000000005', pass: 'Tech@123456' },
   { role: 'merchant', phone: '01000000006', pass: 'Merchant@123456' },
   { role: 'customer', phone: '01000000007', pass: 'Customer@123456' },
 ];

@@ -35,7 +35,16 @@ const normalizeRoleShared = (role: string): string => {
   if (r === "manager") return "manager";
   if (r === "technician" || r === "tech") return "technician";
   if (r === "merchant" || r === "seller") return "merchant";
-  if (r === "programmer" || r === "developer" || r === "dev") return "programmer";
+  if (
+    r === "programmer" ||
+    r === "developer" ||
+    r === "dev" ||
+    r === "assistant_programmer" ||
+    r === "programmer_assistant" ||
+    r === "programmer_lead" ||
+    r === "programmer_junior"
+  )
+    return "programmer";
   if (r === "customer_support" || r === "support") return "customer_support";
   return "customer";
 };
@@ -170,7 +179,7 @@ app.get("/api/admin/categories", authenticateToken,requireAdmin,async (req, res)
   }
 });
 
-app.get("/api/users", async (req, res) => {
+app.get("/api/users", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const rows = await db.prepare("SELECT id, name, role, email, phone, status, verified, balance, createdAt FROM users ORDER BY createdAt DESC").all();
     res.json(rows || []);
@@ -341,7 +350,7 @@ app.use((req: any, res: any, next: any) => {
           const authHeader = req.headers.authorization || "";
           if (authHeader.startsWith("Bearer ")) {
             const token = authHeader.slice(7);
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as any;
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || "tecnorexa-super-production-jwt-secret-2026-fallback") as any;
             const role = normalizeRoleShared(decoded?.role || "");
             if (role === "owner" || role === "programmer") {
               return next(); // Owner/programmer bypass maintenance mode
@@ -526,6 +535,8 @@ async function runMigrations() {
     CREATE TABLE IF NOT EXISTS campaigns (id TEXT PRIMARY KEY, name TEXT, type TEXT, targetRole TEXT, title TEXT, message TEXT, status TEXT DEFAULT 'draft', sentCount INTEGER DEFAULT 0, scheduledAt TEXT, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS cart (id TEXT, userId TEXT NOT NULL, productId TEXT NOT NULL, quantity INTEGER DEFAULT 1, createdAt TEXT, PRIMARY KEY (userId, productId));
     CREATE TABLE IF NOT EXISTS verification_codes (id TEXT PRIMARY KEY, phone TEXT NOT NULL, code TEXT NOT NULL, type TEXT DEFAULT 'login', expiresAt TEXT NOT NULL, verified INTEGER DEFAULT 0, attempts INTEGER DEFAULT 0, createdAt TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS service_quotes (id TEXT PRIMARY KEY, orderId TEXT NOT NULL, technicianId TEXT NOT NULL, laborCost REAL DEFAULT 0, partsCost REAL DEFAULT 0, inspectionFee REAL DEFAULT 0, totalAmount REAL NOT NULL, notes TEXT, status TEXT DEFAULT 'pending', createdAt TEXT, updatedAt TEXT);
+    CREATE TABLE IF NOT EXISTS service_reports (id TEXT PRIMARY KEY, orderId TEXT NOT NULL, technicianId TEXT NOT NULL, deviceType TEXT, deviceBrand TEXT, deviceModel TEXT, diagnosis TEXT NOT NULL, repairAction TEXT NOT NULL, partsUsed TEXT, beforePhotos TEXT, afterPhotos TEXT, warrantyDays INTEGER DEFAULT 30, customerSignature TEXT, createdAt TEXT);
 
     CREATE VIEW IF NOT EXISTS tickets AS SELECT * FROM support_tickets;
     CREATE VIEW IF NOT EXISTS reviews AS SELECT * FROM technician_reviews;
@@ -572,6 +583,10 @@ async function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_support_requests_clientId ON support_requests(clientId);
     CREATE INDEX IF NOT EXISTS idx_support_requests_status ON support_requests(status);
     CREATE INDEX IF NOT EXISTS idx_support_requests_technicianId ON support_requests(assignedTechnicianId);
+    CREATE INDEX IF NOT EXISTS idx_service_quotes_orderId ON service_quotes(orderId);
+    CREATE INDEX IF NOT EXISTS idx_service_quotes_technicianId ON service_quotes(technicianId);
+    CREATE INDEX IF NOT EXISTS idx_service_reports_orderId ON service_reports(orderId);
+    CREATE INDEX IF NOT EXISTS idx_service_reports_technicianId ON service_reports(technicianId);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_performedBy ON audit_logs(performedBy);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_createdAt ON audit_logs(createdAt);
     CREATE INDEX IF NOT EXISTS idx_ai_usage_userId ON ai_usage(userId);
@@ -681,7 +696,11 @@ async function runMigrations() {
   await ensureColumns("users", {
     lastActive: "TEXT",
     available: "INTEGER DEFAULT 1",
+    availabilityStatus: "TEXT DEFAULT 'available'",
+    workedHours: "REAL DEFAULT 0",
+    rating: "REAL DEFAULT 0",
     ratingCount: "INTEGER DEFAULT 0",
+    specialty: "TEXT",
     governorate: "TEXT",
     city: "TEXT",
     area: "TEXT",
@@ -708,10 +727,29 @@ async function runMigrations() {
   await ensureColumns("orders", {
     trackingNumber: "TEXT",
     report: "TEXT",
+    serviceReport: "TEXT",
     partsCost: "REAL DEFAULT 0",
     notes: "TEXT",
     rating: "REAL",
+    quoteId: "TEXT",
+    reportId: "TEXT",
+    deviceType: "TEXT",
+    deviceBrand: "TEXT",
+    deviceModel: "TEXT",
+    problemDesc: "TEXT",
+    governorate: "TEXT",
+    warrantyDays: "INTEGER DEFAULT 30",
+    confirmedByClientAt: "TEXT",
     updatedAt: "TEXT",
+  });
+  await ensureColumns("technician_reviews", {
+    orderId: "TEXT",
+  });
+  await ensureColumns("courses", {
+    instructorId: "TEXT",
+    instructorName: "TEXT",
+    status: "TEXT DEFAULT 'active'",
+    enrolledCount: "INTEGER DEFAULT 0",
   });
   await ensureColumns("developer_tasks", {
     updatedAt: "TEXT",
@@ -802,13 +840,14 @@ async function runMigrations() {
       { id: "programmer", name: "المبرمج 💻", description: "المبرمج - مراقبة النظام والأخطاء" },
       { id: "customer_support", name: "خدمة العملاء 💬", description: "خدمة العملاء - إدارة التذاكر والطلبات" },
       { id: "technician", name: "فني صيانة 🔧", description: "الفني - الطلبات والمحتوى والسوق" },
+      { id: "merchant", name: "تاجر 🏪", description: "التاجر - إدارة المنتجات والمتجر (رسوم توثيق 100 ج.م)" },
       { id: "customer", name: "عميل", description: "العميل - الحد الأدنى من الصلاحيات" },
     ];
     const insertRole = db.prepare(
       "INSERT OR IGNORE INTO roles (id, name, description) VALUES (?, ?, ?)",
     );
     for (const r of seedRoles) insertRole.run(r.id, r.name, r.description);
-    console.log("✅ [SEED] Default roles inserted");
+    console.log("✅ [SEED] Default roles inserted (7 roles)");
   }
 
   const permCount = db
@@ -1045,17 +1084,18 @@ async function runMigrations() {
     .prepare("SELECT COUNT(*) as c FROM specialties")
     .get() as any;
   if (!specCount || specCount.c === 0) {
+    // 🛡️ Technician domain is Home Appliances ONLY (no plumbing, general electrical, mobile, laptop)
     const defaultSpecs = [
       { id: "spec_ac", name: "تكييف وتبريد", category: "cooling" },
-      { id: "spec_washer", name: "غسالات", category: "appliances" },
-      { id: "spec_fridge", name: "ثلاجات وفريزرات", category: "cooling" },
-      { id: "spec_tv", name: "تلفزيونات وشاشات", category: "electronics" },
-      { id: "spec_mobile", name: "موبايلات وتابلت", category: "electronics" },
-      { id: "spec_laptop", name: "لابتوب وكمبيوتر", category: "electronics" },
-      { id: "spec_electric", name: "كهرباء وسلك", category: "electrical" },
-      { id: "spec_plumbing", name: "سباكة ومياه", category: "plumbing" },
-      { id: "spec_kitchen", name: "أجهزة مطبخ", category: "appliances" },
-      { id: "spec_solar", name: "طاقة شمسية", category: "energy" },
+      { id: "spec_washer", name: "غسالات ملابس", category: "appliances" },
+      { id: "spec_fridge", name: "ثلاجات وديب فريزر", category: "cooling" },
+      { id: "spec_tv", name: "شاشات وتلفزيونات منزلية", category: "electronics" },
+      { id: "spec_dishwasher", name: "غسالات أطباق", category: "appliances" },
+      { id: "spec_oven", name: "أفران وبوتاجازات", category: "appliances" },
+      { id: "spec_microwave", name: "ميكروويف وقلايات", category: "appliances" },
+      { id: "spec_heater", name: "سخانات مياه منزلية", category: "appliances" },
+      { id: "spec_kitchen", name: "أجهزة مطبخ منزلية", category: "appliances" },
+      { id: "spec_vacuum", name: "مكانس ومعدات تنظيف منزلية", category: "appliances" },
     ];
     const insertSpec = db.prepare(
       "INSERT OR IGNORE INTO specialties (id, name, category) VALUES (?, ?, ?)",
@@ -1063,7 +1103,11 @@ async function runMigrations() {
     for (const s of defaultSpecs) {
       insertSpec.run(s.id, s.name, s.category);
     }
-    console.log("✅ [SEED] Default specialties inserted");
+    // Delete any non-home appliance specialties if previously inserted
+    try {
+      db.prepare("DELETE FROM specialties WHERE id IN ('spec_mobile', 'spec_laptop', 'spec_electric', 'spec_plumbing', 'spec_solar')").run();
+    } catch {}
+    console.log("✅ [SEED] Home appliance specialties inserted (strictly home appliances only)");
   }
 
   // Seed default 7 official role accounts if not present
@@ -1098,119 +1142,12 @@ async function runMigrations() {
 }
 
 // ========== 5. AUTH ROUTES ==========
-app.post("/api/auth/quick-access", async (req: any, res) => {
-  const { role } = req.body;
-  // Normalize legacy role names to new system
-  const roleMap: Record<string, string> = {
-    developer: "programmer",
-    dev: "programmer",
-    programmer_lead: "programmer_lead",
-    programmer_assistant: "programmer_assistant",
-    programmer_junior: "programmer_junior",
-    admin: "manager",
-    seller: "merchant",
-    user: "customer",
-    client: "customer",
-    support: "customer_support",
-    content_creator: "technician",
-  };
-  const normalizedRole = roleMap[role] || role;
-  const allowedRoles = new Set([
-    "owner",
-    "manager",
-    "programmer",
-    "programmer_lead",
-    "programmer_assistant",
-    "programmer_junior",
-    "customer_support",
-    "technician",
-    "merchant",
-    "customer",
-  ]);
+// ─── QUICK ACCESS ENDPOINT REMOVED ──────────────────────────────────────────
+// This endpoint was removed for security reasons.
+// It allowed login without password which is a critical vulnerability.
+// Use /api/auth/login with proper credentials instead.
 
-  if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
-    return res.status(400).json({ error: "الدور غير مدعوم" });
-  }
 
-  const roleLabels: Record<string, string> = {
-    owner: "المالك",
-    manager: "المدير",
-    programmer: "المسؤول التقني (ماهر)",
-    programmer_lead: "المسؤول التقني (ماهر)",
-    programmer_assistant: "المبرمج المساعد",
-    programmer_junior: "المبرمج العادي",
-    customer_support: "خدمة العملاء",
-    technician: "فني معتمد",
-    merchant: "تاجر معتمد",
-    customer: "عميل",
-  };
-
-  let user: any = null;
-  if (normalizedRole === 'programmer_assistant') {
-    user = db.prepare("SELECT * FROM users WHERE id = 'programmer_assistant' OR (role = 'programmer' AND developerRank = 'assistant') ORDER BY createdAt DESC LIMIT 1").get();
-  } else if (normalizedRole === 'programmer_junior') {
-    user = db.prepare("SELECT * FROM users WHERE id = 'programmer_junior' OR (role = 'programmer' AND developerRank = 'junior') ORDER BY createdAt DESC LIMIT 1").get();
-  } else if (normalizedRole === 'programmer_lead' || normalizedRole === 'programmer') {
-    user = db.prepare("SELECT * FROM users WHERE id = 'programmer_lead' OR (role = 'programmer' AND (developerRank = 'lead' OR phone = '01064739664')) ORDER BY createdAt DESC LIMIT 1").get();
-  } else {
-    user = db.prepare("SELECT * FROM users WHERE role = ? ORDER BY createdAt DESC LIMIT 1").get(normalizedRole);
-  }
-
-  if (user && (user.status === 'banned' || user.status === 'suspended')) {
-    return res.status(403).json({
-      error: `🚫 تم حظر حساب رتبة (${roleLabels[normalizedRole] || normalizedRole}) بقرار إداري من إدارة المنصة.`,
-      isBanned: true
-    });
-  }
-
-  if (!user) {
-    const officialFallback: Record<string, any> = {
-      owner: { id: 'owner_master', name: 'المهندس خالد محمد', phone: '01000000001', role: 'owner', email: 'owner@tecnorexa.com', balance: 0, specialty: 'المالك والمشرف العام', developerRank: 'none' },
-      programmer: { id: 'programmer_lead', name: 'المهندس ماهر خالد', phone: '01064739664', role: 'programmer', email: 'maher@tecnorexa.com', balance: 0, specialty: 'المبرمج وقائد التطوير', developerRank: 'lead' },
-      manager: { id: 'manager_lead', name: 'المدير التنفيذي', phone: '01000000003', role: 'manager', email: 'manager@tecnorexa.com', balance: 0, specialty: 'الإدارة والتشغيل', developerRank: 'none' },
-      customer_support: { id: 'support_lead', name: 'فريق خدمة العملاء', phone: '01000000004', role: 'customer_support', email: 'support@tecnorexa.com', balance: 0, specialty: 'الدعم الفني وخدمة العملاء', developerRank: 'none' },
-      technician: { id: 'tech_lead', name: 'فني صيانة معتمد', phone: '01000000005', role: 'technician', email: 'tech@tecnorexa.com', balance: 0, specialty: 'تكييف وتبريد ❄️', isPro: 1, developerRank: 'none' },
-      merchant: { id: 'merchant_lead', name: 'تاجر قطع الغيار المعتمد', phone: '01000000006', role: 'merchant', email: 'merchant@tecnorexa.com', balance: 0, storeName: 'متجر ريكسا الهندسي', developerRank: 'none' },
-      customer: { id: 'customer_lead', name: 'عميل المنصة المعتمد', phone: '01000000007', role: 'customer', email: 'customer@tecnorexa.com', balance: 0, specialty: 'عميل مميز', developerRank: 'none' },
-    };
-
-    if (officialFallback[normalizedRole]) {
-      const fb = officialFallback[normalizedRole];
-      try {
-        const hash = bcrypt.hashSync(`${fb.role.charAt(0).toUpperCase() + fb.role.slice(1)}@123456`, 10);
-        db.prepare(`
-          INSERT INTO users (id, name, phone, email, role, developerRank, password, status, verified, balance, specialty, isPro, createdAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, datetime('now'))
-          ON CONFLICT(id) DO UPDATE SET role = excluded.role, verified = 1, phone = excluded.phone, developerRank = excluded.developerRank
-        `).run(fb.id, fb.name, fb.phone, fb.email, fb.role, fb.developerRank || 'none', hash, fb.balance, fb.specialty || '', fb.isPro ? 1 : 0);
-        user = await db.prepare("SELECT * FROM users WHERE id = ?").get(fb.id);
-      } catch (seedErr) {
-        console.warn("Auto-heal quick-access seed error:", seedErr);
-      }
-    }
-  }
-
-  if (!user) {
-    return res.status(404).json({ error: "لا يوجد حساب مسجل بهذا الدور حالياً في النظام" });
-  }
-
-  if (user.status === 'banned' || user.status === 'suspended') {
-    return res.status(403).json({
-      error: `🚫 تم حظر حساب رتبة (${roleLabels[normalizedRole] || normalizedRole}) بقرار إداري من إدارة المنصة.`,
-      isBanned: true
-    });
-  }
-
-  const { password: _pw, otp: _otp, otpExpires: _e, ...safeUser } = user;
-  const frontendUser = { ...safeUser, verified: safeUser.verified === 1 };
-  const token = jwt.sign(
-    { id: user.id, role: user.role, name: user.name },
-    JWT_SECRET,
-    { expiresIn: "30d" },
-  );
-
-  res.json({ success: true, token, user: frontendUser });
-});
 
 // GET /api/public-stats — Public statistics for Landing Screen
 app.get("/api/public-stats", async (req, res) => {
@@ -1251,11 +1188,7 @@ app.post("/api/auth/login", async (req, res) => {
     .prepare("SELECT * FROM users WHERE email = ? OR phone = ? OR phone = ? OR phone LIKE ?")
     .get(loginIdentifier, loginIdentifier, normalizedPhone, `%${normalizedPhone.slice(-10)}%`) as any;
 
-  if (!user && (normalizedPhone === '01064739664' || normalizedPhone === '01000000002')) {
-    user = await db.prepare("SELECT * FROM users WHERE id = 'programmer_lead'").get() as any;
-  }
-
-  const pwValid = user && (await bcrypt.compare(password, user.password) || (user.id === 'programmer_lead' && (password === 'Maher@123456' || password === 'Maher@2026!')));
+  const pwValid = user && (await bcrypt.compare(password, user.password));
 
   if (user && pwValid) {
     if (user.status === 'banned' || user.status === 'suspended') {
@@ -1442,8 +1375,8 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
-    const isDevMasterOtp = cleanOtp === '123456';
-    const isValid = (user.otp === cleanOtp && expiresAt >= Date.now()) || isDevMasterOtp;
+    // 🛡️ Strict OTP verification (No master backdoor)
+    const isValid = user.otp === cleanOtp && expiresAt >= Date.now();
 
     if (!isValid) {
       return res.status(401).json({ error: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
@@ -1457,11 +1390,10 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     const updatedName = name ? name : user.name || phone;
-    const updatedRole = role || user.role || "customer";
-
+    // 🛡️ Do NOT allow role elevation during OTP verification (keep existing user.role)
     await db.prepare(
-      "UPDATE users SET verified = 1, otp = NULL, otpExpires = NULL, name = ?, role = ? WHERE id = ?",
-    ).run(updatedName, updatedRole, user.id);
+      "UPDATE users SET verified = 1, otp = NULL, otpExpires = NULL, name = ? WHERE id = ?",
+    ).run(updatedName, user.id);
 
     user = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id) as any;
     const { password: _pw, otp: _otp, otpExpires: _otpExp, ...safeUser } = user;
@@ -1501,7 +1433,11 @@ app.post("/api/auth/register", async (req, res) => {
 
     const userId = `user_${Date.now()}`;
     const hashedPassword = await bcrypt.hash(password, 10);
-    const assignedRole = role || "customer";
+
+    // 🛡️ Privilege Escalation Prevention: Only non-administrative roles can be registered publicly
+    const allowedPublicRoles = ['customer', 'technician', 'merchant'];
+    const normalizedReqRole = normalizeRoleShared(role || 'customer');
+    const assignedRole = allowedPublicRoles.includes(normalizedReqRole) ? normalizedReqRole : 'customer';
 
     // Generate 6-digit verification confirmation code
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -1583,16 +1519,8 @@ function authenticateToken(req: any, res: any, next: any) {
   const token = req.headers["authorization"]?.split(" ")[1];
   if (!token) return res.status(401).json({ error: "Unauthorized" });
   jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
-    if (err) {
-      // Try old token for backwards compatibility
-      const OLD_JWT_SECRET = "technorexa_2025_secret_legacy";
-      jwt.verify(token, OLD_JWT_SECRET, (err2: any, user2: any) => {
-        if (err2) return res.status(403).json({ error: "Invalid Token" });
-        verifyAccountStatus(user2, req, res, next);
-      });
-    } else {
-      verifyAccountStatus(user, req, res, next);
-    }
+    if (err) return res.status(403).json({ error: "Invalid or expired token" });
+    verifyAccountStatus(user, req, res, next);
   });
 }
 
@@ -1895,13 +1823,15 @@ app.get("/api/finance/revenue", async (req, res) => {
 
 // ─── 100% REAL SQLITE OWNER & ADMIN STATS ────────────────────────────────────
 
-app.get("/api/owner/overview", async (req, res) => {
+app.get("/api/owner/overview", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const period = (req.query.period as string) || '7d';
     let dateFilter = "datetime('now', '-7 days')";
-    if (period === '30d') dateFilter = "datetime('now', '-30 days')";
+    if (period === 'today') dateFilter = "datetime('now', 'start of day')";
+    else if (period === '30d') dateFilter = "datetime('now', '-30 days')";
     else if (period === '3m') dateFilter = "datetime('now', '-90 days')";
     else if (period === '1y') dateFilter = "datetime('now', '-365 days')";
+    else if (period === 'all') dateFilter = "datetime('now', '-50 years')";
     else if (period === 'custom') dateFilter = "datetime('now', '-30 days')";
 
     // 1. Total Revenue from DB (Orders + Subscriptions + Courses)
@@ -2274,14 +2204,14 @@ app.post("/api/orders/:id/reassign", authenticateToken,requireAdmin,async (req, 
   }
 });
 
-app.post("/api/orders/:id/status", async (req, res) => {
+app.post("/api/orders/:id/status", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { status } = req.body;
     const orderId = req.params.id;
     await db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(status, orderId);
     try {
       db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
-        .run(`audit_${Date.now()}`, 'تحديث حالة طلب', orderId, 'owner', `تم تغيير حالة الطلب #${orderId} إلى ${status}`, new Date().toISOString());
+        .run(`audit_${Date.now()}`, 'تحديث حالة طلب', orderId, req.user.id, `تم تغيير حالة الطلب #${orderId} إلى ${status}`, new Date().toISOString());
     } catch (e) {}
     res.json({ success: true, message: 'تم تحديث حالة الطلب بنجاح' });
   } catch (err: any) {
@@ -2389,7 +2319,7 @@ app.put("/api/products/:id", authenticateToken, requireOwner, async (req, res) =
 
 // ─── OWNER ADVANCED OPERATIONAL APIS ─────────────────────────────────────────
 
-app.get("/api/owner/withdrawals", async (req, res) => {
+app.get("/api/owner/withdrawals", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const rows = db.prepare(`
       SELECT t.id, t.userId, t.type, t.amount, t.description, t.referenceId, t.status, t.createdAt,
@@ -2405,7 +2335,7 @@ app.get("/api/owner/withdrawals", async (req, res) => {
   }
 });
 
-app.post("/api/owner/withdrawals/:id/action", async (req, res) => {
+app.post("/api/owner/withdrawals/:id/action", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const txId = req.params.id;
     const { action, reason } = req.body;
@@ -2435,7 +2365,7 @@ app.post("/api/owner/withdrawals/:id/action", async (req, res) => {
   }
 });
 
-app.post("/api/owner/wallet/adjust", async (req, res) => {
+app.post("/api/owner/wallet/adjust", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const { userId, amount, type, reason } = req.body;
     if (!userId || !amount || !reason) {
@@ -2449,7 +2379,7 @@ app.post("/api/owner/wallet/adjust", async (req, res) => {
 
     try {
       db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
-        .run(`audit_${Date.now()}`, 'تعديل رصيد يدوي', userId, 'owner', `تعديل رصيد (${delta > 0 ? '+' : ''}${delta} ج.م) للسبب: ${reason}`, new Date().toISOString());
+        .run(`audit_${Date.now()}`, 'تعديل رصيد يدوي', userId, req.user.id, `تعديل رصيد (${delta > 0 ? '+' : ''}${delta} ج.م) للسبب: ${reason}`, new Date().toISOString());
     } catch (e) {}
 
     const updated = await db.prepare("SELECT balance FROM users WHERE id = ?").get(userId) as any;
@@ -2459,27 +2389,39 @@ app.post("/api/owner/wallet/adjust", async (req, res) => {
   }
 });
 
-app.get("/api/owner/system/settings", async (req, res) => {
+app.get("/api/owner/system/settings", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const rows = await db.prepare("SELECT key, value FROM system_settings").all() as any[];
     const settings: Record<string, string> = {};
-    rows.forEach(r => { settings[r.key] = r.value; });
+    // Never expose sensitive keys - mask them
+    const sensitiveKeys = ['jwt_secret', 'stripe_secret', 'gemini_api_key', 'openai_api_key', 'twilio_auth', 'taqnyat_token'];
+    rows.forEach(r => {
+      if (sensitiveKeys.some(sk => r.key.toLowerCase().includes(sk))) {
+        settings[r.key] = r.value ? '••••••••' : '';
+      } else {
+        settings[r.key] = r.value;
+      }
+    });
     res.json(settings);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.put("/api/owner/system/settings", async (req, res) => {
+app.put("/api/owner/system/settings", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const settings = req.body;
+    // Block direct updates to sensitive keys through this endpoint
+    const blockedKeys = ['jwt_secret', 'stripe_secret', 'gemini_api_key', 'openai_api_key'];
     const upsert = db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)");
     Object.keys(settings).forEach(k => {
-      upsert.run(k, String(settings[k]));
+      if (!blockedKeys.includes(k.toLowerCase())) {
+        upsert.run(k, String(settings[k]));
+      }
     });
     try {
       db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
-        .run(`audit_${Date.now()}`, 'تحديث إعدادات النظام', 'system', 'owner', 'تحديث الإعدادات العامة وبوابات الدفع والعمولات', new Date().toISOString());
+        .run(`audit_${Date.now()}`, 'تحديث إعدادات النظام', 'system', req.user.id, 'تحديث الإعدادات العامة للمنصة', new Date().toISOString());
     } catch (e) {}
     res.json({ success: true, message: 'تم حفظ إعدادات النظام بنجاح' });
   } catch (err: any) {
@@ -2487,14 +2429,14 @@ app.put("/api/owner/system/settings", async (req, res) => {
   }
 });
 
-app.post("/api/owner/system/maintenance", async (req, res) => {
+app.post("/api/owner/system/maintenance", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const { enabled } = req.body;
     const val = enabled ? 'true' : 'false';
     db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('maintenance_mode', ?)").run(val);
     try {
       db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
-        .run(`audit_${Date.now()}`, 'وضع الصيانة العام', 'system', 'owner', enabled ? 'المالك قام بتفعيل وضع الصيانة للمنصة' : 'المالك قام بإلغاء وضع الصيانة', new Date().toISOString());
+        .run(`audit_${Date.now()}`, 'وضع الصيانة العام', 'system', req.user.id, enabled ? 'تفعيل وضع الصيانة للمنصة' : 'إلغاء وضع الصيانة واستئناف العمل', new Date().toISOString());
     } catch (e) {}
     res.json({ success: true, maintenanceMode: enabled, message: enabled ? 'تم تفعيل وضع الصيانة للمنصة' : 'تم إلغاء وضع الصيانة واستئناف العمل' });
   } catch (err: any) {
@@ -2502,12 +2444,12 @@ app.post("/api/owner/system/maintenance", async (req, res) => {
   }
 });
 
-app.post("/api/owner/audit-logs/clean", async (req, res) => {
+app.post("/api/owner/audit-logs/clean", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const info = db.prepare("DELETE FROM audit_logs WHERE createdAt < datetime('now', '-6 month')").run();
     try {
       db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
-        .run(`audit_${Date.now()}`, 'تنظيف سجل العمليات', 'audit_logs', 'owner', `تنظيف السجلات الأقدم من 6 أشهر (تم حذف ${info.changes} سجل)`, new Date().toISOString());
+        .run(`audit_${Date.now()}`, 'تنظيف سجل العمليات', 'audit_logs', req.user.id, `تنظيف السجلات الأقدم من 6 أشهر (تم حذف ${info.changes} سجل)`, new Date().toISOString());
     } catch (e) {}
     res.json({ success: true, deletedCount: info.changes, message: `تم تنظيف السجل وحذف ${info.changes} سجل بنجاح` });
   } catch (err: any) {
@@ -2515,7 +2457,7 @@ app.post("/api/owner/audit-logs/clean", async (req, res) => {
   }
 });
 
-app.post("/api/owner/categories/reorder", async (req, res) => {
+app.post("/api/owner/categories/reorder", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { categoryIds } = req.body;
     if (Array.isArray(categoryIds)) {
@@ -2530,7 +2472,7 @@ app.post("/api/owner/categories/reorder", async (req, res) => {
   }
 });
 
-app.get("/api/owner/notifications", async (req, res) => {
+app.get("/api/owner/notifications", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const notifications = await db.prepare("SELECT * FROM notifications ORDER BY createdAt DESC LIMIT 100").all();
     const broadcasts = await db.prepare("SELECT * FROM notifications WHERE userId = 'broadcast' ORDER BY createdAt DESC").all();
@@ -2587,10 +2529,10 @@ const handleBroadcastNotification = async (req: any, res: any) => {
   }
 };
 
-app.post("/api/owner/notifications/broadcast", handleBroadcastNotification);
-app.post("/api/notifications/broadcast", authenticateToken, handleBroadcastNotification);
+app.post("/api/owner/notifications/broadcast", authenticateToken, requireOwner, handleBroadcastNotification);
+app.post("/api/notifications/broadcast", authenticateToken, requireAdmin, handleBroadcastNotification);
 
-app.post("/api/owner/notifications/read-all", async (req, res) => {
+app.post("/api/owner/notifications/read-all", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     await db.prepare("UPDATE notifications SET read = 1").run();
     res.json({ success: true, message: 'تم تحديد جميع الإشعارات كمقروءة' });
@@ -2599,7 +2541,7 @@ app.post("/api/owner/notifications/read-all", async (req, res) => {
   }
 });
 
-app.post("/api/owner/notifications/:id/read", async (req, res) => {
+app.post("/api/owner/notifications/:id/read", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     await db.prepare("UPDATE notifications SET read = 1 WHERE id = ?").run(req.params.id);
     res.json({ success: true, message: 'تم تحديث حالة الإشعار' });
@@ -2743,7 +2685,7 @@ app.get("/api/manager/ticket-distribution", async (req, res) => {
   }
 });
 
-app.get("/api/trade-requests", async (req, res) => {
+app.get("/api/trade-requests", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const dbReqs = await db.prepare("SELECT * FROM approval_requests ORDER BY createdAt DESC").all() as any[];
     if (dbReqs && dbReqs.length > 0) {
@@ -2785,7 +2727,8 @@ app.post("/api/trade-requests", async (req: any, res) => {
 
     const { type, specialty, notes, customerName, phone, senderPhone, transferReceipt } = req.body;
     const reqType = type === "merchant" ? "merchant" : "technician";
-    const fee = reqType === "merchant" ? 500 : 300;
+    // 🛡️ Official Fees: 100 EGP for Merchant, 300 EGP for Technician
+    const fee = reqType === "merchant" ? 100 : 300;
     const newId = `TR-${Date.now().toString().slice(-4)}`;
     const newReq = {
       id: newId,
@@ -2811,16 +2754,16 @@ app.post("/api/trade-requests", async (req: any, res) => {
       db.prepare(`
         INSERT INTO upgrade_requests (id, userId, userName, userPhone, requestedRole, feePaid, receiptImage, senderPhone, status, adminNotes, createdAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'))
-      `).run(newId, userId, customerName || userName, phone || userPhone, reqType, fee, transferReceipt || null, senderPhone || phone || userPhone, notes || "طلب ترقية حساب");
+      `).run(newId, userId, customerName || userName, phone || userPhone, reqType, fee, transferReceipt || null, senderPhone || phone || userPhone, notes || null);
     } catch (e) {}
 
-    res.json({ success: true, message: "تم إرسال طلب الترقية بنجاح لمراجعة الإدارة.", request: newReq });
+    res.json({ success: true, id: newId, message: "تم إرسال طلب الترقية للمراجعة بنجاح وسيتم اعتماده قريباً." });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post("/api/trade-requests/:id/approve", authenticateToken,requireAdmin,async (req: any, res) => {
+app.post("/api/trade-requests/:id/approve", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
     let reqItem: any = null;
@@ -2835,23 +2778,31 @@ app.post("/api/trade-requests/:id/approve", authenticateToken,requireAdmin,async
 
     if (reqItem) {
       const newRole = reqItem.type === 'merchant' ? 'merchant' : 'technician';
-      await db.prepare(
-        "UPDATE users SET role = ?, status = 'active', isPro = 1, verified = 1 WHERE phone = ? OR name = ? OR id = ?"
-      ).run(newRole, reqItem.phone, reqItem.customerName, reqItem.customerId);
+      // 🛡️ Secure matching: by ID or exact phone only (NEVER by name alone)
+      if (reqItem.customerId && reqItem.customerId !== 'guest_user') {
+        await db.prepare(
+          "UPDATE users SET role = ?, status = 'active', isPro = 1, verified = 1 WHERE id = ?"
+        ).run(newRole, reqItem.customerId);
+      } else if (reqItem.phone) {
+        await db.prepare(
+          "UPDATE users SET role = ?, status = 'active', isPro = 1, verified = 1 WHERE phone = ?"
+        ).run(newRole, reqItem.phone);
+      }
 
       await db.prepare("UPDATE approval_requests SET status = 'approved', approvedBy = ? WHERE id = ?").run(req.user?.name || 'الإدارة', id);
       try {
         db.prepare("UPDATE upgrade_requests SET status = 'approved', reviewedBy = ?, reviewedAt = datetime('now') WHERE id = ?").run(req.user?.name || 'الإدارة', id);
       } catch (e) {}
 
+      const roleArabic = newRole === 'technician' ? 'فني معتمد (300 ج.م)' : 'تاجر معتمد (100 ج.م)';
       db.prepare(
         "INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)"
       ).run(
         `audit_${Date.now()}`,
         reqItem.customerId || 'user',
-        req.user?.name || 'الإدارة',
-        'APPROVE_TRADE_REQUEST',
-        `اعتماد ترقية المستخدم ${reqItem.customerName} إلى ${newRole === 'technician' ? 'فني معتمد' : 'تاجر معتمد'}`,
+        req.user?.id || 'admin',
+        `اعتماد طلب ترقية إلى ${newRole === 'technician' ? 'فني' : 'تاجر'}`,
+        `اعتماد ترقية المستخدم ${reqItem.customerName || reqItem.phone} إلى ${roleArabic}`,
         new Date().toISOString()
       );
     }
@@ -2861,7 +2812,7 @@ app.post("/api/trade-requests/:id/approve", authenticateToken,requireAdmin,async
   }
 });
 
-app.post("/api/trade-requests/:id/reject", authenticateToken,requireAdmin,async (req: any, res) => {
+app.post("/api/trade-requests/:id/reject", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -2874,9 +2825,9 @@ app.post("/api/trade-requests/:id/reject", authenticateToken,requireAdmin,async 
     ).run(
       `audit_${Date.now()}`,
       id,
-      req.user?.name || 'الإدارة',
-      'REJECT_TRADE_REQUEST',
-      `رفض طلب الترقية برقم ${id}: ${reason || 'غير محدد'}`,
+      req.user?.id || 'admin',
+      'رفض طلب ترقية',
+      `رفض طلب الترقية برقم ${id}: ${reason || 'عدم استيفاء الشروط'}`,
       new Date().toISOString()
     );
     res.json({ success: true, message: 'تم رفض الطلب بنجاح.' });
@@ -2935,21 +2886,33 @@ app.post("/api/upgrade-requests/:id/reject", authenticateToken,requireAdmin,asyn
   }
 });
 
-app.get("/api/withdraw-requests", async (req, res) => {
+app.get("/api/withdraw-requests", authenticateToken, async (req: any, res) => {
   try {
-    const rows = db.prepare(`
-      SELECT w.*, u.name as userName, u.phone as userPhone, u.role as userRole, COALESCE(u.balance, 0) as userBalance
-      FROM withdraw_requests w
-      LEFT JOIN users u ON w.userId = u.id
-      ORDER BY w.createdAt DESC
-    `).all();
+    const isPrivileged = req.user?.role === 'owner' || req.user?.role === 'manager';
+    let rows;
+    if (isPrivileged) {
+      rows = db.prepare(`
+        SELECT w.*, u.name as userName, u.phone as userPhone, u.role as userRole, COALESCE(u.balance, 0) as userBalance
+        FROM withdraw_requests w
+        LEFT JOIN users u ON w.userId = u.id
+        ORDER BY w.createdAt DESC
+      `).all();
+    } else {
+      rows = db.prepare(`
+        SELECT w.*, u.name as userName, u.phone as userPhone, u.role as userRole, COALESCE(u.balance, 0) as userBalance
+        FROM withdraw_requests w
+        LEFT JOIN users u ON w.userId = u.id
+        WHERE w.userId = ?
+        ORDER BY w.createdAt DESC
+      `).all(req.user.id);
+    }
     res.json(rows || []);
   } catch (err: any) {
     res.json([]);
   }
 });
 
-app.post("/api/withdraw-requests", authenticateToken,async (req: any, res) => {
+app.post("/api/withdraw-requests", authenticateToken, async (req: any, res) => {
   try {
     const { amount, method, accountDetails, notes } = req.body;
     const numAmount = Number(amount);
@@ -2960,6 +2923,10 @@ app.post("/api/withdraw-requests", authenticateToken,async (req: any, res) => {
     if (!user || Number(user.balance || 0) < numAmount) {
       return res.status(400).json({ error: "رصيد المحفظة غير كافٍ لإتمام عملية السحب" });
     }
+
+    // 🛡️ Hold funds immediately to prevent double-spending
+    db.prepare("UPDATE users SET balance = MAX(0, balance - ?) WHERE id = ?").run(numAmount, req.user.id);
+
     const id = `wd_${Date.now()}`;
     db.prepare(`
       INSERT INTO withdraw_requests (id, userId, userName, userPhone, userRole, amount, method, accountDetails, status, notes, createdAt)
@@ -2971,24 +2938,24 @@ app.post("/api/withdraw-requests", authenticateToken,async (req: any, res) => {
       VALUES (?, ?, 'withdrawal', ?, ?, ?, 'pending', datetime('now'))
     `).run(`tx_${Date.now()}`, req.user.id, numAmount, `طلب سحب رصيد (${method || 'فودافون كاش'})`, id);
 
-    res.json({ success: true, id, message: "تم تقديم طلب السحب بنجاح للمراجعة والتحويل." });
+    res.json({ success: true, id, message: "تم تقديم طلب السحب وحجز المبلغ بنجاح للمراجعة والتحويل." });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post("/api/withdraw-requests/:id/approve", authenticateToken,requireAdmin,async (req: any, res) => {
+app.post("/api/withdraw-requests/:id/approve", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
     const reqItem = await db.prepare("SELECT * FROM withdraw_requests WHERE id = ?").get(id) as any;
     if (!reqItem) return res.status(404).json({ error: "طلب السحب غير موجود" });
-    
+    if (reqItem.status !== 'pending') return res.status(400).json({ error: "تمت مراجعة هذا الطلب مسبقاً" });
+
     db.prepare("UPDATE withdraw_requests SET status = 'completed', reviewedBy = ?, reviewedAt = datetime('now') WHERE id = ?").run(req.user?.name || 'الإدارة', id);
     await db.prepare("UPDATE transactions SET status = 'completed' WHERE referenceId = ?").run(id);
-    db.prepare("UPDATE users SET balance = MAX(0, COALESCE(balance, 0) - ?) WHERE id = ?").run(reqItem.amount, reqItem.userId);
 
-    db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'WITHDRAW_APPROVE', ?, ?, ?, datetime('now'))")
-      .run(`audit_${Date.now()}`, reqItem.userId, req.user?.id, `اعتماد سحب ${reqItem.amount} ج.م للمستخدم ${reqItem.userName}`);
+    db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+      .run(`audit_${Date.now()}`, 'اعتماد طلب سحب رصيد', reqItem.userId, req.user?.id || 'admin', `اعتماد صرف مبلغ ${reqItem.amount} ج.م للمستخدم ${reqItem.userName}`);
 
     res.json({ success: true, message: `تم اعتماد صرف مبلغ ${reqItem.amount} ج.م بنجاح` });
   } catch (err: any) {
@@ -2996,49 +2963,149 @@ app.post("/api/withdraw-requests/:id/approve", authenticateToken,requireAdmin,as
   }
 });
 
-app.post("/api/withdraw-requests/:id/reject", authenticateToken,requireAdmin,async (req: any, res) => {
+app.post("/api/withdraw-requests/:id/reject", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
     const reqItem = await db.prepare("SELECT * FROM withdraw_requests WHERE id = ?").get(id) as any;
     if (!reqItem) return res.status(404).json({ error: "طلب السحب غير موجود" });
+    if (reqItem.status !== 'pending') return res.status(400).json({ error: "تمت مراجعة هذا الطلب مسبقاً" });
+
+    // 🛡️ Refund held funds back to user wallet
+    db.prepare("UPDATE users SET balance = balance + ? WHERE id = ?").run(reqItem.amount, reqItem.userId);
 
     db.prepare("UPDATE withdraw_requests SET status = 'rejected', notes = COALESCE(notes, '') || ' | ' || ?, reviewedBy = ?, reviewedAt = datetime('now') WHERE id = ?").run(reason || 'رفض إداري', req.user?.name || 'الإدارة', id);
     await db.prepare("UPDATE transactions SET status = 'rejected', description = description || ' | ' || ? WHERE referenceId = ?").run(reason || 'مرفوض', id);
 
-    db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'WITHDRAW_REJECT', ?, ?, ?, datetime('now'))")
-      .run(`audit_${Date.now()}`, reqItem.userId, req.user?.id, `رفض سحب ${reqItem.amount} ج.م للمستخدم ${reqItem.userName}: ${reason}`);
+    db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+      .run(`audit_${Date.now()}`, 'رفض طلب سحب رصيد', reqItem.userId, req.user?.id || 'admin', `رفض سحب ${reqItem.amount} ج.م للمستخدم ${reqItem.userName} وإعادة المبلغ للمحفظة: ${reason || 'عدم استيفاء الشروط'}`);
 
-    res.json({ success: true, message: "تم رفض طلب السحب بنجاح" });
+    res.json({ success: true, message: "تم رفض طلب السحب وإعادة المبلغ لمحفظة المستخدم بنجاح." });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── SUGGESTIONS & REPORTS APIS ────────────────────────────────────────────────
-app.get("/api/suggestions", async (req, res) => {
+// ─── SUGGESTIONS & REPORTS APIS ─────────────────────────────────────────────
+
+// GET /api/suggestions - Owner/Admin see all suggestions
+app.get("/api/suggestions", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
-    const rows = await db.prepare("SELECT * FROM app_suggestions ORDER BY createdAt DESC").all();
+    const status = req.query.status as string || '';
+    let query = "SELECT s.*, u.name as submitterName FROM app_suggestions s LEFT JOIN users u ON s.userId = u.id";
+    if (status) query += ` WHERE s.status = '${status.replace(/'/g, "''")}'`;
+    query += " ORDER BY s.createdAt DESC";
+    const rows = await db.prepare(query).all();
     res.json(rows || []);
   } catch {
     res.json([]);
   }
 });
 
-app.post("/api/suggestions", async (req: any, res) => {
+// POST /api/suggestions - Any authenticated user can submit
+app.post("/api/suggestions", authenticateToken, async (req: any, res) => {
   try {
-    const { title, description, userName, role } = req.body;
+    const { title, description } = req.body;
     if (!title || !description) return res.status(400).json({ error: "العنوان والتفاصيل مطلوبة" });
     const id = `sug_${Date.now()}`;
     db.prepare("INSERT INTO app_suggestions (id, userId, userName, role, title, description, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, 'pending', datetime('now'))")
-      .run(id, req.user?.id || 'guest', userName || req.user?.name || 'مستخدم', role || req.user?.role || 'customer', title, description);
-    res.json({ success: true, id, message: "تم إرسال اقتراحك للإدارة بنجاح، شكراً لمساهمتك في تطوير TecnoRexa!" });
+      .run(id, req.user.id, req.user.name, req.user.role, title, description);
+    res.json({ success: true, id, message: "تم إرسال اقتراحك للمالك بنجاح. سيتم الرد عليك قريباً." });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.put("/api/suggestions/:id/status", authenticateToken,requireAdmin,async (req: any, res) => {
+// POST /api/suggestions/:id/approve - Owner approves → sends to Main Programmer
+app.post("/api/suggestions/:id/approve", authenticateToken, requireOwner, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const suggestion = await db.prepare("SELECT * FROM app_suggestions WHERE id = ?").get(id) as any;
+    if (!suggestion) return res.status(404).json({ error: "الاقتراح غير موجود" });
+    if (suggestion.status !== 'pending') return res.status(400).json({ error: "هذا الاقتراح تمت مراجعته مسبقاً" });
+
+    await db.prepare("UPDATE app_suggestions SET status = 'owner_approved' WHERE id = ?").run(id);
+
+    // Notify the submitting user of approval
+    try {
+      const notifId = `notif_sug_${Date.now()}`;
+      db.prepare("INSERT INTO notifications (id, userId, title, desc, type, actionUrl, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?)")
+        .run(notifId, suggestion.userId, 'تمت الموافقة على اقتراحك ✅', `اقتراحك "${suggestion.title}" تمت الموافقة عليه من المالك وسيتم تحويله لفريق التطوير.`, 'suggestion', '/notifications', new Date().toISOString());
+    } catch (e) {}
+
+    // Find Main Programmer (developerRank = 'lead') and create a task for them
+    const lead = db.prepare("SELECT id FROM users WHERE role = 'programmer' AND (developerRank = 'lead' OR phone = '01064739664') LIMIT 1").get() as any;
+    const taskId = `task_sug_${Date.now()}`;
+    try {
+      db.prepare(`
+        INSERT INTO developer_tasks (id, title, description, assignedTo, priority, status, progress, dueDate, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, 'medium', 'new', 0, date('now', '+14 days'), datetime('now'), datetime('now'))
+      `).run(
+        taskId,
+        `[اقتراح معتمد من المالك] ${suggestion.title}`,
+        `المالك وافق على هذا الاقتراح وطلب تنفيذه:\n${suggestion.description}\n\nمقدم من: ${suggestion.userName} (${suggestion.role})`,
+        lead ? lead.id : null
+      );
+      // Notify main programmer
+      if (lead) {
+        const progNotifId = `notif_prog_${Date.now()}`;
+        db.prepare("INSERT INTO notifications (id, userId, title, desc, type, actionUrl, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?)")
+          .run(progNotifId, lead.id, 'مهمة برمجية جديدة من المالك 🔔', `تمت الموافقة على اقتراح "${suggestion.title}" وتحويله إليك كمهمة برمجية.`, 'task', '/developer', new Date().toISOString());
+      }
+    } catch (e) {}
+
+    // Log in audit
+    try {
+      db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(`audit_${Date.now()}`, 'اعتماد اقتراح مستخدم وتحويله للمبرمج', suggestion.userId, req.user.id, `اعتماد اقتراح: "${suggestion.title}"`, new Date().toISOString());
+    } catch (e) {}
+
+    res.json({ success: true, message: "تم اعتماد الاقتراح وإرساله لفريق التطوير بنجاح.", taskId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/suggestions/:id/reject - Owner rejects → notifies user only (does NOT go to programmer)
+app.post("/api/suggestions/:id/reject", authenticateToken, requireOwner, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const suggestion = await db.prepare("SELECT * FROM app_suggestions WHERE id = ?").get(id) as any;
+    if (!suggestion) return res.status(404).json({ error: "الاقتراح غير موجود" });
+    if (suggestion.status !== 'pending') return res.status(400).json({ error: "هذا الاقتراح تمت مراجعته مسبقاً" });
+
+    await db.prepare("UPDATE app_suggestions SET status = 'owner_rejected' WHERE id = ?").run(id);
+
+    // Notify the submitting user of rejection ONLY
+    try {
+      const notifId = `notif_sug_rej_${Date.now()}`;
+      const rejectMsg = reason ? `السبب: ${reason}` : 'اقتراحك لا يتوافق مع خطة التطوير الحالية للمنصة.';
+      db.prepare("INSERT INTO notifications (id, userId, title, desc, type, actionUrl, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?)")
+        .run(notifId, suggestion.userId, 'بخصوص اقتراحك ⚠️', `اقتراحك "${suggestion.title}" لم يتم قبوله في الوقت الحالي. ${rejectMsg}`, 'suggestion', '/notifications', new Date().toISOString());
+    } catch (e) {}
+
+    // Log in audit
+    try {
+      db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(`audit_${Date.now()}`, 'رفض اقتراح مستخدم', suggestion.userId, req.user.id, `رفض اقتراح: "${suggestion.title}"${reason ? ' - السبب: ' + reason : ''}`, new Date().toISOString());
+    } catch (e) {}
+
+    res.json({ success: true, message: "تم رفض الاقتراح وإشعار المستخدم." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Legacy approve-to-dev endpoint (kept for backward compat, now secured + redirects to approve)
+app.post("/api/suggestions/:id/approve-to-dev", authenticateToken, requireOwner, async (req: any, res) => {
+  // Redirect to the new unified approve endpoint
+  req.url = `/api/suggestions/${req.params.id}/approve`;
+  return res.redirect(307, `/api/suggestions/${req.params.id}/approve`);
+});
+
+// Legacy status update (kept for backward compat)
+app.put("/api/suggestions/:id/status", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -3049,40 +3116,7 @@ app.put("/api/suggestions/:id/status", authenticateToken,requireAdmin,async (req
   }
 });
 
-app.post("/api/suggestions/:id/approve-to-dev", authenticateToken,requireAdmin,async (req: any, res) => {
-  try {
-    const { id } = req.params;
-    const suggestion = await db.prepare("SELECT * FROM app_suggestions WHERE id = ?").get(id) as any;
-    if (!suggestion) return res.status(404).json({ error: "المقترح غير موجود" });
 
-    await db.prepare("UPDATE app_suggestions SET status = 'approved' WHERE id = ?").run(id);
-
-    const lead = db.prepare("SELECT id FROM users WHERE role = 'programmer' AND (developerRank = 'lead' OR phone = '01064739664') LIMIT 1").get() as any;
-    const taskId = `task_${Date.now()}`;
-    db.prepare(`
-      INSERT INTO developer_tasks (id, title, description, assignedTo, priority, status, progress, dueDate, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, 'medium', 'new', 0, date('now', '+7 days'), datetime('now'), datetime('now'))
-    `).run(
-      taskId,
-      `[ميزة مقترحة معتمدة] ${suggestion.title}`,
-      `تم اعتماد هذا المقترح من الإدارة لتحويله لميزة في المنصة:\n${suggestion.description}\nالمقترح من: ${suggestion.userName} (${suggestion.role})`,
-      lead ? lead.id : null
-    );
-    res.json({ success: true, message: "تم اعتماد المقترح وتحويله لمهمة برمجية لفريق التطوير بنجاح.", taskId });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/api/suggestions/:id/reject", authenticateToken,requireAdmin,async (req: any, res) => {
-  try {
-    const { id } = req.params;
-    await db.prepare("UPDATE app_suggestions SET status = 'rejected' WHERE id = ?").run(id);
-    res.json({ success: true, message: "تم رفض المقترح." });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 app.get("/api/reports", authenticateToken,requireAdmin,async (req, res) => {
   try {
@@ -3488,30 +3522,109 @@ app.post("/api/merchant/withdraw", authenticateToken,async (req: any, res) => {
 
 // ─── TECHNICIAN ENDPOINTS ──────────────────────────────────────────────
 
-app.get("/api/technician/kpis", authenticateToken,async (req: any, res) => {
+// ─── TECHNICIAN ENDPOINTS & OPERATIONS ──────────────────────────────────────────────
+
+// GET /api/technician/overview — Real-time technician performance metrics & KPIs
+app.get("/api/technician/overview", authenticateToken, async (req: any, res) => {
   try {
-    const userId = req.user?.id;
-    const user = userId ? await db.prepare("SELECT isPro, specialty FROM users WHERE id = ?").get(userId) as any : null;
-    const newRequests = userId
-      ? Number((db.prepare("SELECT COUNT(*) as c FROM orders WHERE technicianId = ? AND status = 'pending'").get(userId) as any)?.c || 0)
-      : 0;
-    const completedOrders = userId
-      ? Number((db.prepare("SELECT COUNT(*) as c FROM orders WHERE technicianId = ? AND status = 'completed'").get(userId) as any)?.c || 0)
-      : 0;
-    const maintenanceEarnings = userId
-      ? Number((db.prepare("SELECT COALESCE(SUM(total), 0) as s FROM orders WHERE technicianId = ? AND status = 'completed'").get(userId) as any)?.s || 0)
-      : 0;
-    const ratingRow = userId ? (db.prepare("SELECT COALESCE(AVG(rating), 0) as r FROM technician_reviews WHERE technicianId = ?").get(userId) as any) : null;
-    const overallRating = ratingRow?.r ? Number(Number(ratingRow.r).toFixed(1)) : 0;
+    const userId = req.user.id;
+    const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+    if (!user) return res.status(404).json({ error: "المستخدم غير موجود" });
+
+    // Pending maintenance requests (available in area or assigned)
+    const pendingRequests = Number((db.prepare(`
+      SELECT COUNT(*) as c FROM orders 
+      WHERE type = 'maintenance' 
+        AND (technicianId = ? OR (technicianId IS NULL AND status = 'pending'))
+        AND status IN ('pending', 'assigned')
+    `).get(userId) as any)?.c || 0);
+
+    // Active maintenance orders currently in progress
+    const activeOrders = Number((db.prepare(`
+      SELECT COUNT(*) as c FROM orders 
+      WHERE technicianId = ? 
+        AND status IN ('accepted', 'quoted', 'quote_approved', 'on_way', 'arrived', 'diagnosing', 'repairing', 'in_progress', 'service_report_submitted')
+    `).get(userId) as any)?.c || 0);
+
+    // Completed maintenance orders
+    const completedOrders = Number((db.prepare(`
+      SELECT COUNT(*) as c FROM orders 
+      WHERE technicianId = ? AND status = 'completed'
+    `).get(userId) as any)?.c || 0);
+
+    // Maintenance earnings from ledger transactions
+    const maintenanceEarnings = Number((db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as s FROM transactions 
+      WHERE userId = ? AND type = 'earning' AND (description LIKE '%صيانة%' OR referenceId LIKE 'ord_%')
+    `).get(userId) as any)?.s || 0);
+
+    // Course earnings from ledger transactions
+    const coursesEarnings = Number((db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as s FROM transactions 
+      WHERE userId = ? AND type = 'earning' AND (description LIKE '%كورس%' OR referenceId LIKE 'course_%' OR referenceId LIKE 'crs_%')
+    `).get(userId) as any)?.s || 0);
+
+    // Overall rating from technician_reviews
+    const ratingRow = db.prepare(`
+      SELECT COALESCE(AVG(rating), 0) as avgRating, COUNT(*) as cnt 
+      FROM technician_reviews WHERE technicianId = ?
+    `).get(userId) as any;
+
+    const overallRating = ratingRow?.avgRating ? Number(Number(ratingRow.avgRating).toFixed(1)) : (user.rating ? Number(user.rating) : 0);
+    const ratingCount = ratingRow?.cnt ? Number(ratingRow.cnt) : (user.ratingCount ? Number(user.ratingCount) : 0);
+    const workedHours = Number(user.workedHours || (completedOrders * 1.5) || 0);
+
+    res.json({
+      success: true,
+      pendingRequests,
+      activeOrders,
+      completedOrders,
+      maintenanceEarnings,
+      coursesEarnings,
+      totalEarnings: Number(user.balance || 0),
+      overallRating,
+      ratingCount,
+      workedHours,
+      available: Boolean(user.available !== undefined ? user.available : 1),
+      availabilityStatus: user.availabilityStatus || (user.available ? 'available' : 'unavailable'),
+      specialty: user.specialty || 'صيانة أجهزة منزلية',
+      governorate: user.governorate || 'القاهرة',
+      isPro: Boolean(user.isPro),
+      status: user.status
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Backward compatibility alias for KPI widget
+app.get("/api/technician/kpis", authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+    const newRequests = Number((db.prepare(`
+      SELECT COUNT(*) as c FROM orders 
+      WHERE type = 'maintenance' 
+        AND (technicianId = ? OR (technicianId IS NULL AND status = 'pending'))
+        AND status IN ('pending', 'assigned')
+    `).get(userId) as any)?.c || 0);
+
+    const completedOrders = Number((db.prepare("SELECT COUNT(*) as c FROM orders WHERE technicianId = ? AND status = 'completed'").get(userId) as any)?.c || 0);
+    const maintenanceEarnings = Number((db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM transactions WHERE userId = ? AND type = 'earning' AND (description LIKE '%صيانة%' OR referenceId LIKE 'ord_%')").get(userId) as any)?.s || 0);
+    const coursesEarnings = Number((db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM transactions WHERE userId = ? AND type = 'earning' AND (description LIKE '%كورس%' OR referenceId LIKE 'course_%' OR referenceId LIKE 'crs_%')").get(userId) as any)?.s || 0);
+    
+    const ratingRow = db.prepare("SELECT COALESCE(AVG(rating), 0) as r, COUNT(*) as cnt FROM technician_reviews WHERE technicianId = ?").get(userId) as any;
+    const overallRating = ratingRow?.r ? Number(Number(ratingRow.r).toFixed(1)) : (user?.rating || 0);
 
     res.json({
       newRequests,
       maintenanceEarnings,
-      coursesEarnings: 0,
+      coursesEarnings,
       overallRating,
+      ratingCount: ratingRow?.cnt || user?.ratingCount || 0,
       completedOrders,
-      isSubscribed: user ? Boolean(user.isPro) : false,
-      specialty: user?.specialty || ''
+      isSubscribed: Boolean(user?.isPro),
+      specialty: user?.specialty || 'صيانة أجهزة منزلية'
     });
   } catch {
     res.json({
@@ -3519,6 +3632,7 @@ app.get("/api/technician/kpis", authenticateToken,async (req: any, res) => {
       maintenanceEarnings: 0,
       coursesEarnings: 0,
       overallRating: 0,
+      ratingCount: 0,
       completedOrders: 0,
       isSubscribed: false,
       specialty: ''
@@ -3526,101 +3640,586 @@ app.get("/api/technician/kpis", authenticateToken,async (req: any, res) => {
   }
 });
 
-app.get("/api/technician/charts", async (req, res) => {
-  res.json({
-    weeklyOrders: [],
-    monthlyEarnings: {
-      maintenance: 0,
-      courses: 0,
-      total: 0,
-      maintenancePercent: 0,
-      coursesPercent: 0
-    }
-  });
+// GET /api/technician/requests — List incoming & assigned maintenance requests
+app.get("/api/technician/requests", authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+
+    const orders = db.prepare(`
+      SELECT o.*, u.name as clientRealName, u.phone as clientRealPhone
+      FROM orders o
+      LEFT JOIN users u ON u.id = o.userId
+      WHERE o.type = 'maintenance'
+        AND (o.technicianId = ? OR (o.technicianId IS NULL AND o.status = 'pending'))
+      ORDER BY o.createdAt DESC
+      LIMIT 60
+    `).all(userId) as any[];
+
+    const enriched = orders.map((ord: any) => {
+      let parsedItems = [];
+      try { parsedItems = typeof ord.items === 'string' ? JSON.parse(ord.items) : (ord.items || []); } catch {}
+
+      let quote = null;
+      try { quote = db.prepare("SELECT * FROM service_quotes WHERE orderId = ? ORDER BY createdAt DESC LIMIT 1").get(ord.id); } catch {}
+
+      let report = null;
+      try { report = db.prepare("SELECT * FROM service_reports WHERE orderId = ? LIMIT 1").get(ord.id); } catch {}
+
+      return {
+        ...ord,
+        items: parsedItems,
+        customerName: ord.customerName || ord.clientRealName || 'عميل TecnoRexa',
+        phone: ord.clientRealPhone || ord.phone || '',
+        quote,
+        report,
+      };
+    });
+
+    res.json(enriched);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get("/api/technician/reviews", authenticateToken,async (req: any, res) => {
+// POST /api/technician/availability — Toggle online/busy/offline status
+app.post("/api/technician/availability", authenticateToken, async (req: any, res) => {
   try {
-    const userId = req.user?.id;
-    const reviews = userId
-      ? await db.prepare("SELECT id, customerName, rating, comment, createdAt FROM technician_reviews WHERE technicianId = ? ORDER BY createdAt DESC LIMIT 20").all(userId)
-      : [];
+    const { available, status } = req.body;
+    const isAvail = (available === true || available === 1 || available === '1' || available === 'true') ? 1 : 0;
+    const availStatus = status || (isAvail ? 'available' : 'unavailable');
+
+    await db.prepare("UPDATE users SET available = ?, availabilityStatus = ? WHERE id = ?").run(isAvail, availStatus, req.user.id);
+    const updated = await db.prepare("SELECT id, name, phone, email, role, status, available, availabilityStatus FROM users WHERE id = ?").get(req.user.id);
+    
+    res.json({ 
+      success: true, 
+      available: isAvail, 
+      availabilityStatus: availStatus,
+      user: updated, 
+      message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴" 
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/technician/orders/:id/action — Accept or Decline a service request
+app.post("/api/technician/orders/:id/action", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { action, reason } = req.body;
+  try {
+    const order = await db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as any;
+    if (!order) return res.status(404).json({ error: "طلب الصيانة غير موجود" });
+
+    if (action === 'accept') {
+      await db.prepare(`
+        UPDATE orders 
+        SET technicianId = ?, technicianName = ?, status = 'accepted', updatedAt = datetime('now') 
+        WHERE id = ?
+      `).run(req.user.id, req.user.name || 'فني صيانة معتمد', id);
+
+      // Notify customer
+      try {
+        db.prepare(`
+          INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+          VALUES (?, ?, 'order_status', 'تم قبول طلب الصيانة ✅', ?, ?, datetime('now'))
+        `).run(
+          `notif_${Date.now()}`,
+          order.userId,
+          `قام الفني ${req.user.name} بقبول طلب الصيانة الخاص بك #${order.id}`,
+          JSON.stringify({ orderId: id, status: 'accepted' })
+        );
+        io.to(order.userId).emit("order_status_updated", { orderId: id, status: 'accepted', technicianName: req.user.name });
+      } catch {}
+
+      return res.json({ success: true, status: 'accepted', message: "تم قبول طلب الصيانة بنجاح. يمكنك الآن تقديم عرض السعر للعميل." });
+    } else if (action === 'decline') {
+      const declineNote = `[رفض الفني (${req.user.name}): ${reason || 'عدم التفرغ'}]`;
+      await db.prepare(`
+        UPDATE orders 
+        SET technicianId = NULL, status = 'pending', notes = COALESCE(notes, '') || '\n' || ?, updatedAt = datetime('now') 
+        WHERE id = ?
+      `).run(declineNote, id);
+
+      return res.json({ success: true, status: 'pending', message: "تم رفض الطلب وإعادته لقائمة الانتظار." });
+    } else {
+      return res.status(400).json({ error: "الإجراء غير معروف (يجب أن يكون accept أو decline)" });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/technician/orders/:id/quote — Send itemized quotation to customer
+app.post("/api/technician/orders/:id/quote", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { laborCost, partsCost, inspectionFee, notes } = req.body;
+  try {
+    const order = await db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as any;
+    if (!order) return res.status(404).json({ error: "الطلب غير موجود" });
+
+    const lCost = Math.max(0, Number(laborCost) || 0);
+    const pCost = Math.max(0, Number(partsCost) || 0);
+    const iFee = Math.max(0, Number(inspectionFee) || 0);
+    const totalAmount = lCost + pCost + iFee;
+
+    if (totalAmount <= 0) {
+      return res.status(400).json({ error: "يرجى تحديد تفاصيل وتكلفة عرض السعر التقديري" });
+    }
+
+    const quoteId = `quote_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO service_quotes (id, orderId, technicianId, laborCost, partsCost, inspectionFee, totalAmount, notes, status, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))
+    `).run(quoteId, id, req.user.id, lCost, pCost, iFee, totalAmount, notes || '');
+
+    await db.prepare(`
+      UPDATE orders 
+      SET quoteId = ?, total = ?, status = 'quoted', updatedAt = datetime('now') 
+      WHERE id = ?
+    `).run(quoteId, totalAmount, id);
+
+    // Notify customer
+    try {
+      db.prepare(`
+        INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+        VALUES (?, ?, 'service_quote', 'عرض سعر صيانة جديد 📋', ?, ?, datetime('now'))
+      `).run(
+        `notif_${Date.now()}`,
+        order.userId,
+        `قدم الفني عرض سعر بقيمة ${totalAmount} ج.م لصيانة جهازك. يرجى المراجعة والموافقة.`,
+        JSON.stringify({ orderId: id, quoteId, totalAmount })
+      );
+      io.to(order.userId).emit("quote_received", { orderId: id, quoteId, totalAmount });
+    } catch {}
+
+    res.json({
+      success: true,
+      quoteId,
+      totalAmount,
+      message: `تم إرسال عرض السعر بقيمة ${totalAmount} ج.م للعميل بنجاح 🚀`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/customer/orders/:id/quote-action — Customer Approves or Rejects quotation
+app.post("/api/customer/orders/:id/quote-action", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { action, reason } = req.body;
+  try {
+    const order = await db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as any;
+    if (!order) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (order.userId !== req.user.id && req.user.role !== 'owner' && req.user.role !== 'manager') {
+      return res.status(403).json({ error: "غير مصرح لك باتخاذ قرار بشأن هذا العرض" });
+    }
+
+    if (action === 'approve') {
+      if (order.quoteId) {
+        db.prepare("UPDATE service_quotes SET status = 'approved', updatedAt = datetime('now') WHERE id = ?").run(order.quoteId);
+      }
+      await db.prepare("UPDATE orders SET status = 'quote_approved', updatedAt = datetime('now') WHERE id = ?").run(id);
+
+      // Notify technician
+      if (order.technicianId) {
+        try {
+          db.prepare(`
+            INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+            VALUES (?, ?, 'quote_approved', 'وافق العميل على عرض السعر! 🎉', ?, ?, datetime('now'))
+          `).run(
+            `notif_${Date.now()}`,
+            order.technicianId,
+            `وافق العميل على عرض السعر للطلب #${order.id}. يمكنك الآن بدء التحرك لموقع العميل.`,
+            JSON.stringify({ orderId: id })
+          );
+          io.to(order.technicianId).emit("quote_approved", { orderId: id });
+        } catch {}
+      }
+
+      res.json({ success: true, status: 'quote_approved', message: "تمت الموافقة على عرض السعر بنجاح! تم إشعار الفني للبدء." });
+    } else if (action === 'reject') {
+      if (order.quoteId) {
+        db.prepare("UPDATE service_quotes SET status = 'rejected', updatedAt = datetime('now') WHERE id = ?").run(order.quoteId);
+      }
+      await db.prepare("UPDATE orders SET status = 'quote_rejected', updatedAt = datetime('now') WHERE id = ?").run(id);
+
+      // Notify technician
+      if (order.technicianId) {
+        try {
+          db.prepare(`
+            INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+            VALUES (?, ?, 'quote_rejected', 'تم رفض عرض السعر ❌', ?, ?, datetime('now'))
+          `).run(
+            `notif_${Date.now()}`,
+            order.technicianId,
+            `رفض العميل عرض السعر المقدم للطلب #${order.id}. السبب: ${reason || 'غير محدد'}`,
+            JSON.stringify({ orderId: id, reason })
+          );
+          io.to(order.technicianId).emit("quote_rejected", { orderId: id, reason });
+        } catch {}
+      }
+
+      res.json({ success: true, status: 'quote_rejected', message: "تم رفض عرض السعر." });
+    } else {
+      res.status(400).json({ error: "إجراء غير صالح (يجب أن يكون approve أو reject)" });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/technician/orders/:id/status — Update Field Status (on_way, arrived, diagnosing, repairing)
+app.post("/api/technician/orders/:id/status", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const allowedStatuses = ['on_way', 'arrived', 'diagnosing', 'repairing', 'in_progress'];
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: `حالة غير مدعومة. الحالات المتاحة: ${allowedStatuses.join(', ')}` });
+  }
+
+  try {
+    const order = await db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as any;
+    if (!order) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (order.technicianId !== req.user.id && req.user.role !== 'owner' && req.user.role !== 'manager') {
+      return res.status(403).json({ error: "غير مصرح لك بتحديث حالة هذا الطلب" });
+    }
+
+    await db.prepare("UPDATE orders SET status = ?, updatedAt = datetime('now') WHERE id = ?").run(status, id);
+
+    // Update technician availability status to busy during active work
+    if (status === 'repairing' || status === 'diagnosing') {
+      db.prepare("UPDATE users SET availabilityStatus = 'busy' WHERE id = ?").run(req.user.id);
+    }
+
+    const statusLabels: Record<string, string> = {
+      on_way: "الفني في الطريق لموقعك 🚗",
+      arrived: "وصل الفني إلى موقع العميل 📍",
+      diagnosing: "جاري فحص الجهاز وتشخيص العطل 🔍",
+      repairing: "جاري صيانة وإصلاح الجهاز واستبدال القطع 🔧",
+      in_progress: "الصيانة قيد التنفيذ",
+    };
+
+    const label = statusLabels[status] || status;
+
+    // Notify customer
+    try {
+      db.prepare(`
+        INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+        VALUES (?, ?, 'order_status', 'تحديث حالة الصيانة 🛠️', ?, ?, datetime('now'))
+      `).run(
+        `notif_${Date.now()}`,
+        order.userId,
+        `${label} (طلب #${order.id})`,
+        JSON.stringify({ orderId: id, status })
+      );
+      io.to(order.userId).emit("order_status_updated", { orderId: id, status, label });
+    } catch {}
+
+    res.json({ success: true, status, message: `تم تحديث الحالة إلى: ${label}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/technician/orders/:id/report — Submit comprehensive maintenance completion report
+app.post("/api/technician/orders/:id/report", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const {
+    deviceType,
+    deviceBrand,
+    deviceModel,
+    diagnosis,
+    repairAction,
+    partsUsed,
+    beforePhotos,
+    afterPhotos,
+    warrantyDays,
+    customerSignature
+  } = req.body;
+
+  if (!diagnosis || !repairAction) {
+    return res.status(400).json({ error: "يرجى كتابة تشخيص العطل والإجراءات المنفذة للإصلاح" });
+  }
+
+  try {
+    const order = await db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as any;
+    if (!order) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (order.technicianId !== req.user.id && req.user.role !== 'owner' && req.user.role !== 'manager') {
+      return res.status(403).json({ error: "غير مصرح لك بتقديم تقرير صيانة لهذا الطلب" });
+    }
+
+    const reportId = `rep_${Date.now()}`;
+    const warranty = Number(warrantyDays) || 30;
+
+    db.prepare(`
+      INSERT INTO service_reports (
+        id, orderId, technicianId, deviceType, deviceBrand, deviceModel,
+        diagnosis, repairAction, partsUsed, beforePhotos, afterPhotos,
+        warrantyDays, customerSignature, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
+      reportId,
+      id,
+      req.user.id,
+      deviceType || order.serviceType || 'جهاز منزلي',
+      deviceBrand || '',
+      deviceModel || '',
+      diagnosis,
+      repairAction,
+      typeof partsUsed === 'object' ? JSON.stringify(partsUsed) : (partsUsed || ''),
+      typeof beforePhotos === 'object' ? JSON.stringify(beforePhotos) : (beforePhotos || ''),
+      typeof afterPhotos === 'object' ? JSON.stringify(afterPhotos) : (afterPhotos || ''),
+      warranty,
+      customerSignature || ''
+    );
+
+    await db.prepare(`
+      UPDATE orders 
+      SET reportId = ?, serviceReport = ?, warrantyDays = ?, status = 'service_report_submitted', updatedAt = datetime('now') 
+      WHERE id = ?
+    `).run(reportId, diagnosis, warranty, id);
+
+    // Notify customer
+    try {
+      db.prepare(`
+        INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+        VALUES (?, ?, 'report_submitted', 'تم رفع تقرير الصيانة وضمان الإصلاح 📋', ?, ?, datetime('now'))
+      `).run(
+        `notif_${Date.now()}`,
+        order.userId,
+        `أنهى الفني أعمال الصيانة للطلب #${order.id} وقدم تقرير الإصلاح مع ضمان ${warranty} يوماً. يرجى مراجعته وتأكيد استلام الجهاز.`,
+        JSON.stringify({ orderId: id, reportId, warrantyDays: warranty })
+      );
+      io.to(order.userId).emit("service_report_submitted", { orderId: id, reportId, warrantyDays: warranty });
+    } catch {}
+
+    res.json({
+      success: true,
+      reportId,
+      message: `تم رفع تقرير الصيانة وضمان ${warranty} يوماً بنجاح. تم إشعار العميل لتأكيد الاستلام.`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/customer/orders/:id/confirm-completion — Customer confirms service completion & releases wallet payout
+app.post("/api/customer/orders/:id/confirm-completion", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const order = await db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as any;
+    if (!order) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (order.userId !== req.user.id && req.user.role !== 'owner' && req.user.role !== 'manager') {
+      return res.status(403).json({ error: "غير مصرح لك بتأكيد إتمام هذا الطلب" });
+    }
+
+    if (order.status === 'completed') {
+      return res.json({ success: true, message: "تم تأكيد هذا الطلب وإتمامه مسبقاً" });
+    }
+
+    // Mark completed
+    await db.prepare(`
+      UPDATE orders 
+      SET status = 'completed', confirmedByClientAt = datetime('now'), updatedAt = datetime('now') 
+      WHERE id = ?
+    `).run(id);
+
+    // Ledger settlement to technician wallet
+    const techId = order.technicianId;
+    let netEarnings = 0;
+    if (techId) {
+      const orderTotal = Math.max(0, Number(order.total) || 150);
+      
+      // Get platform commission (default 10%)
+      const commSetting = db.prepare("SELECT value FROM system_settings WHERE key = 'maintenance_commission'").get() as any;
+      const commissionRate = commSetting?.value ? Number(commSetting.value) / 100 : 0.10;
+      const platformFee = Math.round(orderTotal * commissionRate);
+      netEarnings = Math.max(0, orderTotal - platformFee);
+
+      // 1. Credit technician balance
+      db.prepare("UPDATE users SET balance = COALESCE(balance, 0) + ?, workedHours = COALESCE(workedHours, 0) + 1.5, availabilityStatus = 'available' WHERE id = ?").run(netEarnings, techId);
+
+      // 2. Insert financial transaction record
+      const txnId = `tx_maint_${Date.now()}`;
+      db.prepare(`
+        INSERT INTO transactions (id, userId, type, amount, description, referenceId, status, createdAt)
+        VALUES (?, ?, 'earning', ?, ?, ?, 'completed', datetime('now'))
+      `).run(
+        txnId,
+        techId,
+        netEarnings,
+        `أرباح صيانة طلب #${order.id} (الإجمالي: ${orderTotal} ج.م - عمولة المنصة: ${platformFee} ج.م)`,
+        order.id
+      );
+
+      // 3. Notify technician
+      try {
+        db.prepare(`
+          INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+          VALUES (?, ?, 'order_completed', 'تم تأكيد إتمام الصيانة وإيداع الأرباح! 💰', ?, ?, datetime('now'))
+        `).run(
+          `notif_${Date.now()}`,
+          techId,
+          `أكد العميل إتمام صيانة الطلب #${order.id}. تم إيداع صافي أرباحك (${netEarnings} ج.م) في محفظتك بنجاح!`,
+          JSON.stringify({ orderId: id, netEarnings })
+        );
+        io.to(techId).emit("order_completed", { orderId: id, netEarnings });
+      } catch {}
+    }
+
+    res.json({
+      success: true,
+      status: 'completed',
+      netEarnings,
+      message: "تم تأكيد استلام الجهاز وإتمام الصيانة بنجاح! يمكنك الآن تقييم الفني."
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/orders/:id/rate — Customer rates the technician (1-5 stars + review)
+app.post("/api/orders/:id/rate", authenticateToken, async (req: any, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+  const numRating = Number(rating);
+
+  if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+    return res.status(400).json({ error: "يرجى تحديد تقييم صحيح من 1 إلى 5 نجوم" });
+  }
+
+  try {
+    const order = await db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as any;
+    if (!order) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (!order.technicianId) return res.status(400).json({ error: "لا يوجد فني مرتبط بهذا الطلب للتقييم" });
+
+    const reviewId = `rev_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO technician_reviews (id, technicianId, customerId, customerName, orderId, rating, comment, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
+      reviewId,
+      order.technicianId,
+      req.user.id,
+      req.user.name || 'عميل TecnoRexa',
+      id,
+      numRating,
+      comment || ''
+    );
+
+    // Recalculate true average rating and update user
+    const stats = db.prepare(`
+      SELECT AVG(rating) as avgRating, COUNT(*) as cnt 
+      FROM technician_reviews 
+      WHERE technicianId = ?
+    `).get(order.technicianId) as any;
+
+    const realAvg = stats?.avgRating ? Number(Number(stats.avgRating).toFixed(1)) : numRating;
+    const realCnt = stats?.cnt ? Number(stats.cnt) : 1;
+
+    db.prepare("UPDATE users SET rating = ?, ratingCount = ? WHERE id = ?").run(realAvg, realCnt, order.technicianId);
+    db.prepare("UPDATE orders SET rating = ? WHERE id = ?").run(numRating, id);
+
+    // Notify technician
+    try {
+      db.prepare(`
+        INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+        VALUES (?, ?, 'new_review', 'تقييم عميل جديد ⭐', ?, ?, datetime('now'))
+      `).run(
+        `notif_${Date.now()}`,
+        order.technicianId,
+        `حصلت على تقييم ${numRating} نجوم من العميل: ${comment || 'خدمة ممتازة'}`,
+        JSON.stringify({ orderId: id, rating: numRating })
+      );
+      io.to(order.technicianId).emit("new_review", { orderId: id, rating: numRating, comment });
+    } catch {}
+
+    res.json({
+      success: true,
+      rating: realAvg,
+      ratingCount: realCnt,
+      message: "شكراً لتقييمك! تم تسجيل التقييم والمراجعة بنجاح."
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/technician/reviews — List reviews for the current technician
+app.get("/api/technician/reviews", authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const reviews = db.prepare(`
+      SELECT id, customerName, rating, comment, orderId, createdAt 
+      FROM technician_reviews 
+      WHERE technicianId = ? 
+      ORDER BY createdAt DESC 
+      LIMIT 30
+    `).all(userId);
     res.json(reviews || []);
-  } catch {
+  } catch (err: any) {
     res.json([]);
   }
 });
 
-app.post("/api/technician/subscribe", authenticateToken,async (req: any, res) => {
-  try {
-    const userId = req.user?.id;
-    const { specialty } = req.body || {};
-    if (userId) {
-      db.prepare("UPDATE users SET isPro = 1, specialty = COALESCE(?, specialty) WHERE id = ?").run(specialty || null, userId);
-    }
-    res.json({ 
-      success: true, 
-      isSubscribed: true, 
-      specialty: specialty || 'صيانة أجهزة منزلية',
-      message: 'تهانينا! أصبحت فني معتمد في TecnoRexa.' 
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+// POST /api/technician/courses — Technician creates educational course (Draft -> Admin Review)
+app.post("/api/technician/courses", authenticateToken, async (req: any, res) => {
+  const { title, price, description, thumbnail } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: "عنوان الكورس مطلوب" });
   }
-});
 
-app.post("/api/technician/availability", authenticateToken,async (req: any, res) => {
-  try {
-    const { available } = req.body;
-    const isAvail = (available === true || available === 1 || available === '1' || available === 'true') ? 1 : 0;
-    await db.prepare("UPDATE users SET available = ? WHERE id = ?").run(isAvail, req.user.id);
-    const updated = await db.prepare("SELECT id, name, phone, email, role, status, available FROM users WHERE id = ?").get(req.user.id);
-    res.json({ success: true, available: isAvail, user: updated, message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴" });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/api/technician/orders/:id/action", authenticateToken,async (req: any, res) => {
-  const { id } = req.params;
-  const { action, report, partsCost } = req.body;
-  try {
-    const newStatus = action === 'complete' ? 'completed' : (action === 'accept' ? 'accepted' : 'in_progress');
-    await db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(newStatus, id);
-    res.json({ success: true, message: 'تم تنفيذ إجراء الفني بنجاح على الطلب.' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/api/technician/courses", authenticateToken,async (req: any, res) => {
-  const { title, price, level, description } = req.body;
   try {
     const courseId = `crs_${Date.now()}`;
+    const p = Math.max(0, Number(price) || 0);
+
     db.prepare(`
-      INSERT INTO courses (id, title, description, price, instructorId, instructorName, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run(courseId, title, description || '', Number(price) || 0, req.user?.id || 'tech', req.user?.name || 'فني صيانة');
+      INSERT INTO courses (id, title, description, price, thumbnail, instructorId, instructorName, status, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_approval', datetime('now'))
+    `).run(
+      courseId,
+      title.trim(),
+      description ? description.trim() : 'كورس تدريبي معتمد لصيانة الأجهزة المنزلية',
+      p,
+      thumbnail || null,
+      req.user.id,
+      req.user.name || 'فني صيانة معتمد'
+    );
+
     res.json({ 
       success: true, 
-      message: 'تم إرسال كورس "' + title + '" للمراجعة والاعتماد من قبل إدارة المنصة.' 
+      id: courseId,
+      message: `تم رفع كورس "${title.trim()}" وهو الآن قيد مراجعة واعتماد الإدارة قبل النشر.` 
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post("/api/technician/reels", authenticateToken,async (req: any, res) => {
-  const { title, videoUrl } = req.body;
+// POST /api/technician/reels — Upload technical video reel
+app.post("/api/technician/reels", authenticateToken, async (req: any, res) => {
+  const { title, videoUrl, description } = req.body;
+  if (!videoUrl) return res.status(400).json({ error: "رابط الفيديو مطلوب" });
+
   try {
     const reelId = `reel_${Date.now()}`;
     db.prepare(`
       INSERT INTO reels (id, userId, userName, videoUrl, description, createdAt)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `).run(reelId, req.user?.id || 'tech', req.user?.name || 'فني صيانة', videoUrl || '', title || '');
+    `).run(
+      reelId,
+      req.user.id,
+      req.user.name || 'فني صيانة',
+      videoUrl,
+      description || title || 'شرح صيانة وإصلاح أعطال'
+    );
+
     res.json({ 
       success: true, 
-      message: 'تم نشر الفيديو القصير بنجاح في المركز الإعلامي.' 
+      id: reelId, 
+      message: "تم نشر فيديو الصيانة في المركز الإعلامي ومجتمع الفنيين بنجاح! 🚀" 
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4605,8 +5204,8 @@ app.post(
 );
 
 app.put(
-  "/api/admin/users/:id", authenticateToken,requireAdmin,async (req: any, res) => {
-    const { role, status } = req.body;
+  "/api/admin/users/:id", authenticateToken, requireAdmin, async (req: any, res) => {
+    const { role, status, banReason } = req.body;
     const targetId = req.params.id;
     const currentUser = req.user;
     try {
@@ -4616,80 +5215,90 @@ app.put(
       if (!oldUser)
         return res.status(404).json({ error: "المستخدم غير موجود" });
 
-      const normalizedCurrentRole = normalizeRoleServer(
-        currentUser.role || "customer",
-      );
-      const normalizedTargetRole = normalizeRoleServer(
-        role || oldUser.role || "customer",
-      );
+      const normalizedCurrentRole = normalizeRoleServer(currentUser.role || "customer");
+      const normalizedTargetRole = normalizeRoleServer(role || oldUser.role || "customer");
+      const oldUserRole = normalizeRoleServer(oldUser.role || "customer");
 
-      // Prevent self-ban or banning own account
+      // 🛡️ OWNER SELF-PROTECTION: Cannot modify own account status
       if (targetId === currentUser.id && (status === "banned" || status === "suspended")) {
         return res.status(400).json({ error: "لا يمكنك حظر حسابك الخاص" });
       }
 
-      // Prevent banning the owner account
-      if (normalizeRoleServer(oldUser.role) === "owner" && (status === "banned" || status === "suspended")) {
+      // 🛡️ OWNER SELF-PROTECTION: Cannot change own role to lower role
+      if (targetId === currentUser.id && normalizedCurrentRole === "owner" && normalizedTargetRole !== "owner") {
+        return res.status(400).json({ error: "لا يمكن للمالك تخفيض رتبة حسابه الخاص" });
+      }
+
+      // 🛡️ Cannot ban any owner account
+      if (oldUserRole === "owner" && (status === "banned" || status === "suspended")) {
         return res.status(403).json({ error: "لا يمكن حظر حساب المالك" });
       }
 
-      // Only owner can assign owner or manager roles
-      const highLevelRoles = ["owner", "manager"];
-      if (
-        highLevelRoles.includes(normalizedTargetRole) &&
-        normalizedCurrentRole !== "owner"
-      ) {
-        return res
-          .status(403)
-          .json({ error: "فقط المالك يمكنه تعيين الملاك أو المديرين" });
+      // 🛡️ Cannot change owner's role without being owner
+      if (oldUserRole === "owner" && normalizedCurrentRole !== "owner") {
+        return res.status(403).json({ error: "لا يمكنك تعديل صلاحيات المالك" });
       }
 
-      // Only owner can modify high level roles
+      // 🛡️ Only owner can assign owner or manager roles
+      const highLevelRoles = ["owner", "manager"];
+      if (highLevelRoles.includes(normalizedTargetRole) && normalizedCurrentRole !== "owner") {
+        return res.status(403).json({ error: "فقط المالك يمكنه تعيين الملاك أو المديرين" });
+      }
+
+      // 🛡️ Only owner can modify high level roles (except self-editing)
       if (
-        highLevelRoles.includes(
-          normalizeRoleServer(oldUser.role || "customer"),
-        ) &&
+        highLevelRoles.includes(oldUserRole) &&
         normalizedCurrentRole !== "owner" &&
         targetId !== currentUser.id
       ) {
-        return res
-          .status(403)
-          .json({ error: "لا يمكنك تعديل صلاحيات المدير أو المالك" });
+        return res.status(403).json({ error: "لا يمكنك تعديل صلاحيات المدير أو المالك" });
       }
 
       const finalStatus = status || oldUser.status;
       const isBannedFlag = (finalStatus === 'banned' || finalStatus === 'suspended') ? 1 : 0;
+      const finalBanReason = isBannedFlag === 1 ? (banReason || 'حظر إداري') : null;
+
       await db.prepare("UPDATE users SET role = ?, status = ?, banned = ?, banReason = ? WHERE id = ?").run(
         normalizedTargetRole,
         finalStatus,
         isBannedFlag,
-        isBannedFlag === 1 ? 'حظر إداري' : null,
+        finalBanReason,
         targetId,
       );
+
       const logId = `audit_${Date.now()}`;
+      // Build human-readable Arabic action
+      let arabicAction = 'تحديث بيانات مستخدم';
+      if (isBannedFlag === 1) arabicAction = `حظر مستخدم${finalBanReason ? ' - السبب: ' + finalBanReason : ''}`;
+      else if (oldUser.status === 'banned' && finalStatus === 'active') arabicAction = 'رفع الحظر عن مستخدم';
+      else if (oldUser.role !== normalizedTargetRole) arabicAction = `تغيير رتبة من ${oldUser.role} إلى ${normalizedTargetRole}`;
 
       db.prepare(
-        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'USER_UPDATE', ?, ?, ?, ?)",
+        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
       ).run(
         logId,
+        arabicAction,
         targetId,
         currentUser.id,
         JSON.stringify({
+          targetName: oldUser.name,
           oldRole: oldUser.role,
           newRole: normalizedTargetRole,
           oldStatus: oldUser.status,
-          newStatus: status,
+          newStatus: finalStatus,
+          banReason: finalBanReason,
         }),
         new Date().toISOString(),
       );
-      // Notify user
+
+      // Notify user via socket
       io.to(targetId).emit("role_changed", {
         newRole: normalizedTargetRole,
-        newStatus: status,
+        newStatus: finalStatus,
       });
-      if (status === "banned" || status === "suspended") {
+      if (isBannedFlag === 1) {
         io.to(targetId).emit("force_banned", {
-          reason: "تم حظر هذا الحساب من قبل إدارة المنصة.",
+          reason: finalBanReason || "تم حظر هذا الحساب من قبل إدارة المنصة.",
         });
       }
       res.json({ success: true });
@@ -4704,15 +5313,44 @@ app.delete(
   authenticateToken,
   requireOwner, async (req: any, res) => {
     const targetId = req.params.id;
+    
+    // 🛡️ Cannot delete own account
     if (targetId === req.user.id)
       return res.status(400).json({ error: "لا يمكنك حذف حسابك الخاص" });
+    
     try {
+      const targetUser = db.prepare("SELECT * FROM users WHERE id = ?").get(targetId) as any;
+      if (!targetUser)
+        return res.status(404).json({ error: "المستخدم غير موجود" });
+      
+      // 🛡️ Cannot delete another owner account
+      if (normalizeRoleServer(targetUser.role) === 'owner')
+        return res.status(403).json({ error: "لا يمكن حذف حساب المالك" });
+
+      // Soft-delete financial records (anonymize but keep for accounting)
+      const anonymizedName = `محذوف_${targetId.slice(-6)}`;
+      try {
+        db.prepare("UPDATE transactions SET userId = 'DELETED_USER' WHERE userId = ?").run(targetId);
+      } catch (e) {}
+      try {
+        db.prepare("UPDATE orders SET userId = 'DELETED_USER' WHERE userId = ?").run(targetId);
+      } catch (e) {}
+
+      // Hard delete the user account and personal data
       await db.prepare("DELETE FROM users WHERE id = ?").run(targetId);
+      
+      // Clean up related non-financial data
+      try { db.prepare("DELETE FROM notifications WHERE userId = ?").run(targetId); } catch (e) {}
+      try { db.prepare("DELETE FROM cart WHERE userId = ?").run(targetId); } catch (e) {}
+      try { db.prepare("DELETE FROM wishlist WHERE userId = ?").run(targetId); } catch (e) {}
+      try { db.prepare("DELETE FROM technician_specialties WHERE technicianId = ?").run(targetId); } catch (e) {}
+
       const logId = `audit_${Date.now()}`;
       db.prepare(
-        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'USER_DELETE', ?, ?, '{}', ?)",
-      ).run(logId, targetId, req.user.id, new Date().toISOString());
-      res.json({ success: true });
+        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+      ).run(logId, `حذف مستخدم نهائياً (${targetUser.name} - ${targetUser.role})`, targetId, req.user.id, JSON.stringify({ deletedName: targetUser.name, deletedRole: targetUser.role, deletedPhone: targetUser.phone }), new Date().toISOString());
+      
+      res.json({ success: true, message: `تم حذف حساب ${targetUser.name} بنجاح` });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -4729,7 +5367,7 @@ app.get("/api/user/wallet", authenticateToken,async (req: any, res) => {
 
 // Legacy admin user routes (keep for compatibility)
 app.put("/api/user/profile", authenticateToken,async (req: any, res) => {
-  const { name, phone, email, avatar, bio, expertise, available } = req.body;
+  const { name, phone, email, avatar, bio, expertise, available, specialty } = req.body;
   try {
     const currentUser = await db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id) as any;
     if (!currentUser) return res.status(404).json({ error: "المستخدم غير موجود" });
@@ -4756,10 +5394,10 @@ app.put("/api/user/profile", authenticateToken,async (req: any, res) => {
         : JSON.stringify(expertise || {});
     const finalAvailable = available !== undefined ? (available === true || available === 1 || available === '1' ? 1 : 0) : (currentUser.available ?? 1);
     db.prepare(
-      "UPDATE users SET name = COALESCE(?, name), phone = ?, email = ?, avatar = COALESCE(?, avatar), bio = COALESCE(?, bio), expertise = ?, available = ? WHERE id = ?",
-    ).run(name || currentUser.name, finalPhone, finalEmail, avatar || currentUser.avatar, bio || currentUser.bio, expertiseValue, finalAvailable, req.user.id);
+      "UPDATE users SET name = COALESCE(?, name), phone = ?, email = ?, avatar = COALESCE(?, avatar), bio = COALESCE(?, bio), expertise = ?, available = ?, specialty = COALESCE(?, specialty) WHERE id = ?",
+    ).run(name || currentUser.name, finalPhone, finalEmail, avatar || currentUser.avatar, bio || currentUser.bio, expertiseValue, finalAvailable, specialty ?? null, req.user.id);
 
-    const updatedUser = await db.prepare("SELECT id, name, phone, email, role, status, balance, avatar, bio, available FROM users WHERE id = ?").get(req.user.id);
+    const updatedUser = await db.prepare("SELECT id, name, phone, email, role, status, balance, avatar, bio, available, specialty, rating, ratingCount FROM users WHERE id = ?").get(req.user.id);
     res.json({ success: true, user: updatedUser });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4794,28 +5432,53 @@ app.put("/api/user/:id", authenticateToken,requireAdmin,async (req: any, res) =>
   }
 });
 
-app.post("/api/wallet/topup", authenticateToken,async (req: any, res) => {
-  const { amount } = req.body;
+app.post("/api/wallet/topup", authenticateToken, async (req: any, res) => {
+  const { amount, receiptImage, senderPhone, notes } = req.body;
   const numAmount = Number(amount);
   if (!numAmount || numAmount <= 0) {
-    return res.status(400).json({ error: "Invalid amount" });
+    return res.status(400).json({ error: "يرجى تحديد مبلغ صالح للشحن" });
   }
 
-  try {
-    await db.prepare("UPDATE users SET balance = balance + ? WHERE id = ?").run(
-      numAmount,
-      req.user.id,
-    );
-    const txId = `tx_${Date.now()}`;
-    const now = new Date().toISOString();
+  // 🛡️ Only Owner can directly topup arbitrary funds without receipt review
+  if (req.user?.role === 'owner') {
     try {
+      await db.prepare("UPDATE users SET balance = balance + ? WHERE id = ?").run(numAmount, req.user.id);
+      const txId = `tx_${Date.now()}`;
       db.prepare(`
         INSERT INTO transactions (id, userId, type, amount, description, referenceId, status, createdAt)
-        VALUES (?, ?, 'topup', ?, 'شحن محفظة إلكترونية', 'WALLET_TOPUP', 'completed', ?)
-      `).run(txId, req.user.id, numAmount, now);
-    } catch (e) {}
+        VALUES (?, ?, 'topup', ?, 'شحن مباشر من المالك', 'WALLET_TOPUP', 'completed', datetime('now'))
+      `).run(txId, req.user.id, numAmount);
+      return res.json({ success: true, message: `تم شحن المحفظة بمبلغ ${numAmount} ج.م بنجاح` });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
-    res.json({ success: true, message: `تم شحن المحفظة بمبلغ ${numAmount} ج.م بنجاح` });
+  // Regular users submit topup requests with proof for admin approval
+  try {
+    const reqId = `topup_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO approval_requests (id, requesterId, requesterName, type, details, status, createdAt)
+      VALUES (?, ?, ?, 'wallet_topup', ?, 'pending', datetime('now'))
+    `).run(
+      reqId,
+      req.user.id,
+      req.user.name,
+      JSON.stringify({
+        amount: numAmount,
+        receiptImage: receiptImage || null,
+        senderPhone: senderPhone || req.user.phone,
+        notes: notes || 'طلب شحن محفظة',
+      })
+    );
+
+    const txId = `tx_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO transactions (id, userId, type, amount, description, referenceId, status, createdAt)
+      VALUES (?, ?, 'topup', ?, 'طلب شحن محفظة قيد المراجعة', ?, 'pending', datetime('now'))
+    `).run(txId, req.user.id, numAmount, reqId);
+
+    res.json({ success: true, message: `تم تسجيل طلب شحن المحفظة بمبلغ ${numAmount} ج.م وسيقوم المالك بمراجعته واعتماده فوراً.` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -5314,10 +5977,6 @@ app.get("/api/orders", async (req: any, res) => {
           "SELECT * FROM orders WHERE userId = ? ORDER BY createdAt DESC",
         )
         .all(userId || "") as any[];
-      // If user has no orders yet, return recent demo orders so the screen isn't empty
-      if (!orders || orders.length === 0) {
-        orders = await db.prepare("SELECT * FROM orders ORDER BY createdAt DESC LIMIT 10").all() as any[];
-      }
     }
     res.json(orders || []);
   } catch (err: any) {
@@ -5369,9 +6028,10 @@ app.post("/api/orders", async (req: any, res) => {
       }
     }
 
+    const gov = req.body.governorate || (loc.includes('-') ? loc.split('-')[0].trim() : 'القاهرة');
     db.prepare(`
-      INSERT INTO orders (id, userId, technicianId, sellerId, type, status, items, total, customerName, serviceType, location, createdAt)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+      INSERT INTO orders (id, userId, technicianId, sellerId, type, status, items, total, customerName, serviceType, deviceType, problemDesc, notes, governorate, location, createdAt)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       orderId,
       userId,
@@ -5382,6 +6042,10 @@ app.post("/api/orders", async (req: any, res) => {
       orderTotal,
       custName,
       sType,
+      sType,
+      notes || sType,
+      notes || '',
+      gov,
       loc,
       new Date().toISOString()
     );
@@ -5462,10 +6126,32 @@ app.get("/api/orders/:id", authenticateToken,async (req: any, res) => {
       supportReq = await db.prepare("SELECT * FROM support_requests WHERE orderId = ? OR id = ?").get(order.id, order.id);
     } catch {}
 
+    let quote = null;
+    try {
+      quote = db.prepare("SELECT * FROM service_quotes WHERE orderId = ? ORDER BY createdAt DESC LIMIT 1").get(order.id);
+    } catch {}
+
+    let serviceReport = null;
+    try {
+      serviceReport = db.prepare("SELECT * FROM service_reports WHERE orderId = ? LIMIT 1").get(order.id);
+    } catch {}
+
+    let tech = null;
+    if (order.technicianId) {
+      try {
+        tech = db.prepare("SELECT id, name, phone, specialty, rating, ratingCount, avatar FROM users WHERE id = ?").get(order.technicianId);
+      } catch {}
+    }
+
     res.json({
       ...order,
       items: parsedItems,
       supportRequest: supportReq,
+      quote,
+      serviceReport,
+      technician: tech,
+      technicianName: order.technicianName || tech?.name || '',
+      technicianPhone: tech?.phone || '',
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -7047,7 +7733,14 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-app.post("/api/products", authenticateToken,async (req: any, res) => {
+app.post("/api/products", authenticateToken, async (req: any, res) => {
+  const userRole = normalizeRoleServer(req.user.role);
+  if (userRole !== 'merchant' && userRole !== 'owner' && userRole !== 'manager') {
+    return res.status(403).json({
+      error: "غير مصرح لك بإضافة منتجات في السوق. حساب الفني والعميل مخصص لشراء قطع الغيار فقط، البيع مقتصر على التجار المعتمدين."
+    });
+  }
+
   const { name, description, price, category, stock, image, specifications, specs } = req.body;
   const id = `prod_${Date.now()}`;
   const specsData = specifications || (specs ? (typeof specs === 'object' ? JSON.stringify(specs) : String(specs)) : null);
@@ -7074,22 +7767,12 @@ app.post("/api/products", authenticateToken,async (req: any, res) => {
 });
 
 app.get("/api/products/:id/reviews", async (req, res) => {
-  res.json([
-    {
-      id: "1",
-      userName: "أحمد محمد",
-      rating: 5,
-      comment: "منتج ممتاز جداً وتوصيل سريع",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      userName: "سارة علي",
-      rating: 4,
-      comment: "جيد ولكن السعر مرتفع قليلاً",
-      createdAt: new Date().toISOString(),
-    },
-  ]);
+  try {
+    const reviews = db.prepare("SELECT * FROM technician_reviews WHERE orderId = ? OR technicianId = ? ORDER BY createdAt DESC LIMIT 10").all(req.params.id, req.params.id);
+    res.json(reviews || []);
+  } catch {
+    res.json([]);
+  }
 });
 
 app.get("/api/products/:id/related", async (req, res) => {
@@ -8250,35 +8933,81 @@ app.get("/api/courses/:id", async (req, res) => {
   }
 });
 
-app.post("/api/courses", authenticateToken,async (req: any, res) => {
-  const { title, description, price, thumbnail } = req.body;
+app.post("/api/courses", authenticateToken, async (req: any, res) => {
+  const { title, description, price, thumbnail, level } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: "عنوان الكورس مطلوب" });
+  }
   const id = `course_${Date.now()}`;
+  const userRole = normalizeRoleServer(req.user.role);
+  const initialStatus = (userRole === 'owner' || userRole === 'manager') ? 'active' : 'pending_approval';
+
   try {
-    db.prepare(
-      "INSERT INTO courses (id, title, description, price, thumbnail, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-    ).run(id, title, description, price, thumbnail, new Date().toISOString());
-    res.json({ success: true, id });
+    db.prepare(`
+      INSERT INTO courses (id, title, description, price, thumbnail, instructorId, instructorName, status, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
+      id,
+      title.trim(),
+      description || '',
+      Math.max(0, Number(price) || 0),
+      thumbnail || null,
+      req.user.id,
+      req.user.name || 'فني صيانة معتمد',
+      initialStatus
+    );
+    res.json({
+      success: true,
+      id,
+      status: initialStatus,
+      message: initialStatus === 'active' ? 'تم نشر الكورس بنجاح' : 'تم رفع الكورس وهو قيد مراجعة واعتماد الإدارة'
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post("/api/courses/:id/lessons", authenticateToken,async (req: any, res) => {
+app.post("/api/courses/:id/approve", authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const course = db.prepare("SELECT * FROM courses WHERE id = ?").get(req.params.id) as any;
+    if (!course) return res.status(404).json({ error: "الكورس غير موجود" });
+    db.prepare("UPDATE courses SET status = 'active' WHERE id = ?").run(req.params.id);
+
+    if (course.instructorId) {
+      try {
+        db.prepare(`
+          INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+          VALUES (?, ?, 'course_approved', 'تم اعتماد كورسك التدريبي! 🎓', ?, ?, datetime('now'))
+        `).run(
+          `notif_${Date.now()}`,
+          course.instructorId,
+          `تم اعتماد كورس "${course.title}" من قبل الإدارة وأصبح منشوراً ومتاحاً للشراء في المنصة.`,
+          JSON.stringify({ courseId: course.id })
+        );
+      } catch {}
+    }
+
+    res.json({ success: true, message: "تم اعتماد ونشر الكورس بنجاح" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/courses/:id/lessons", authenticateToken, async (req: any, res) => {
   const { title, duration, videoUrl, orderIndex } = req.body;
   const id = `less_${Date.now()}`;
   try {
     db.prepare(
-      "INSERT INTO course_lessons (id, courseId, title, duration, videoUrl, orderIndex, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO course_lessons (id, courseId, title, duration, videoUrl, orderIndex, createdAt) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
     ).run(
       id,
       req.params.id,
       title,
-      duration,
+      duration || '10:00',
       videoUrl,
-      orderIndex || 0,
-      new Date().toISOString(),
+      orderIndex || 0
     );
-    res.json({ success: true });
+    res.json({ success: true, id });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -8439,10 +9168,20 @@ app.post("/api/subscriptions/subscribe", authenticateToken,async (req: any, res)
   const startDate = now.toISOString();
   const endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
   const effectiveRole = targetRole || (planId === 'technician' ? 'technician' : planId === 'merchant' ? 'merchant' : req.user.role);
-  const planName = plan || (effectiveRole === 'technician' ? 'ترقية فني معتمد (300 ج.م)' : effectiveRole === 'merchant' ? 'ترقية تاجر معتمد (500 ج.م)' : 'الباقة الاحترافية Pro');
-  const numAmount = Number(amount) || (effectiveRole === 'technician' ? 300 : effectiveRole === 'merchant' ? 500 : 299);
+  // 🛡️ Official Fees: 100 EGP for Merchant, 300 EGP for Technician
+  const planName = plan || (effectiveRole === 'technician' ? 'ترقية فني معتمد (300 ج.م)' : effectiveRole === 'merchant' ? 'ترقية تاجر معتمد (100 ج.م)' : 'الباقة الاحترافية Pro');
+  const numAmount = Number(amount) || (effectiveRole === 'technician' ? 300 : effectiveRole === 'merchant' ? 100 : 299);
 
   try {
+    // 🛡️ Enforce wallet balance check and debit if paying with wallet
+    if (!paymentMethod || paymentMethod === 'wallet') {
+      const u = db.prepare("SELECT balance FROM users WHERE id = ?").get(req.user.id) as any;
+      if (!u || (u.balance || 0) < numAmount) {
+        return res.status(400).json({ error: `رصيد المحفظة الحالي (${u?.balance || 0} ج.م) غير كافٍ للاشتراك بقيمة ${numAmount} ج.م` });
+      }
+      db.prepare("UPDATE users SET balance = balance - ? WHERE id = ?").run(numAmount, req.user.id);
+    }
+
     db.prepare(`
       INSERT INTO subscriptions (id, userId, plan, planId, targetRole, amount, paymentMethod, receiptImage, startDate, endDate, status, createdAt, expiresAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
@@ -8453,6 +9192,12 @@ app.post("/api/subscriptions/subscribe", authenticateToken,async (req: any, res)
       INSERT INTO transactions (id, userId, type, amount, description, referenceId, status, createdAt)
       VALUES (?, ?, 'subscription', ?, ?, ?, 'completed', ?)
     `).run(`tx_sub_${Date.now()}`, req.user.id, numAmount, `اشتراك في ${planName}`, id, startDate);
+
+    // Record in audit_logs
+    try {
+      db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+        .run(`audit_${Date.now()}`, `ترقية اشتراك ${effectiveRole === 'merchant' ? 'تاجر 100 ج.م' : 'فني 300 ج.م'}`, req.user.id, req.user.id, `اشتراك ${req.user.name} في ${planName} وسداد ${numAmount} ج.م`);
+    } catch {}
 
     // Mirror to upgrade_requests for admin audit
     try {
@@ -8466,7 +9211,7 @@ app.post("/api/subscriptions/subscribe", authenticateToken,async (req: any, res)
     if (effectiveRole === 'technician') {
       await db.prepare(`
         UPDATE users SET role = 'technician', specialty = ?, specialtyPending = 0, isPro = 1 WHERE id = ?
-      `).run(specialty || 'صيانة عامة', req.user.id);
+      `).run(specialty || 'صيانة أجهزة منزلية', req.user.id);
     } else if (effectiveRole === 'merchant') {
       await db.prepare(`
         UPDATE users SET role = 'merchant', canSell = 1, isPro = 1, storeName = ? WHERE id = ?
@@ -8809,7 +9554,7 @@ app.get("/api/technicians", async (req, res) => {
   try {
     const techs = db
       .prepare(
-        "SELECT id, name, role, avatar, bio, governorate, city, area, phone, specialty, status, balance, createdAt FROM users WHERE role = 'technician'",
+        "SELECT id, name, role, avatar, bio, governorate, city, area, specialty, status FROM users WHERE role = 'technician' AND status = 'active'",
       )
       .all();
     res.json(techs || []);
@@ -9718,10 +10463,22 @@ app.delete("/api/owner/users/:id", authenticateToken, requireOwner, async (req: 
     const targetId = req.params.id;
     const targetUser = await db.prepare("SELECT id, role, name FROM users WHERE id = ?").get(targetId) as any;
     if (!targetUser) return res.status(404).json({ error: "المستخدم غير موجود" });
-    if (targetUser.role === 'owner' || targetId === req.user.id) {
-      return res.status(400).json({ error: "لا يمكن حذف حساب المالك الرئيسي" });
+    if (targetUser.role === 'owner' || targetId === req.user.id || targetId === 'owner_master') {
+      return res.status(403).json({ error: "لا يمكن حذف حساب المالك الرئيسي للمنظومة 🛡️" });
     }
+
+    // Anonymize financial history before deletion to prevent constraint errors
+    try {
+      db.prepare("UPDATE orders SET userId = 'DELETED_USER' WHERE userId = ?").run(targetId);
+      db.prepare("UPDATE transactions SET userId = 'DELETED_USER' WHERE userId = ?").run(targetId);
+    } catch {}
+
     await db.prepare("DELETE FROM users WHERE id = ?").run(targetId);
+
+    db.prepare(
+      "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'حذف مستخدم نهائياً', ?, ?, ?, datetime('now'))"
+    ).run(`audit_${Date.now()}`, targetId, req.user.id, `حذف حساب (${targetUser.name}) إدارياً`);
+
     res.json({ success: true, message: `تم حذف حساب (${targetUser.name}) بنجاح` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -9732,6 +10489,12 @@ app.delete("/api/owner/users/:id", authenticateToken, requireOwner, async (req: 
 app.post("/api/admin/users", authenticateToken, requireAdmin, async (req: any, res) => {
   const { name, phone, email, role, password } = req.body;
   if (!name || !phone) return res.status(400).json({ error: "الاسم ورقم الهاتف مطلوبان" });
+
+  // 🛡️ Privilege Escalation Prevention: Only Owner can create Owner or Manager accounts
+  if (req.user.role === 'manager' && (role === 'owner' || role === 'manager')) {
+    return res.status(403).json({ error: "لا يمتلك المدير صلاحية إنشاء حسابات إدارية عليا (مالك أو مدير)" });
+  }
+
   try {
     const defaultPass = password || '123456';
     const hash = bcrypt.hashSync(defaultPass, 10);
@@ -9743,6 +10506,10 @@ app.post("/api/admin/users", authenticateToken, requireAdmin, async (req: any, r
       INSERT INTO users (id, name, phone, email, password, role, status, createdAt)
       VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'))
     `).run(userId, name, phone, userEmail, hash, userRole);
+
+    db.prepare(
+      "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'إنشاء حساب مستخدم', ?, ?, ?, datetime('now'))"
+    ).run(`audit_${Date.now()}`, userId, req.user.id, `إنشاء حساب ${name} برتبة ${userRole}`);
 
     res.json({
       success: true,

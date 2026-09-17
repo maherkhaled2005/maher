@@ -159,7 +159,7 @@ export default function RegisterScreen({ navigation }: any) {
 
     if (role === 'merchant') {
       if (!senderPhone.trim()) {
-        Alert.alert('تنبيه', 'يرجى إدخال رقم المحفظة المحول منها رسوم الاشتراك (500 ج.م)');
+        Alert.alert('تنبيه', 'يرجى إدخال رقم المحفظة المحول منها رسوم الاشتراك (100 ج.م)');
         return;
       }
       if (!receiptImage) {
@@ -484,7 +484,7 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
           )}
 
-          {/* Paywall & Verification for Tech (300 EGP) and Merchant (500 EGP) */}
+          {/* Paywall & Verification for Tech (300 EGP) and Merchant (100 EGP) */}
           {(role === 'technician' || role === 'merchant') && (
             <View
               style={{
@@ -501,7 +501,7 @@ export default function RegisterScreen({ navigation }: any) {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 8 }}>
                 <Text style={{ color: '#D4AF37', fontWeight: '900', fontSize: 15 }}>
-                  {role === 'technician' ? 'رسوم اعتماد الفني (300 ج.م)' : 'رسوم توثيق التاجر (500 ج.م)'}
+                  {role === 'technician' ? 'رسوم اعتماد الفني (300 ج.م)' : 'رسوم توثيق التاجر (100 ج.م)'}
                 </Text>
                 <Sparkles size={16} color="#D4AF37" />
               </View>

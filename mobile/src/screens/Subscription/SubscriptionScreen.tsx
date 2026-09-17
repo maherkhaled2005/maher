@@ -83,7 +83,7 @@ export default function SubscriptionScreen({ route, navigation }: any) {
   };
 
   const isTech = activeTab === 'technician';
-  const price = isTech ? 300 : 500;
+  const price = isTech ? 300 : 100;
   const planTitle = isTech ? 'ترقية فني معتمد' : 'ترقية تاجر معتمد';
 
   const effectiveSpecialty =
@@ -276,7 +276,7 @@ export default function SubscriptionScreen({ route, navigation }: any) {
               fontSize: 13,
             }}
           >
-            تاجر قطع غيار (500 ج.م)
+            تاجر قطع غيار (100 ج.م)
           </Text>
         </TouchableOpacity>
       </View>

@@ -181,10 +181,11 @@ export default function OrdersScreen({ navigation }: any) {
       if (!isForMe) return false;
     }
 
+    const inProgressStatuses = ['accepted', 'quoted', 'quote_approved', 'on_way', 'arrived', 'diagnosing', 'repairing', 'service_report_submitted', 'in_progress'];
     if (activeTab === 'maintenance' && o.type !== 'maintenance') return false;
     if (activeTab === 'purchase' && o.type !== 'purchase') return false;
     if (activeTab === 'pending' && o.status !== 'pending') return false;
-    if (activeTab === 'in_progress' && o.status !== 'in_progress') return false;
+    if (activeTab === 'in_progress' && !inProgressStatuses.includes(o.status)) return false;
     if (activeTab === 'on_way' && o.status !== 'on_way') return false;
     if (activeTab === 'completed' && o.status !== 'completed') return false;
     if (activeTab === 'cancelled' && o.status !== 'cancelled') return false;
@@ -204,12 +205,28 @@ export default function OrdersScreen({ navigation }: any) {
     switch (status) {
       case 'pending':
         return { label: 'معلق', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)', icon: Clock, step: 1 };
-      case 'in_progress':
-        return { label: 'قيد المراجعة / التنفيذ', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)', icon: Package, step: 2 };
+      case 'accepted':
+        return { label: 'تم القبول', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)', icon: CheckCircle, step: 2 };
+      case 'quoted':
+        return { label: 'عرض سعر', color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.15)', icon: DollarSign, step: 2 };
+      case 'quote_approved':
+        return { label: 'عرض مقبول', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)', icon: CheckCircle, step: 2 };
+      case 'quote_rejected':
+        return { label: 'عرض مرفوض', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.15)', icon: XCircle, step: 2 };
       case 'on_way':
         return { label: 'في الطريق', color: colors.primary, bg: 'rgba(212, 175, 55, 0.15)', icon: Truck, step: 3 };
+      case 'arrived':
+        return { label: 'وصل الفني', color: '#06B6D4', bg: 'rgba(6, 182, 212, 0.15)', icon: MapPin, step: 3 };
+      case 'diagnosing':
+        return { label: 'فحص وتشخيص', color: '#EC4899', bg: 'rgba(236, 72, 153, 0.15)', icon: Wrench, step: 3 };
+      case 'repairing':
+        return { label: 'جاري الإصلاح', color: colors.primary, bg: 'rgba(212, 175, 55, 0.15)', icon: Wrench, step: 3 };
+      case 'service_report_submitted':
+        return { label: 'تقرير الصيانة جاهز', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)', icon: FileText, step: 4 };
+      case 'in_progress':
+        return { label: 'قيد التنفيذ', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)', icon: Package, step: 2 };
       case 'completed':
-        return { label: 'مكتمل', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)', icon: CheckCircle, step: 4 };
+        return { label: 'مكتمل', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)', icon: CheckCircle, step: 5 };
       case 'cancelled':
         return { label: 'ملغي ومسترجع', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.15)', icon: XCircle, step: 0 };
       default:
@@ -230,8 +247,12 @@ export default function OrdersScreen({ navigation }: any) {
 
   // Open Order Details
   const handleOpenDetails = (order: OrderRecord) => {
-    setSelectedOrder(order);
-    setDetailsModalVisible(true);
+    if (navigation?.navigate) {
+      navigation.navigate('OrderDetails', { orderId: order.id });
+    } else {
+      setSelectedOrder(order);
+      setDetailsModalVisible(true);
+    }
   };
 
   // Customer Cancel (< 10 minutes limit)

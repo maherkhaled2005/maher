@@ -44,20 +44,17 @@ const SPECIALTIES = [
 
 export default function TechnicianDashboard({ navigation }: any) {
   const { user, updateUser } = useAuthStore();
-  const [showSubscription, setShowSubscription] = useState(user?.role !== 'technician' && !user?.isPro);
   const [isAvailable, setIsAvailable] = useState(user?.available !== undefined ? Boolean(user.available) : true);
-  const [selectedSpecs, setSelectedSpecs] = useState<string[]>(['ac', 'fridge']);
   const [refreshing, setRefreshing] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<number>(user?.balance || 0);
+  const [overview, setOverview] = useState<any>(null);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
-  const [completedCount, setCompletedCount] = useState<number>(0);
 
   const handleToggleAvailability = async (val: boolean) => {
     setIsAvailable(val);
     try {
-      await api.post('/technician/availability', { available: val });
-      if (user) {
-        updateUser({ ...user, available: val ? 1 : 0 });
+      const res = await api.post('/technician/availability', { available: val });
+      if (res?.data?.available !== undefined && user) {
+        updateUser({ ...user, available: res.data.available });
       }
     } catch (e) {
       console.warn('Could not update availability', e);
@@ -66,49 +63,35 @@ export default function TechnicianDashboard({ navigation }: any) {
 
   const loadTechnicianData = async () => {
     try {
-      // 1. Fetch Orders
-      const ordersRes = await api.get('/orders').catch(() => null);
-      if (ordersRes?.data && Array.isArray(ordersRes.data)) {
-        const maintOrders = ordersRes.data.filter((o: any) => o.type === 'maintenance');
-        const completedOrders = maintOrders.filter((o: any) => o.status === 'completed');
-        setCompletedCount(completedOrders.length);
-
-        const pendingOrAssigned = maintOrders.filter((o: any) => o.status === 'pending' || o.status === 'assigned' || o.status === 'in_progress');
-        if (pendingOrAssigned.length > 0) {
-          const mapped = pendingOrAssigned.map((ord: any) => {
-            let items: any[] = [];
-            try { items = typeof ord.items === 'string' ? JSON.parse(ord.items) : (ord.items || []); } catch {}
-            return {
-              id: ord.id,
-              device: ord.deviceType || (items[0]?.name) || 'طلب صيانة منزلية 🔧',
-              problem: ord.problemDesc || 'كشف وفحص عطل فني في موقع العميل',
-              location: ord.deliveryAddress || ord.address || 'القاهرة',
-              time: ord.createdAt ? new Date(ord.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'الآن',
-              price: `${ord.total || 350} ج.م`,
-              status: ord.status,
-              raw: ord,
-            };
-          });
-          setIncomingRequests(mapped);
-        } else {
-          setIncomingRequests([]);
+      // 1. Fetch Real KPI Overview from Backend
+      const overviewRes = await api.get('/technician/overview').catch(() => null);
+      if (overviewRes?.data) {
+        setOverview(overviewRes.data);
+        if (overviewRes.data.available !== undefined) {
+          setIsAvailable(Boolean(overviewRes.data.available));
         }
       }
 
-      // 2. Fetch Wallet
-      const balRes = await api.get('/user/balance').catch(() => null);
-      if (balRes?.data?.balance !== undefined) {
-        setWalletBalance(balRes.data.balance);
-      }
-
-      // 3. Fetch Profile to sync availability
-      const profileRes = await api.get('/user/profile').catch(() => null);
-      if (profileRes?.data && profileRes.data.available !== undefined) {
-        const avail = Boolean(profileRes.data.available);
-        setIsAvailable(avail);
-        if (user) {
-          updateUser({ ...user, available: profileRes.data.available });
-        }
+      // 2. Fetch Real Service Requests for this technician
+      const reqRes = await api.get('/technician/requests').catch(() => null);
+      if (reqRes?.data && Array.isArray(reqRes.data)) {
+        const mapped = reqRes.data.filter((ord: any) => ord.status !== 'completed' && ord.status !== 'cancelled').map((ord: any) => {
+          let items: any[] = [];
+          try { items = typeof ord.items === 'string' ? JSON.parse(ord.items) : (ord.items || []); } catch {}
+          return {
+            id: ord.id,
+            device: ord.deviceType || (items[0]?.name) || ord.serviceType || 'طلب صيانة منزلية 🔧',
+            problem: ord.problemDesc || ord.notes || 'كشف وفحص عطل فني في موقع العميل',
+            location: ord.location || ord.address || ord.governorate || 'القاهرة',
+            time: ord.createdAt ? new Date(ord.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'الآن',
+            price: `${ord.total || 250} ج.م`,
+            status: ord.status,
+            raw: ord,
+          };
+        });
+        setIncomingRequests(mapped);
+      } else {
+        setIncomingRequests([]);
       }
     } catch (e) {
       console.warn('Could not refresh tech data', e);
@@ -121,28 +104,21 @@ export default function TechnicianDashboard({ navigation }: any) {
     loadTechnicianData();
   }, []);
 
-  // ✅ PRODUCTION-SAFE: Grace Period Auto-Offline (10 minutes)
-  // The technician stays available for 10 minutes after leaving the app.
-  // If they return within 10 minutes → stays online (normal app switch).
-  // If they stay away for 10+ minutes → goes offline automatically.
-  // This matches industry standards (Uber, Bosta, etc.)
-  const GRACE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes
+  // Grace Period Auto-Offline (10 minutes)
+  const GRACE_PERIOD_MS = 10 * 60 * 1000;
   const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState.match(/inactive|background/)) {
-        // App went to background — start grace period timer
         if (!offlineTimerRef.current) {
           offlineTimerRef.current = setTimeout(() => {
-            // 10 minutes passed and still in background → go offline
             setIsAvailable(false);
             api.post('/technician/availability', { available: false }).catch(() => {});
             offlineTimerRef.current = null;
           }, GRACE_PERIOD_MS);
         }
       } else if (nextState === 'active') {
-        // App came back to foreground — cancel the timer, stay online
         if (offlineTimerRef.current) {
           clearTimeout(offlineTimerRef.current);
           offlineTimerRef.current = null;
@@ -152,7 +128,6 @@ export default function TechnicianDashboard({ navigation }: any) {
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const handleUnload = () => {
-        // On web close → go offline immediately (intentional action)
         api.post('/technician/availability', { available: false }).catch(() => {});
       };
       window.addEventListener('beforeunload', handleUnload);
@@ -174,149 +149,77 @@ export default function TechnicianDashboard({ navigation }: any) {
     loadTechnicianData();
   }, []);
 
-  // Technician KPIs (Dynamic from real database)
-  const workedHoursVal = (user as any)?.workedHours || (completedCount * 1.5) || 0;
+  // Dynamic KPIs strictly from Real Database Numbers
+  const workedHoursVal = overview?.workedHours ?? (user as any)?.workedHours ?? 0;
+  const maintEarnings = overview?.maintenanceEarnings ?? 0;
+  const courseEarnings = overview?.coursesEarnings ?? 0;
+  const completedOrdersCount = overview?.completedOrders ?? 0;
+  const trueRating = overview?.overallRating || user?.rating;
+  const trueRatingCount = overview?.ratingCount || user?.ratingCount || 0;
 
   const technicianKpis = [
-    { label: 'طلبات صيانة متاحة', value: `${incomingRequests.length} طلبات`, note: incomingRequests.length > 0 ? 'في منطقتك 📍' : 'لا توجد طلبات جديدة', icon: Package, color: '#F59E0B' },
-    { label: 'ساعات العمل النشطة ⏱️', value: `${Number(workedHoursVal).toFixed(1)} ساعة`, note: 'تتوقف تلقائياً عند الإغلاق 🔴', icon: Clock, color: '#10B981' },
-    { label: 'أرباح الصيانة 🔧', value: `${(walletBalance || 0).toLocaleString()} ج.م`, note: 'أرباحك من عمليات الصيانة', icon: DollarSign, color: colors.primary },
-    { label: 'أرباح الكورسات 📚', value: '0 ج.م', note: 'عائد نشر الكورسات والشروحات', icon: BookOpen, color: '#8B5CF6' },
-    { label: 'التقييم العام', value: user?.rating ? `${user.rating} ⭐` : 'جديد', note: user?.ratingCount ? `${user.ratingCount} تقييم` : 'لا توجد تقييمات بعد', icon: Star, color: '#F59E0B' },
-    { label: 'الطلبات المنجزة', value: `${completedCount} طلب`, note: completedCount > 0 ? 'منجز بنجاح' : 'لا توجد طلبات بعد', icon: CheckCircle2, color: '#3B82F6' },
+    {
+      label: 'طلبات صيانة متاحة',
+      value: `${overview?.pendingRequests ?? incomingRequests.length} طلبات`,
+      note: incomingRequests.length > 0 ? 'في منطقتك 📍' : 'لا توجد طلبات جديدة',
+      icon: Package,
+      color: '#F59E0B'
+    },
+    {
+      label: 'ساعات العمل النشطة ⏱️',
+      value: `${Number(workedHoursVal).toFixed(1)} ساعة`,
+      note: isAvailable ? 'متاح للعمل الآن 🟢' : 'غير متصل حالياً 🔴',
+      icon: Clock,
+      color: '#10B981'
+    },
+    {
+      label: 'أرباح الصيانة 🔧',
+      value: `${maintEarnings.toLocaleString()} ج.م`,
+      note: 'أرباحك من عمليات الصيانة المنجزة',
+      icon: DollarSign,
+      color: colors.primary
+    },
+    {
+      label: 'أرباح الكورسات 📚',
+      value: `${courseEarnings.toLocaleString()} ج.م`,
+      note: 'عائد بيع الكورسات والشروحات (80%)',
+      icon: BookOpen,
+      color: '#8B5CF6'
+    },
+    {
+      label: 'التقييم العام',
+      value: trueRating ? `${trueRating} ⭐` : 'جديد',
+      note: trueRatingCount ? `${trueRatingCount} تقييم حقيقي` : 'لا توجد تقييمات بعد',
+      icon: Star,
+      color: '#F59E0B'
+    },
+    {
+      label: 'الطلبات المنجزة',
+      value: `${completedOrdersCount} طلب`,
+      note: completedOrdersCount > 0 ? 'منجز بنجاح' : 'لا توجد طلبات بعد',
+      icon: CheckCircle2,
+      color: '#3B82F6'
+    },
   ];
 
   // Technician Sections
   const technicianSections = [
     { label: 'طلبات الصيانة الواردة', desc: 'استعراض والرد على طلبات العملاء وإتمام الصيانة', icon: Package, screen: 'Orders', color: '#F59E0B' },
     { label: 'الدعم الفني والمساعدة 🎧', desc: 'تواصل مع خدمة العملاء لحل أي استفسار أو مشكلة بالطلبات', icon: Headphones, screen: 'Tickets', color: '#0D9488' },
-    { label: 'إدارة الكورسات والشروحات', desc: 'نشر كورسات مدفوعة وتحقيق أرباح إضافية', icon: BookOpen, screen: 'WebCommunity', color: '#10B981' },
+    { label: 'إدارة الكورسات والشروحات', desc: 'نشر كورسات مدفوعة وتحقيق أرباح إضافية', icon: BookOpen, screen: 'Courses', color: '#10B981' },
     { label: 'المحفظة وسحب الأرباح', desc: 'تحويل الأرباح إلى فودافون كاش أو إنستاباي', icon: Wallet, screen: 'Wallet', color: colors.primary },
     { label: 'مجتمع الفنيين والريلز', desc: 'شروحات وفيديوهات صيانة مع زملائك الفنيين', icon: Video, screen: 'WebCommunity', color: '#8B5CF6' },
     { label: 'ملفي المهني والتقييمات', desc: 'عرض التقييمات السابقة ومناطق التغطية', icon: Award, screen: 'Profile', color: '#3B82F6' },
   ];
 
-  const handleSubscribe = () => {
-    if (user) {
-      updateUser({ ...user, isPro: true, role: 'technician' });
-    }
-    setShowSubscription(false);
-    Alert.alert('🎉 مبروك!', 'تم تفعيل اشتراك الفني بنجاح! يمكنك الآن استقبال طلبات الصيانة.');
-  };
-
   const handleAcceptRequest = async (req: any) => {
-    if (req.id && req.id.startsWith('ord_')) {
+    if (req.id) {
       try {
-        await api.post(`/orders/${req.id}/arrive`).catch(() => {});
+        await api.post(`/technician/orders/${req.id}/action`, { action: 'accept' }).catch(() => {});
       } catch {}
       navigation.navigate('OrderDetails', { orderId: req.id });
-    } else {
-      Alert.alert('✅ تم قبول الطلب', `تم قبول طلب ${req.device}. تم إرسال بياناتك للعميل ورقم الطلب هو #${req.id}`, [
-        { text: 'عرض الطلب', onPress: () => navigation.navigate('Orders') }
-      ]);
     }
   };
-
-  // Subscription Gate Screen
-  if (showSubscription) {
-    return (
-      <SafeAreaView
-        style={{ flex: 1, backgroundColor: colors.dark, padding: spacing.xl, justifyContent: 'center' }}
-      >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ alignItems: 'center', paddingVertical: spacing.xl, paddingBottom: 150 }}
-          showsVerticalScrollIndicator={true}
-        >
-          <View
-            style={{
-              width: 90,
-              height: 90,
-              borderRadius: 45,
-              backgroundColor: 'rgba(212,175,55,0.15)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: spacing.lg,
-              borderWidth: 2,
-              borderColor: colors.primary,
-            }}
-          >
-            <Wrench size={42} color={colors.primary} />
-          </View>
-
-          <Text style={{ color: colors.white, fontSize: 26, fontWeight: '900', textAlign: 'center', marginBottom: spacing.xs }}>
-            اشتراك فريق الفنيين المعتمدين 🔧
-          </Text>
-          <Text style={{ color: colors.gray, fontSize: 13, textAlign: 'center', marginBottom: spacing.lg }}>
-            انضم إلى منصة TecnoRexa واستقبل طلبات الصيانة الحقيقية في منطقتك.
-          </Text>
-
-          {/* Pricing Box */}
-          <View
-            style={{
-              backgroundColor: colors.darkCard,
-              borderRadius: borderRadius.xl,
-              padding: spacing.lg,
-              width: '100%',
-              maxWidth: 480,
-              borderWidth: 1.5,
-              borderColor: colors.primary,
-              marginBottom: spacing.xl,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: colors.primary, fontSize: 32, fontWeight: '900' }}>300 ج.م</Text>
-            <Text style={{ color: colors.gray, fontSize: 13, marginBottom: spacing.md }}>اشتراك شهري شامل كافة المميزات</Text>
-            
-            <View style={{ width: '100%', gap: spacing.sm }}>
-              {[
-                'استقبال طلبات الصيانة الحصرية في محيطك الجغرافي 📍',
-                'إمكانية بيع كورسات ودورات تدريبية وتحقيق دخل سلبي 📚',
-                'محفظة إلكترونية لصرف الأرباح فورياً (فودافون كاش / إنستاباي) 💳',
-                'شارة فني معتمد وبناء تقييم وسمعة موثوقة ⭐',
-              ].map((feat, i) => (
-                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'flex-end' }}>
-                  <Text style={{ color: colors.white, fontSize: 12, textAlign: 'right', flex: 1 }}>{feat}</Text>
-                  <CheckCircle2 color={colors.primary} size={16} />
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <TouchableOpacity
-            onPress={handleSubscribe}
-            style={{
-              backgroundColor: colors.primary,
-              paddingVertical: spacing.md,
-              paddingHorizontal: spacing.xxl,
-              borderRadius: borderRadius.lg,
-              width: '100%',
-              maxWidth: 480,
-              alignItems: 'center',
-              marginBottom: spacing.md,
-            }}
-          >
-            <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 16 }}>
-              تفعيل الاشتراك الآن (300 ج.م) ✓
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setShowSubscription(false)}
-            style={{
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.lg,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: colors.gray, fontSize: 13, fontWeight: '700' }}>
-              المتابعة للوحة التحكم وتصفح الطلبات
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView

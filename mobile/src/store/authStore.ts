@@ -100,19 +100,11 @@ export const useAuthStore = create<AuthState>()(
             set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
             return;
           }
+          throw new Error(data?.error || 'بيانات الدخول غير صحيحة');
         } catch (error: any) {
-          // If server error is credentials-specific (400/401 with message), throw it
-          if (error?.response?.status === 400 || error?.response?.status === 401) {
-            set({ isLoading: false });
-            throw error;
-          }
+          set({ isLoading: false });
+          throw error;
         }
-
-        // Offline / Network Failure Fallback Login
-        const fallbackUser = resolveMockUser(cleanId);
-        const fallbackToken = `offline-token-${Date.now()}`;
-        await saveSession(fallbackToken, fallbackUser);
-        set({ user: fallbackUser, token: fallbackToken, isAuthenticated: true, isLoading: false });
       },
 
       loginWithOTP: async (phone, otp) => {
@@ -124,11 +116,11 @@ export const useAuthStore = create<AuthState>()(
             set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
             return;
           }
-        } catch {}
-        const fallbackUser = resolveMockUser(phone);
-        const fallbackToken = `offline-token-${Date.now()}`;
-        await saveSession(fallbackToken, fallbackUser);
-        set({ user: fallbackUser, token: fallbackToken, isAuthenticated: true, isLoading: false });
+          throw new Error(data?.error || 'رمز التحقق غير صحيح');
+        } catch (error: any) {
+          set({ isLoading: false });
+          throw error;
+        }
       },
 
       register: async (formData) => {
@@ -140,14 +132,17 @@ export const useAuthStore = create<AuthState>()(
             set({ user: res.user, token: res.token, isAuthenticated: true, isLoading: false });
             return;
           }
-        } catch {}
-        const fallbackUser = resolveMockUser(formData.phone || formData.email || 'new_user');
-        const fallbackToken = `offline-token-${Date.now()}`;
-        await saveSession(fallbackToken, fallbackUser);
-        set({ user: fallbackUser, token: fallbackToken, isAuthenticated: true, isLoading: false });
+          throw new Error(res?.error || 'فشل تسجيل الحساب');
+        } catch (error: any) {
+          set({ isLoading: false });
+          throw error;
+        }
       },
 
       quickAccess: async (role) => {
+        if (!__DEV__) {
+          throw new Error('الدخول السريع غير متاح في بيئة الإنتاج');
+        }
         set({ isLoading: true });
         try {
           const data = await fetchApi('/auth/quick-access', { method: 'POST', data: { role } });
@@ -157,10 +152,7 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
         } catch {}
-        const mockUser = MOCK_USERS[role] || resolveMockUser(role);
-        const mockToken = `quick-token-${role}-${Date.now()}`;
-        await saveSession(mockToken, mockUser);
-        set({ user: mockUser, token: mockToken, isAuthenticated: true, isLoading: false });
+        set({ isLoading: false });
       },
 
       logout: async () => {

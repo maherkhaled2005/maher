@@ -1,5 +1,6 @@
 // ========================================
-// RBAC Roles & Permissions - Techno Rexa (Mobile)
+// RBAC Roles & Permissions - TecnoRexa (Mobile)
+// 7 Official Roles ONLY — assistant/junior/lead are designations (developerRank), NOT roles
 // ========================================
 
 export const VALID_ROLES = [
@@ -10,7 +11,6 @@ export const VALID_ROLES = [
   "programmer",
   "manager",
   "owner",
-  "assistant_programmer",
 ] as const;
 export type ValidRole = (typeof VALID_ROLES)[number];
 
@@ -118,11 +118,6 @@ export const ROLE_PERMISSIONS: Record<ValidRole, readonly Permission[]> = {
     "content.manage",
     "tickets.manage",
   ],
-  assistant_programmer: [
-    "bugs.view",
-    "system.logs",
-    "users.view",
-  ],
   customer_support: [
     "tickets.view",
     "tickets.manage",
@@ -201,9 +196,8 @@ export function normalizeRole(role: string): ValidRole {
     case "developer":
     case "programmer":
     case "dev":
-      return "programmer";
     case "assistant_programmer":
-      return "assistant_programmer";
+      return "programmer";
     case "support":
     case "customer_support":
       return "customer_support";
@@ -219,7 +213,6 @@ export function getRoleLabel(role: string): string {
     owner: "المالك 👑",
     manager: "المدير 👔",
     programmer: "المبرمج 💻",
-    assistant_programmer: "مساعد مبرمج 👨‍💻",
     customer_support: "دعم العملاء 🎧",
     technician: "فني صيانة 🔧",
     merchant: "تاجر معتمد 🏪",
@@ -238,7 +231,6 @@ export function getRoleColor(role: string): string {
     owner: "#D4AF37",
     manager: "#1E40AF",
     programmer: "#7C3AED",
-    assistant_programmer: "#8B5CF6",
     customer_support: "#0D9488",
     technician: "#EA580C",
     merchant: "#15803D",
@@ -259,7 +251,6 @@ export function isStaffRole(role: string): boolean {
     "owner",
     "manager",
     "programmer",
-    "assistant_programmer",
     "customer_support",
   ];
   return staffRoles.includes(normalizeRole(role));

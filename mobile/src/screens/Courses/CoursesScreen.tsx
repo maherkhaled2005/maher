@@ -78,22 +78,29 @@ export default function CoursesScreen({ navigation }: any) {
       return;
     }
     const priceNum = parseFloat(formPrice) || 0;
-    const newCourse: Course = {
-      id: `crs_${Date.now()}`,
-      title: formTitle.trim(),
-      description: formDesc.trim() || 'كورس تدريبي معتمد',
-      price: priceNum,
-      instructorName: user?.name || 'فني معتمد',
-      level: formLevel,
-      studentsCount: 0,
-      rating: 0,
-    };
+    try {
+      setLoading(true);
+      const res = await fetchApi('/courses', {
+        method: 'POST',
+        data: {
+          title: formTitle.trim(),
+          description: formDesc.trim() || 'كورس تدريبي معتمد لصيانة الأجهزة المنزلية',
+          price: priceNum,
+          level: formLevel,
+        },
+      });
 
-    setCourses((prev) => [newCourse, ...prev]);
-    setAddModalVisible(false);
-    setFormTitle('');
-    setFormDesc('');
-    Alert.alert('🎉 مبروك!', 'تم نشر الكورس التدريبي بنجاح ويمكن للمتدربين الاشتراك فيه الآن.');
+      setAddModalVisible(false);
+      setFormTitle('');
+      setFormDesc('');
+      setFormPrice('');
+      await loadCourses(true);
+      Alert.alert('🎉 تم بنجاح!', res.message || 'تم رفع الكورس التدريبي بنجاح وهو قيد المراجعة والاعتماد.');
+    } catch (err: any) {
+      Alert.alert('خطأ', err.message || 'تعذر نشر الكورس، يرجى المحاولة لاحقاً');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -44,11 +44,12 @@ import OwnerSideDrawer, { OWNER_SECTIONS } from '../../components/OwnerSideDrawe
 import { generateExecutiveReportHTML, exportExecutiveCSV } from '../../utils/executiveReport';
 
 const PERIODS = [
+  { label: 'اليوم', value: 'today' },
   { label: '7 أيام', value: '7d' },
   { label: '30 يوم', value: '30d' },
   { label: '3 أشهر', value: '3m' },
   { label: 'السنة', value: '1y' },
-  { label: 'مخصص', value: 'custom' },
+  { label: 'الكل', value: 'all' },
 ];
 
 export default function OwnerDashboard({ navigation }: any) {
@@ -216,7 +217,7 @@ export default function OwnerDashboard({ navigation }: any) {
                 <Crown size={18} color={colors.primary} />
               </View>
               <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '900', marginTop: 2 }}>
-                {user?.name && !user.name.toLowerCase().includes('test') ? user.name : 'إدارة منصة TecnoRexa'}
+                {user?.name?.trim() ? user.name : 'إدارة منصة TecnoRexa'}
               </Text>
               <Text style={{ color: colors.gray, fontSize: 11, marginTop: 1 }}>
                 أهلاً بك سيادة المالك في غرفة القيادة
@@ -235,9 +236,9 @@ export default function OwnerDashboard({ navigation }: any) {
               }}
             >
               <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '900' }}>
-                {user?.name && user.name.trim().length > 0 && !user.name.toLowerCase().includes('test')
+                {user?.name && user.name.trim().length > 0
                   ? user.name.trim().charAt(0)
-                  : 'خ'}
+                  : '👑'}
               </Text>
             </View>
           </View>
@@ -255,7 +256,7 @@ export default function OwnerDashboard({ navigation }: any) {
           <View style={{ alignItems: 'flex-end' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>
-                19 قسماً إدارياً ورقابياً بانتظارك
+                {`${OWNER_SECTIONS.length} قسماً إدارياً ورقابياً بانتظارك`}
               </Text>
               <Sparkles size={16} color={colors.primary} />
             </View>
@@ -425,26 +426,32 @@ export default function OwnerDashboard({ navigation }: any) {
             </View>
 
             {/* Custom Bar Graph for React Native Web & Mobile */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 120, paddingTop: 20 }}>
-              {stats.weeklyGrowth.map((d: any, idx: number) => {
-                const userBarH = Math.min(Math.max((d.newUsers / 40) * 90, 15), 90);
-                const orderBarH = Math.min(Math.max((d.completedOrders / 30) * 90, 12), 90);
+            {(!stats.weeklyGrowth || stats.weeklyGrowth.length === 0) ? (
+              <View style={{ height: 100, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: colors.gray, fontSize: 12 }}>لا توجد بيانات نمو مسجلة لهذه الفترة بعد</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 120, paddingTop: 20 }}>
+                {stats.weeklyGrowth.map((d: any, idx: number) => {
+                  const userBarH = Math.min(Math.max((d.newUsers / 40) * 90, 15), 90);
+                  const orderBarH = Math.min(Math.max((d.completedOrders / 30) * 90, 12), 90);
 
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    onPress={() => setSelectedChartPoint(d)}
-                    style={{ alignItems: 'center', flex: 1 }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
-                      <View style={{ width: 8, height: userBarH, backgroundColor: '#3B82F6', borderRadius: 4 }} />
-                      <View style={{ width: 8, height: orderBarH, backgroundColor: colors.primary, borderRadius: 4 }} />
-                    </View>
-                    <Text style={{ color: colors.gray, fontSize: 10, marginTop: 6 }}>{d.day}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => setSelectedChartPoint(d)}
+                      style={{ alignItems: 'center', flex: 1 }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
+                        <View style={{ width: 8, height: userBarH, backgroundColor: '#3B82F6', borderRadius: 4 }} />
+                        <View style={{ width: 8, height: orderBarH, backgroundColor: colors.primary, borderRadius: 4 }} />
+                      </View>
+                      <Text style={{ color: colors.gray, fontSize: 10, marginTop: 6 }}>{d.day}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             {selectedChartPoint && (
               <View style={{ marginTop: spacing.md, padding: spacing.sm, backgroundColor: '#1A1A1A', borderRadius: borderRadius.md, flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -552,15 +559,19 @@ export default function OwnerDashboard({ navigation }: any) {
             <Text style={styles.sectionTitle}>أحدث العمليات وسجل النظام</Text>
           </View>
           <View style={styles.feedCard}>
-            {stats.liveActivities.map((act: any, idx: number) => (
-              <View key={act.id || idx} style={[styles.feedItem, idx === stats.liveActivities.length - 1 && { borderBottomWidth: 0 }]}>
-                <Text style={styles.feedTime}>{act.time ? new Date(act.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'الآن'}</Text>
-                <View style={{ flex: 1, alignItems: 'flex-end', paddingRight: spacing.sm }}>
-                  <Text style={styles.feedText}>{act.text}</Text>
+            {(!stats.liveActivities || stats.liveActivities.length === 0) ? (
+              <Text style={{ color: colors.gray, textAlign: 'center', padding: spacing.md }}>لا توجد أنشطة مسجلة في سجل النظام حالياً</Text>
+            ) : (
+              stats.liveActivities.map((act: any, idx: number) => (
+                <View key={act.id || idx} style={[styles.feedItem, idx === stats.liveActivities.length - 1 && { borderBottomWidth: 0 }]}>
+                  <Text style={styles.feedTime}>{act.time ? new Date(act.time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'الآن'}</Text>
+                  <View style={{ flex: 1, alignItems: 'flex-end', paddingRight: spacing.sm }}>
+                    <Text style={styles.feedText}>{act.text}</Text>
+                  </View>
+                  <View style={styles.feedDot} />
                 </View>
-                <View style={styles.feedDot} />
-              </View>
-            ))}
+              ))
+            )}
           </View>
         </View>
       </ScrollView>

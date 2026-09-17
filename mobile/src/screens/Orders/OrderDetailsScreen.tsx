@@ -9,6 +9,8 @@ import {
   Linking,
   ActivityIndicator,
   Platform,
+  TextInput,
+  Modal,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -24,18 +26,34 @@ import {
   Navigation,
   MessageCircle,
   Wrench,
+  FileText,
+  Star,
+  Check,
+  X,
+  ShieldCheck,
+  DollarSign,
+  Calendar,
+  AlertCircle,
+  Cpu,
 } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { api } from '../../api/client';
 
-const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: 'قيد الانتظار', color: colors.warning, icon: Clock },
-  accepted: { label: 'تم القبول', color: colors.info, icon: CheckCircle2 },
-  on_way: { label: 'في الطريق', color: colors.primary, icon: Navigation },
-  in_progress: { label: 'جاري التنفيذ', color: colors.primary, icon: Wrench },
-  completed: { label: 'مكتمل بنجاح', color: colors.success, icon: CheckCircle2 },
-  cancelled: { label: 'ملغي', color: colors.danger, icon: ShieldAlert },
+const STATUS_LABELS: Record<string, { label: string; color: string; icon: any; desc: string }> = {
+  pending: { label: 'قيد الانتظار', color: colors.warning, icon: Clock, desc: 'في انتظار قبول الفني للطلب' },
+  accepted: { label: 'تم القبول', color: colors.info, icon: CheckCircle2, desc: 'قبل الفني الطلب - بانتظار تقديم عرض السعر أو التوجه' },
+  quoted: { label: 'عرض السعر مرسل', color: '#8B5CF6', icon: DollarSign, desc: 'قدم الفني عرض السعر وفي انتظار موافقة العميل' },
+  quote_approved: { label: 'تمت الموافقة على العرض', color: colors.success, icon: CheckCircle2, desc: 'وافق العميل على عرض السعر والبدء بالصيانة' },
+  quote_rejected: { label: 'مرفوض عرض السعر', color: colors.danger, icon: X, desc: 'تم رفض عرض السعر المقدم' },
+  on_way: { label: 'الفني في الطريق', color: colors.primary, icon: Navigation, desc: 'الفني في طريقه لموقع العميل' },
+  arrived: { label: 'وصل الفني', color: '#06B6D4', icon: MapPin, desc: 'الفني وصل لمقر العميل' },
+  diagnosing: { label: 'جاري الفحص والتشخيص', color: '#EC4899', icon: Wrench, desc: 'الفني يقوم بفحص وتحديد أعطال الجهاز' },
+  repairing: { label: 'جاري الإصلاح والصيانة', color: colors.primary, icon: Wrench, desc: 'الفني يقوم بتنفيذ الإصلاحات وتركيب القطع' },
+  service_report_submitted: { label: 'تم إصدار تقرير الصيانة', color: '#10B981', icon: FileText, desc: 'أنهى الفني العمل وقدم التقرير مع شهادة الضمان' },
+  in_progress: { label: 'جاري التنفيذ', color: colors.primary, icon: Wrench, desc: 'أعمال الصيانة قيد التنفيذ' },
+  completed: { label: 'مكتمل بنجاح', color: colors.success, icon: CheckCircle2, desc: 'تم استلام الجهاز وإغلاق الطلب بنجاح' },
+  cancelled: { label: 'ملغي', color: colors.danger, icon: ShieldAlert, desc: 'تم إلغاء هذا الطلب' },
 };
 
 export default function OrderDetailsScreen({ route, navigation }: any) {
@@ -47,12 +65,38 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Quote Modal State
+  const [quoteModalVisible, setQuoteModalVisible] = useState(false);
+  const [laborCost, setLaborCost] = useState('');
+  const [partsCost, setPartsCost] = useState('');
+  const [inspectionFee, setInspectionFee] = useState('50');
+  const [quoteNotes, setQuoteNotes] = useState('');
+
+  // Service Report Modal State
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportDeviceType, setReportDeviceType] = useState('');
+  const [reportBrand, setReportBrand] = useState('');
+  const [reportModel, setReportModel] = useState('');
+  const [reportDiagnosis, setReportDiagnosis] = useState('');
+  const [reportRepairAction, setReportRepairAction] = useState('');
+  const [reportPartsUsed, setReportPartsUsed] = useState('');
+  const [reportWarrantyDays, setReportWarrantyDays] = useState('30');
+
+  // Rating Modal State
+  const [rateModalVisible, setRateModalVisible] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+
   const fetchOrder = async () => {
     try {
       setLoading(true);
       const res = await api.get(`/orders/${orderId}`);
       if (res.data) {
         setOrder(res.data);
+        // Pre-fill report form if order has device details
+        setReportDeviceType(res.data.deviceType || res.data.serviceType || '');
+        setReportBrand(res.data.deviceBrand || '');
+        setReportModel(res.data.deviceModel || '');
       }
     } catch (err: any) {
       console.warn('Error fetching order details:', err.message);
@@ -81,32 +125,138 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
     });
   };
 
-  const handleArrive = async () => {
+  // Technician Order Action (Accept / Decline)
+  const handleTechAction = async (action: 'accept' | 'decline') => {
     try {
       setActionLoading(true);
-      await api.post(`/orders/${order.id}/arrive`);
-      Alert.alert('✅ تم التحديث', 'تم تسجيل وصولك لموقع العميل بنجاح.');
+      const res = await api.post(`/technician/orders/${order.id}/action`, { action });
+      Alert.alert('✅ نجاح', res.data?.message || 'تم تحديث حالة الطلب');
       await fetchOrder();
     } catch (err: any) {
-      Alert.alert('خطأ', err.message || 'تعذر تحديث الحالة');
+      Alert.alert('خطأ', err.response?.data?.error || err.message || 'تعذر تنفيذ الإجراء');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleComplete = async () => {
+  // Technician Submit Quote
+  const handleSubmitQuote = async () => {
+    const labor = parseFloat(laborCost);
+    if (isNaN(labor) || labor <= 0) {
+      Alert.alert('تنبيه', 'يرجى إدخال قيمة المصنعية / أجر اليد بشكل صحيح');
+      return;
+    }
     try {
       setActionLoading(true);
-      await api.post(`/orders/${order.id}/complete`, { report: 'تمت الصيانة بنجاح', partsCost: 0 });
-      Alert.alert('🎉 مبروك', 'تم إتمام الصيانة وإغلاق الطلب بنجاح.');
+      await api.post(`/technician/orders/${order.id}/quote`, {
+        laborCost: labor,
+        partsCost: parseFloat(partsCost) || 0,
+        inspectionFee: parseFloat(inspectionFee) || 0,
+        notes: quoteNotes,
+      });
+      setQuoteModalVisible(false);
+      Alert.alert('🎉 تم إرسال العرض', 'تم إرسال عرض السعر للعميل وفي انتظار موافقته.');
       await fetchOrder();
     } catch (err: any) {
-      Alert.alert('خطأ', err.message || 'تعذر إنهاء الطلب');
+      Alert.alert('خطأ', err.response?.data?.error || err.message || 'تعذر إرسال عرض السعر');
     } finally {
       setActionLoading(false);
     }
   };
 
+  // Customer Quote Action (Approve / Reject)
+  const handleQuoteDecision = async (action: 'approve' | 'reject') => {
+    try {
+      setActionLoading(true);
+      const res = await api.post(`/customer/orders/${order.id}/quote-action`, { action });
+      Alert.alert('تم التحديث', res.data?.message || 'تم تسجيل قرارك بنجاح.');
+      await fetchOrder();
+    } catch (err: any) {
+      Alert.alert('خطأ', err.response?.data?.error || err.message || 'تعذر تحديث القرار');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Technician Field Status Progression
+  const handleUpdateStatus = async (status: string, successMsg: string) => {
+    try {
+      setActionLoading(true);
+      await api.post(`/technician/orders/${order.id}/status`, { status });
+      Alert.alert('✅ تم التحديث', successMsg);
+      await fetchOrder();
+    } catch (err: any) {
+      Alert.alert('خطأ', err.response?.data?.error || err.message || 'تعذر تحديث الحالة');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Technician Submit Service Report
+  const handleSubmitReport = async () => {
+    if (!reportDiagnosis.trim()) {
+      Alert.alert('تنبيه', 'يرجى كتابة تشخيص العطل بدقة');
+      return;
+    }
+    if (!reportRepairAction.trim()) {
+      Alert.alert('تنبيه', 'يرجى توضيح الإجراءات الفنية المنفذة للإصلاح');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      await api.post(`/technician/orders/${order.id}/report`, {
+        deviceType: reportDeviceType,
+        deviceBrand: reportBrand,
+        deviceModel: reportModel,
+        diagnosis: reportDiagnosis,
+        repairAction: reportRepairAction,
+        partsUsed: reportPartsUsed,
+        warrantyDays: parseInt(reportWarrantyDays, 10) || 30,
+      });
+      setReportModalVisible(false);
+      Alert.alert('📋 تم رفع التقرير', 'تم إصدار تقرير الصيانة مع شهادة الضمان وإشعار العميل.');
+      await fetchOrder();
+    } catch (err: any) {
+      Alert.alert('خطأ', err.response?.data?.error || err.message || 'تعذر حفظ تقرير الصيانة');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Customer Confirm Service Completion
+  const handleConfirmCompletion = async () => {
+    try {
+      setActionLoading(true);
+      const res = await api.post(`/customer/orders/${order.id}/confirm-completion`);
+      Alert.alert('🎉 تم استلام الجهاز', res.data?.message || 'تم إتمام الصيانة وإيداع المستحقات بنجاح!');
+      await fetchOrder();
+      setRateModalVisible(true);
+    } catch (err: any) {
+      Alert.alert('خطأ', err.response?.data?.error || err.message || 'تعذر تأكيد استلام الجهاز');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Customer Submit Rating
+  const handleSubmitRating = async () => {
+    try {
+      setActionLoading(true);
+      await api.post(`/orders/${order.id}/rate`, {
+        rating: selectedRating,
+        comment: ratingComment,
+      });
+      setRateModalVisible(false);
+      Alert.alert('⭐ شكراً لتقييمك', 'تم تسجيل تقييمك للفني بنجاح وتحديث درجته في المنصة.');
+      await fetchOrder();
+    } catch (err: any) {
+      Alert.alert('خطأ', err.response?.data?.error || err.message || 'تعذر إرسال التقييم');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Merchant Ship Order
   const handleShip = async () => {
     try {
       setActionLoading(true);
@@ -120,6 +270,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
     }
   };
 
+  // Customer Cancel (< 10 minutes)
   const handleCancel = async () => {
     const orderAgeMinutes = order?.createdAt
       ? Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000)
@@ -161,15 +312,11 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
 
   const currentStatus = STATUS_LABELS[order?.status] || STATUS_LABELS.pending;
   const StatusIcon = currentStatus.icon;
-  const isMaintenance = order?.type === 'maintenance' || order?.type === 'technician' || !!order?.technicianName;
+  const isMaintenance = order?.type === 'maintenance' || order?.type === 'technician' || !!order?.technicianName || !!order?.serviceType;
+  const isTechAssigned = order?.technicianId === user?.id;
 
   return (
-    <SafeAreaView
-      style={[
-        { flex: 1, backgroundColor: colors.dark },
-        
-      ]}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.dark }}>
       {/* Header */}
       <View
         style={{
@@ -205,7 +352,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
           <ChevronRight color={colors.white} size={22} />
         </TouchableOpacity>
         <Text style={{ color: colors.primary, fontSize: typography.sizes.lg, fontWeight: '900', textAlign: 'center' }}>
-          {order ? `تفاصيل الطلب #${order.id}` : 'تفاصيل الطلب'}
+          {order ? `طلب صيانة #${order.id}` : 'تفاصيل الطلب'}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -223,30 +370,29 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
             borderWidth: 1,
             borderColor: currentStatus.color,
             marginBottom: spacing.md,
-            flexDirection: 'row-reverse',
-            alignItems: 'center',
-            justifyContent: 'space-between',
           }}
         >
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: spacing.sm }}>
-            <StatusIcon color={currentStatus.color} size={24} />
-            <View>
-              <Text style={{ color: currentStatus.color, fontSize: typography.sizes.md, fontWeight: '900' }}>
-                {currentStatus.label}
-              </Text>
-              <Text style={{ color: colors.gray, fontSize: 12 }}>
-                {isMaintenance ? 'خدمة صيانة منزلية' : 'طلب شراء من السوق'}
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: spacing.sm }}>
+              <StatusIcon color={currentStatus.color} size={26} />
+              <View>
+                <Text style={{ color: currentStatus.color, fontSize: typography.sizes.md, fontWeight: '900' }}>
+                  {currentStatus.label}
+                </Text>
+                <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right' }}>
+                  {currentStatus.desc}
+                </Text>
+              </View>
+            </View>
+            <View style={{ backgroundColor: 'rgba(212,175,55,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+              <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 15 }}>
+                {order?.total || order?.totalPrice || 0} ج.م
               </Text>
             </View>
           </View>
-          <View style={{ backgroundColor: 'rgba(212,175,55,0.1)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 }}>
-            <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 14 }}>
-              {order?.total || order?.totalPrice || 0} ج.م
-            </Text>
-          </View>
         </View>
 
-        {/* Customer / Service Info Card */}
+        {/* Appliance & Service Details Card */}
         <View
           style={{
             backgroundColor: '#141414',
@@ -258,7 +404,46 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
           }}
         >
           <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '900', textAlign: 'right', marginBottom: spacing.sm }}>
-            معلومات {isMaintenance ? 'الخدمة والعميل' : 'الشحن والتوصيل'}
+            🔧 بيانات الجهاز والعطل
+          </Text>
+
+          <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text style={{ color: colors.gray, fontSize: 13 }}>نوع الجهاز:</Text>
+            <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13 }}>
+              {order?.deviceType || order?.serviceType || 'أجهزة منزلية'}
+            </Text>
+          </View>
+
+          {(order?.deviceBrand || order?.deviceModel) && (
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={{ color: colors.gray, fontSize: 13 }}>الماركة / الموديل:</Text>
+              <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13 }}>
+                {[order.deviceBrand, order.deviceModel].filter(Boolean).join(' - ')}
+              </Text>
+            </View>
+          )}
+
+          {order?.problemDesc && (
+            <View style={{ backgroundColor: '#1A1A1A', padding: 12, borderRadius: 8, marginTop: 4, borderWidth: 1, borderColor: '#333' }}>
+              <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>وصف المشكلة / العطل المبلغ عنه:</Text>
+              <Text style={{ color: colors.white, fontSize: 13, textAlign: 'right', lineHeight: 20 }}>{order.problemDesc}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Customer Info Card */}
+        <View
+          style={{
+            backgroundColor: '#141414',
+            padding: spacing.md,
+            borderRadius: borderRadius.lg,
+            borderWidth: 1,
+            borderColor: '#222',
+            marginBottom: spacing.md,
+          }}
+        >
+          <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '900', textAlign: 'right', marginBottom: spacing.sm }}>
+            👤 بيانات العميل وموقع الزيارة
           </Text>
 
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -275,23 +460,16 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
             </Text>
           </View>
 
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
             <MapPin color={colors.primary} size={16} />
             <Text style={{ color: colors.gray, fontSize: 13, flex: 1, textAlign: 'right' }}>
-              {order?.address || 'العنوان محدد في الخريطة'}
+              {[order?.governorate, order?.address].filter(Boolean).join(' - ') || 'العنوان محدد في الخريطة'}
             </Text>
           </View>
-
-          {order?.problemDesc && (
-            <View style={{ backgroundColor: '#1A1A1A', padding: 10, borderRadius: 8, marginTop: 6, borderWidth: 1, borderColor: '#333' }}>
-              <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right', marginBottom: 2 }}>وصف المشكلة / العطل:</Text>
-              <Text style={{ color: colors.white, fontSize: 13, textAlign: 'right', lineHeight: 20 }}>{order.problemDesc}</Text>
-            </View>
-          )}
         </View>
 
-        {/* Assigned Technician Card (if maintenance) */}
-        {isMaintenance && (
+        {/* Assigned Technician Card (Visible to Customer or when assigned) */}
+        {isMaintenance && order?.technicianId && (
           <View
             style={{
               backgroundColor: '#141414',
@@ -303,21 +481,26 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
             }}
           >
             <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '900', textAlign: 'right', marginBottom: spacing.sm }}>
-              الفني المكلف بالصيانة
+              🧑‍🔧 الفني المكلف بالصيانة
             </Text>
 
             <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
-                <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(212,175,55,0.15)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Wrench color={colors.primary} size={20} />
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(212,175,55,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Wrench color={colors.primary} size={22} />
                 </View>
                 <View>
                   <Text style={{ color: colors.white, fontWeight: '700', fontSize: 14 }}>
-                    {order?.technicianName || 'المهندس مصطفى'}
+                    {order?.technicianName || 'فني معتمد من المنصة'}
                   </Text>
                   <Text style={{ color: colors.gray, fontSize: 12 }}>
                     {order?.technicianPhone || '01000000000'}
                   </Text>
+                  {order?.technician?.rating && (
+                    <Text style={{ color: colors.warning, fontSize: 12, marginTop: 2 }}>
+                      ⭐ {order.technician.rating} ({order.technician.ratingCount || 1} تقييم)
+                    </Text>
+                  )}
                 </View>
               </View>
 
@@ -362,74 +545,294 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
           </View>
         )}
 
-        {/* Order Items Breakdown */}
-        <View
-          style={{
-            backgroundColor: '#141414',
-            padding: spacing.md,
-            borderRadius: borderRadius.lg,
-            borderWidth: 1,
-            borderColor: '#222',
-            marginBottom: spacing.xl,
-          }}
-        >
-          <Text style={{ color: colors.white, fontSize: 14, fontWeight: '900', textAlign: 'right', marginBottom: spacing.sm }}>
-            تفاصيل البنود والأسعار
-          </Text>
-
-          {Array.isArray(order?.items) && order.items.length > 0 ? (
-            order.items.map((item: any, idx: number) => (
+        {/* Itemized Quotation Card (if exists) */}
+        {order?.quote && (
+          <View
+            style={{
+              backgroundColor: '#161922',
+              padding: spacing.md,
+              borderRadius: borderRadius.lg,
+              borderWidth: 1,
+              borderColor: order.quote.status === 'approved' ? colors.success : '#8B5CF6',
+              marginBottom: spacing.md,
+            }}
+          >
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '900', textAlign: 'right' }}>
+                📄 عرض السعر المقدم
+              </Text>
               <View
-                key={idx}
                 style={{
-                  flexDirection: 'row-reverse',
-                  justifyContent: 'space-between',
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#222',
-                  paddingVertical: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  backgroundColor: order.quote.status === 'approved' ? 'rgba(16,185,129,0.2)' : 'rgba(139,92,246,0.2)',
                 }}
               >
-                <Text style={{ color: colors.white, fontSize: 13 }}>{item.qty || 1}x {item.name || item.title || 'بند صيانة'}</Text>
-                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
-                  {(item.price || 0) * (item.qty || 1)} ج.م
+                <Text style={{ fontSize: 11, fontWeight: '800', color: order.quote.status === 'approved' ? colors.success : '#8B5CF6' }}>
+                  {order.quote.status === 'approved' ? '✅ تمت الموافقة' : order.quote.status === 'rejected' ? '❌ مرفوض' : '⏳ في انتظار قرار العميل'}
                 </Text>
               </View>
-            ))
-          ) : (
-            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 8 }}>
-              <Text style={{ color: colors.white, fontSize: 13 }}>خدمة صيانة وفحص فني</Text>
-              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>{order?.total || 0} ج.م</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 4 }}>
+              <Text style={{ color: colors.gray, fontSize: 13 }}>أجر اليد / المصنعية:</Text>
+              <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13 }}>{order.quote.laborCost} ج.م</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 4 }}>
+              <Text style={{ color: colors.gray, fontSize: 13 }}>تكلفة قطع الغيار:</Text>
+              <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13 }}>{order.quote.partsCost} ج.م</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 4 }}>
+              <Text style={{ color: colors.gray, fontSize: 13 }}>رسوم الكشف والتشخيص:</Text>
+              <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13 }}>{order.quote.inspectionFee} ج.م</Text>
+            </View>
+
+            {order.quote.notes ? (
+              <View style={{ backgroundColor: '#111319', padding: 8, borderRadius: 6, marginVertical: 6 }}>
+                <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right' }}>ملاحظات الفني:</Text>
+                <Text style={{ color: colors.white, fontSize: 12, textAlign: 'right' }}>{order.quote.notes}</Text>
+              </View>
+            ) : null}
+
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', borderTopWidth: 1, borderColor: '#262D3D', paddingTop: 8, marginTop: 4 }}>
+              <Text style={{ color: colors.white, fontSize: 14, fontWeight: '900' }}>المبلغ الإجمالي المعتمد:</Text>
+              <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '900' }}>{order.quote.totalAmount} ج.م</Text>
+            </View>
+
+            {/* Customer Quotation Actions (Approve / Reject) */}
+            {role === 'customer' && order.status === 'quoted' && (
+              <View style={{ flexDirection: 'row-reverse', gap: 10, marginTop: 12 }}>
+                <TouchableOpacity
+                  onPress={() => handleQuoteDecision('approve')}
+                  disabled={actionLoading}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.success,
+                    paddingVertical: 10,
+                    borderRadius: borderRadius.md,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: colors.white, fontWeight: '900', fontSize: 13 }}>الموافقة على العرض ✅</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleQuoteDecision('reject')}
+                  disabled={actionLoading}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#1E1E1E',
+                    borderWidth: 1,
+                    borderColor: colors.danger,
+                    paddingVertical: 10,
+                    borderRadius: borderRadius.md,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: colors.danger, fontWeight: '900', fontSize: 13 }}>رفض العرض ❌</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Service Report Card (if submitted) */}
+        {order?.serviceReport && (
+          <View
+            style={{
+              backgroundColor: '#142018',
+              padding: spacing.md,
+              borderRadius: borderRadius.lg,
+              borderWidth: 1,
+              borderColor: colors.success,
+              marginBottom: spacing.md,
+            }}
+          >
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+              <Text style={{ color: colors.success, fontSize: 14, fontWeight: '900', textAlign: 'right' }}>
+                📋 تقرير الصيانة وضمان الإصلاح
+              </Text>
+              <View style={{ backgroundColor: 'rgba(16,185,129,0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                <Text style={{ color: colors.success, fontWeight: '900', fontSize: 11 }}>
+                  🛡️ ضمان {order.serviceReport.warrantyDays || order.warrantyDays || 30} يوماً
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ marginBottom: 8 }}>
+              <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right' }}>التشخيص الفني للعطل:</Text>
+              <Text style={{ color: colors.white, fontSize: 13, textAlign: 'right', fontWeight: '600' }}>
+                {order.serviceReport.diagnosis || order.serviceReport}
+              </Text>
+            </View>
+
+            {order.serviceReport.repairAction ? (
+              <View style={{ marginBottom: 8 }}>
+                <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right' }}>الإجراءات الفنية المنفذة:</Text>
+                <Text style={{ color: colors.white, fontSize: 13, textAlign: 'right' }}>
+                  {order.serviceReport.repairAction}
+                </Text>
+              </View>
+            ) : null}
+
+            {order.serviceReport.partsUsed ? (
+              <View style={{ backgroundColor: '#0B130E', padding: 8, borderRadius: 6, marginBottom: 8 }}>
+                <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right' }}>قطع الغيار المستخدمة:</Text>
+                <Text style={{ color: colors.white, fontSize: 12, textAlign: 'right' }}>
+                  {order.serviceReport.partsUsed}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Customer Completion Confirmation Button */}
+            {role === 'customer' && order.status === 'service_report_submitted' && (
+              <TouchableOpacity
+                onPress={handleConfirmCompletion}
+                disabled={actionLoading}
+                style={{
+                  backgroundColor: colors.success,
+                  paddingVertical: 12,
+                  borderRadius: borderRadius.md,
+                  alignItems: 'center',
+                  marginTop: 6,
+                }}
+              >
+                <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>
+                  تأكيد استلام الجهاز وإتمام الصيانة ✅
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Customer Rating Card if Completed */}
+        {order?.status === 'completed' && (
+          <View
+            style={{
+              backgroundColor: '#1E1B10',
+              padding: spacing.md,
+              borderRadius: borderRadius.lg,
+              borderWidth: 1,
+              borderColor: colors.primary,
+              marginBottom: spacing.md,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '900', marginBottom: 4 }}>
+              🎉 تمت الصيانة بنجاح
+            </Text>
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
+              تم إغلاق الطلب وتأكيد استلام الجهاز من قبل العميل
+            </Text>
+            {role === 'customer' && (
+              <TouchableOpacity
+                onPress={() => setRateModalVisible(true)}
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingVertical: 10,
+                  paddingHorizontal: 20,
+                  borderRadius: borderRadius.md,
+                  flexDirection: 'row-reverse',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <Star color={colors.dark} size={16} fill={colors.dark} />
+                <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 13 }}>
+                  تقييم خدمة الفني ⭐
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* ================= ACTIONS BASED ON ROLE ================= */}
+        <View style={{ gap: 10, marginTop: spacing.sm }}>
+          {/* Technician: Accept or Decline unassigned order */}
+          {role === 'technician' && order?.status === 'pending' && (
+            <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => handleTechAction('accept')}
+                disabled={actionLoading}
+                style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 15 }}>قبول مهمة الصيانة 👍</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleTechAction('decline')}
+                disabled={actionLoading}
+                style={{ flex: 1, backgroundColor: '#1E1E1E', borderWidth: 1, borderColor: colors.danger, paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.danger, fontWeight: '900', fontSize: 15 }}>اعتذار عن الطلب ❌</Text>
+              </TouchableOpacity>
             </View>
           )}
 
-          <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', paddingTop: 12, marginTop: 4 }}>
-            <Text style={{ color: colors.white, fontSize: 14, fontWeight: '900' }}>المبلغ الإجمالي:</Text>
-            <Text style={{ color: colors.primary, fontSize: 18, fontWeight: '900' }}>
-              {order?.total || order?.totalPrice || 0} ج.م
-            </Text>
-          </View>
-        </View>
-
-        {/* Action Buttons Depending on Role */}
-        <View style={{ gap: 10 }}>
-          {/* Technician Actions */}
-          {role === 'technician' && order?.status === 'pending' && (
+          {/* Technician: Send Quote when Accepted */}
+          {role === 'technician' && isTechAssigned && order?.status === 'accepted' && (
             <TouchableOpacity
-              onPress={handleArrive}
+              onPress={() => setQuoteModalVisible(true)}
               disabled={actionLoading}
-              style={{ backgroundColor: colors.primary, paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
+              style={{ backgroundColor: '#8B5CF6', paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
             >
-              <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 15 }}>وصلت لموقع العميل 📍</Text>
+              <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15 }}>تقديم وتحديد عرض السعر 📝</Text>
             </TouchableOpacity>
           )}
 
-          {role === 'technician' && (order?.status === 'on_way' || order?.status === 'in_progress') && (
+          {/* Technician: Start Driving when Quote Approved or Accepted */}
+          {role === 'technician' && isTechAssigned && (order?.status === 'quote_approved' || order?.status === 'accepted') && (
             <TouchableOpacity
-              onPress={handleComplete}
+              onPress={() => handleUpdateStatus('on_way', 'تم تسجيل أنك في الطريق للعميل 🚗')}
+              disabled={actionLoading}
+              style={{ backgroundColor: colors.primary, paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 15 }}>التحرك والتوجه لموقع العميل 🚗</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Technician: Arrived at Location */}
+          {role === 'technician' && isTechAssigned && order?.status === 'on_way' && (
+            <TouchableOpacity
+              onPress={() => handleUpdateStatus('arrived', 'تم تسجيل وصولك لموقع العميل بنجاح 📍')}
+              disabled={actionLoading}
+              style={{ backgroundColor: '#06B6D4', paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15 }}>وصلت لموقع العميل 📍</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Technician: Start Diagnosing */}
+          {role === 'technician' && isTechAssigned && order?.status === 'arrived' && (
+            <TouchableOpacity
+              onPress={() => handleUpdateStatus('diagnosing', 'جاري فحص الجهاز وتشخيص العطل 🔍')}
+              disabled={actionLoading}
+              style={{ backgroundColor: '#EC4899', paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15 }}>بدء الفحص والتشخيص 🔍</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Technician: Start Repairing */}
+          {role === 'technician' && isTechAssigned && order?.status === 'diagnosing' && (
+            <TouchableOpacity
+              onPress={() => handleUpdateStatus('repairing', 'تم بدء أعمال الصيانة والإصلاح 🔧')}
+              disabled={actionLoading}
+              style={{ backgroundColor: colors.primary, paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 15 }}>بدء الإصلاح وتركيب القطع 🔧</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Technician: Submit Service Report */}
+          {role === 'technician' && isTechAssigned && (order?.status === 'repairing' || order?.status === 'in_progress') && (
+            <TouchableOpacity
+              onPress={() => setReportModalVisible(true)}
               disabled={actionLoading}
               style={{ backgroundColor: colors.success, paddingVertical: 14, borderRadius: borderRadius.md, alignItems: 'center' }}
             >
-              <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15 }}>إتمام الصيانة وإغلاق الطلب ✅</Text>
+              <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15 }}>إصدار تقرير الصيانة وضمان الإصلاح 📋</Text>
             </TouchableOpacity>
           )}
 
@@ -444,7 +847,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
             </TouchableOpacity>
           )}
 
-          {/* Customer Actions */}
+          {/* Customer Cancel Button (Within 10 mins) */}
           {role === 'customer' && order?.status === 'pending' && (() => {
             const ageMins = order?.createdAt
               ? Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000)
@@ -471,7 +874,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
             );
           })()}
 
-          {/* General Call Button */}
+          {/* Direct Phone Call Button */}
           <TouchableOpacity
             onPress={() => handleCall()}
             style={{
@@ -493,6 +896,211 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* ================= MODAL: QUOTATION (عرض السعر) ================= */}
+      <Modal visible={quoteModalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: spacing.md }}>
+          <View style={{ backgroundColor: '#161922', borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: '#8B5CF6' }}>
+            <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '900', textAlign: 'right', marginBottom: spacing.md }}>
+              تقديم عرض سعر تفصيلي للعميل 📝
+            </Text>
+
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>أجر اليد / المصنعية (ج.م) *</Text>
+            <TextInput
+              style={{ backgroundColor: '#1E2330', color: colors.white, padding: 12, borderRadius: 8, textAlign: 'right', marginBottom: 12, borderWidth: 1, borderColor: '#334155' }}
+              placeholder="مثال: 150"
+              placeholderTextColor="#666"
+              keyboardType="numeric"
+              value={laborCost}
+              onChangeText={setLaborCost}
+            />
+
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>تكلفة قطع الغيار (ج.م)</Text>
+            <TextInput
+              style={{ backgroundColor: '#1E2330', color: colors.white, padding: 12, borderRadius: 8, textAlign: 'right', marginBottom: 12, borderWidth: 1, borderColor: '#334155' }}
+              placeholder="مثال: 200 (أو 0 إذا لم توجد قطع)"
+              placeholderTextColor="#666"
+              keyboardType="numeric"
+              value={partsCost}
+              onChangeText={setPartsCost}
+            />
+
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>رسوم الكشف والفحص (ج.م)</Text>
+            <TextInput
+              style={{ backgroundColor: '#1E2330', color: colors.white, padding: 12, borderRadius: 8, textAlign: 'right', marginBottom: 12, borderWidth: 1, borderColor: '#334155' }}
+              placeholder="50"
+              placeholderTextColor="#666"
+              keyboardType="numeric"
+              value={inspectionFee}
+              onChangeText={setInspectionFee}
+            />
+
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>ملاحظات الفني للعميل</Text>
+            <TextInput
+              style={{ backgroundColor: '#1E2330', color: colors.white, padding: 12, borderRadius: 8, textAlign: 'right', marginBottom: 16, borderWidth: 1, borderColor: '#334155', minHeight: 60 }}
+              placeholder="تفاصيل العطل والقطع المطلوب استبدالها..."
+              placeholderTextColor="#666"
+              multiline
+              value={quoteNotes}
+              onChangeText={setQuoteNotes}
+            />
+
+            <View style={{ backgroundColor: '#111319', padding: 10, borderRadius: 8, marginBottom: 16, flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
+              <Text style={{ color: colors.white, fontWeight: '700' }}>المبلغ الإجمالي المقدر:</Text>
+              <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 16 }}>
+                {(parseFloat(laborCost) || 0) + (parseFloat(partsCost) || 0) + (parseFloat(inspectionFee) || 0)} ج.م
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+              <TouchableOpacity
+                onPress={handleSubmitQuote}
+                disabled={actionLoading}
+                style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 14 }}>إرسال العرض للعميل 🚀</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setQuoteModalVisible(false)}
+                style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, backgroundColor: '#1E1E1E' }}
+              >
+                <Text style={{ color: colors.gray, fontWeight: '700' }}>إلغاء</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: SERVICE REPORT (تقرير الصيانة) ================= */}
+      <Modal visible={reportModalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: spacing.md }}>
+          <ScrollView contentContainerStyle={{ backgroundColor: '#142018', borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.success }}>
+            <Text style={{ color: colors.success, fontSize: 16, fontWeight: '900', textAlign: 'right', marginBottom: spacing.md }}>
+              إصدار تقرير الصيانة وضمان الإصلاح 📋
+            </Text>
+
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>التشخيص الفني للعطل المنفذ *</Text>
+            <TextInput
+              style={{ backgroundColor: '#0D1711', color: colors.white, padding: 10, borderRadius: 8, textAlign: 'right', marginBottom: 10, borderWidth: 1, borderColor: '#1F3828', minHeight: 60 }}
+              placeholder="مثال: تسريب غاز تبريد في المكثف وتلف الثرموستات..."
+              placeholderTextColor="#666"
+              multiline
+              value={reportDiagnosis}
+              onChangeText={setReportDiagnosis}
+            />
+
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>الإجراءات الفنية المنفذة للإصلاح *</Text>
+            <TextInput
+              style={{ backgroundColor: '#0D1711', color: colors.white, padding: 10, borderRadius: 8, textAlign: 'right', marginBottom: 10, borderWidth: 1, borderColor: '#1F3828', minHeight: 60 }}
+              placeholder="مثال: لحام مكان التسريب، إعادة شحن الفريون، تركيب ثرموستات أصلي..."
+              placeholderTextColor="#666"
+              multiline
+              value={reportRepairAction}
+              onChangeText={setReportRepairAction}
+            />
+
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>قطع الغيار المركبة</Text>
+            <TextInput
+              style={{ backgroundColor: '#0D1711', color: colors.white, padding: 10, borderRadius: 8, textAlign: 'right', marginBottom: 10, borderWidth: 1, borderColor: '#1F3828' }}
+              placeholder="مثال: ثرموستات دانفوس أصلي، شحن فريون R134a..."
+              placeholderTextColor="#666"
+              value={reportPartsUsed}
+              onChangeText={setReportPartsUsed}
+            />
+
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>مدة الضمان المعتمد (بالأيام)</Text>
+            <View style={{ flexDirection: 'row-reverse', gap: 10, marginBottom: 16 }}>
+              {['30', '60', '90'].map((days) => (
+                <TouchableOpacity
+                  key={days}
+                  onPress={() => setReportWarrantyDays(days)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 6,
+                    backgroundColor: reportWarrantyDays === days ? colors.success : '#0D1711',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.success,
+                  }}
+                >
+                  <Text style={{ color: reportWarrantyDays === days ? colors.white : colors.gray, fontWeight: '700' }}>
+                    {days} يوماً
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+              <TouchableOpacity
+                onPress={handleSubmitReport}
+                disabled={actionLoading}
+                style={{ flex: 1, backgroundColor: colors.success, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>اعتماد التقرير والضمان ✅</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setReportModalVisible(false)}
+                style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, backgroundColor: '#1E1E1E' }}
+              >
+                <Text style={{ color: colors.gray, fontWeight: '700' }}>إلغاء</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: CUSTOMER RATING ================= */}
+      <Modal visible={rateModalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: spacing.md }}>
+          <View style={{ backgroundColor: '#141414', borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.primary }}>
+            <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '900', textAlign: 'center', marginBottom: spacing.sm }}>
+              تقييم خدمة الصيانة ⭐
+            </Text>
+            <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'center', marginBottom: spacing.md }}>
+              رأيك يساعدنا في الحفاظ على أعلى معايير الجودة لفنيي TecnoRexa
+            </Text>
+
+            {/* Star Selector */}
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'center', gap: 12, marginBottom: spacing.lg }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setSelectedRating(star)}>
+                  <Star
+                    size={36}
+                    color={star <= selectedRating ? colors.warning : '#444'}
+                    fill={star <= selectedRating ? colors.warning : 'transparent'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              style={{ backgroundColor: '#1E1E1E', color: colors.white, padding: 12, borderRadius: 8, textAlign: 'right', marginBottom: 16, borderWidth: 1, borderColor: '#333', minHeight: 70 }}
+              placeholder="اكتب تعليقك وملاحظاتك على الخدمة..."
+              placeholderTextColor="#666"
+              multiline
+              value={ratingComment}
+              onChangeText={setRatingComment}
+            />
+
+            <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+              <TouchableOpacity
+                onPress={handleSubmitRating}
+                disabled={actionLoading}
+                style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 14 }}>إرسال التقييم ⭐</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setRateModalVisible(false)}
+                style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, backgroundColor: '#1E1E1E' }}
+              >
+                <Text style={{ color: colors.gray, fontWeight: '700' }}>لاحقاً</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

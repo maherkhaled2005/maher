@@ -202,7 +202,7 @@ export const getRoleDrawerConfig = (role: string): RoleDrawerConfig => {
     case 'owner':
       return {
         title: 'غرفة عمليات المالك',
-        subtitle: 'الأقسام الـ 19 مرتبة بدقة من الأهم للأقل أهمية',
+        subtitle: `الأقسام الـ ${OWNER_SECTIONS.length} مرتبة بدقة من الأهم للأقل أهمية`,
         badge: 'مالك المنصة 👑',
         color: colors.primary,
         icon: Crown,
@@ -211,7 +211,7 @@ export const getRoleDrawerConfig = (role: string): RoleDrawerConfig => {
     case 'manager':
       return {
         title: 'غرفة عمليات المدير',
-        subtitle: 'الأقسام الإدارية والتشغيلية المعتمدة (16 قسماً)',
+        subtitle: `الأقسام الإدارية والتشغيلية المعتمدة (${MANAGER_SECTIONS.length} قسماً)`,
         badge: 'المدير العام 👔',
         color: '#1E40AF',
         icon: Briefcase,
@@ -221,7 +221,7 @@ export const getRoleDrawerConfig = (role: string): RoleDrawerConfig => {
     case 'lead_developer':
       return {
         title: 'مركز تحكم المطورين',
-        subtitle: 'أدوات التطوير ومراقبة الأداء والمهام (12 قسماً)',
+        subtitle: `أدوات التطوير ومراقبة الأداء والمهام (${PROGRAMMER_SECTIONS.length} قسماً)`,
         badge: 'مهندس برمجيات 💻',
         color: '#7C3AED',
         icon: Code,
@@ -231,7 +231,7 @@ export const getRoleDrawerConfig = (role: string): RoleDrawerConfig => {
     case 'support':
       return {
         title: 'مركز خدمة العملاء',
-        subtitle: 'إدارة التذاكر والشكاوى والردود الفورية (10 أقسام)',
+        subtitle: `إدارة التذاكر والشكاوى والردود الفورية (${SUPPORT_SECTIONS.length} أقسام)`,
         badge: 'خدمة العملاء 🎧',
         color: '#0D9488',
         icon: Headphones,
@@ -240,7 +240,7 @@ export const getRoleDrawerConfig = (role: string): RoleDrawerConfig => {
     case 'technician':
       return {
         title: 'حقيبة الفني والعمليات',
-        subtitle: 'طلبات الصيانة والكورسات والمحفظة (10 أقسام)',
+        subtitle: `طلبات الصيانة والكورسات والمحفظة (${TECHNICIAN_SECTIONS.length} قسماً)`,
         badge: 'فني معتمد 🔧',
         color: '#EA580C',
         icon: Wrench,
@@ -249,7 +249,7 @@ export const getRoleDrawerConfig = (role: string): RoleDrawerConfig => {
     case 'merchant':
       return {
         title: 'بوابة التاجر والمتجر',
-        subtitle: 'إدارة المنتجات والشحن ومبيعات السوق (11 قسماً)',
+        subtitle: `إدارة المنتجات والشحن ومبيعات السوق (${MERCHANT_SECTIONS.length} قسماً)`,
         badge: 'متجر معتمد 🏪',
         color: '#15803D',
         icon: Store,
@@ -259,7 +259,7 @@ export const getRoleDrawerConfig = (role: string): RoleDrawerConfig => {
     default:
       return {
         title: 'خدمات العميل والسوق',
-        subtitle: 'التسوق وحجز الفنيين وتتبع الطلبات (10 أقسام)',
+        subtitle: `التسوق وحجز الفنيين وتتبع الطلبات (${CUSTOMER_SECTIONS.length} أقسام)`,
         badge: 'عميل المنصة 👤',
         color: '#06B6D4',
         icon: User,

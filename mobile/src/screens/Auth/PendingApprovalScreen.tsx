@@ -37,7 +37,7 @@ export default function PendingApprovalScreen() {
 
   const isTech = user?.role === 'technician';
   const isMerchant = user?.role === 'merchant';
-  const feeText = isTech ? '300 ج.م' : isMerchant ? '500 ج.م' : 'رسوم الاشتراك';
+  const feeText = isTech ? '300 ج.م' : isMerchant ? '100 ج.م' : 'رسوم الاشتراك';
   const roleTitle = isTech ? 'فني صيانة معتمد 🧑‍🔧' : isMerchant ? 'تاجر ومورد قطع غيار 🏪' : 'حساب مهني';
 
   const handleRefreshStatus = async () => {

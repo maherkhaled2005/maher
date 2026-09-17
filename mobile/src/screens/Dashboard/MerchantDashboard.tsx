@@ -124,7 +124,7 @@ export default function MerchantDashboard({ navigation }: any) {
       updateUser({ ...user, isPro: true, role: 'merchant' });
     }
     setShowSubscription(false);
-    Alert.alert('🎉 مبروك!', 'تم تفعيل اشتراك التاجر بنجاح (500 ج.م)! يمكنك الآن نشر قطع الغيار واستقبال الطلبات.');
+    Alert.alert('🎉 مبروك!', 'تم تفعيل اشتراك التاجر بنجاح (100 ج.م)! يمكنك الآن نشر قطع الغيار واستقبال الطلبات.');
   };
 
   const handleFulfillOrder = async (ord: any) => {

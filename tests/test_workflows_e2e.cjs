@@ -33,40 +33,48 @@ function request(path, options = {}) {
   });
 }
 
+const CREDENTIALS = {
+  owner: { phone: '01000000001', password: 'Owner@123456' },
+  manager: { phone: '01000000003', password: 'Manager@123456' },
+  programmer: { phone: '01064739664', password: 'Maher@123456' },
+  customer_support: { phone: '01000000004', password: 'Support@123456' },
+  technician: { phone: '01000000005', password: 'Tech@123456' },
+  merchant: { phone: '01000000006', password: 'Merchant@123456' },
+  customer: { phone: '01000000007', password: 'Customer@123456' },
+};
+
+async function loginRole(role) {
+  const creds = CREDENTIALS[role];
+  const res = await request('/api/auth/login', {
+    method: 'POST',
+    body: { phone: creds.phone, password: creds.password },
+  });
+  if (!res.data?.token) throw new Error(`${role} login failed: ${JSON.stringify(res.data)}`);
+  return res.data;
+}
+
 async function runTests() {
   console.log('--- 🚀 STARTING FULL TECNOREXA E2E WORKFLOW SIMULATION ---');
 
   // 1. Authenticate Customer
   console.log('1. Authenticating Customer...');
-  const custAuth = await request('/api/auth/quick-access', {
-    method: 'POST',
-    body: { role: 'customer' },
-  });
-  if (!custAuth.data?.token) throw new Error('Customer login failed');
-  const custToken = custAuth.data.token;
-  const custUser = custAuth.data.user;
+  const custAuth = await loginRole('customer');
+  const custToken = custAuth.token;
+  const custUser = custAuth.user;
   console.log(`✅ Customer logged in: ${custUser.name} (${custUser.id})`);
 
   // 2. Authenticate Technician
   console.log('2. Authenticating Technician...');
-  const techAuth = await request('/api/auth/quick-access', {
-    method: 'POST',
-    body: { role: 'technician' },
-  });
-  if (!techAuth.data?.token) throw new Error('Technician login failed');
-  const techToken = techAuth.data.token;
-  const techUser = techAuth.data.user;
+  const techAuth = await loginRole('technician');
+  const techToken = techAuth.token;
+  const techUser = techAuth.user;
   console.log(`✅ Technician logged in: ${techUser.name} (${techUser.id})`);
 
   // 3. Authenticate Merchant
   console.log('3. Authenticating Merchant...');
-  const merchAuth = await request('/api/auth/quick-access', {
-    method: 'POST',
-    body: { role: 'merchant' },
-  });
-  if (!merchAuth.data?.token) throw new Error('Merchant login failed');
-  const merchToken = merchAuth.data.token;
-  const merchUser = merchAuth.data.user;
+  const merchAuth = await loginRole('merchant');
+  const merchToken = merchAuth.token;
+  const merchUser = merchAuth.user;
   console.log(`✅ Merchant logged in: ${merchUser.name} (${merchUser.id})`);
 
   // 4. Customer books a maintenance request
@@ -207,11 +215,8 @@ async function runTests() {
 
   // 16. Trade Request Approval (Manager/Owner)
   console.log('16. Authenticating Owner and approving Trade Upgrade Request...');
-  const ownerAuth = await request('/api/auth/quick-access', {
-    method: 'POST',
-    body: { role: 'owner' },
-  });
-  const ownerToken = ownerAuth.data?.token;
+  const ownerAuth = await loginRole('owner');
+  const ownerToken = ownerAuth.token;
   const tradeApproveRes = await request('/api/trade-requests/TR-101/approve', {
     method: 'POST',
     headers: { Authorization: `Bearer ${ownerToken}` },

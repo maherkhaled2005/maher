@@ -59,7 +59,6 @@ const ALL_ROLES = [
   { key: 'owner', label: '👑 المالك' },
   { key: 'manager', label: '👔 المدير' },
   { key: 'programmer', label: '💻 المبرمج' },
-  { key: 'assistant_programmer', label: '👨‍💻 مساعد مبرمج' },
   { key: 'customer_support', label: '🎧 الدعم' },
   { key: 'technician', label: '🔧 الفني' },
   { key: 'merchant', label: '🏪 التاجر' },
@@ -195,6 +194,19 @@ export default function AdminUsersScreen({ navigation }: any) {
 
   const handleToggleBan = async (u: UserRecord) => {
     const targetNormRole = normalizeRole(u.role);
+
+    // 🛡️ Owner self-protection: Cannot ban self
+    if (u.id === currentUser?.id) {
+      Alert.alert('غير مسموح ⚠️', 'لا يمكنك حظر حسابك الخاص.');
+      return;
+    }
+
+    // 🛡️ Cannot ban any owner account
+    if (targetNormRole === 'owner') {
+      Alert.alert('غير مسموح ⚠️', 'لا يمكن حظر حساب المالك بقرار إداري.');
+      return;
+    }
+
     if (isManager && (targetNormRole === 'owner' || targetNormRole === 'manager')) {
       Alert.alert('غير مصرح', 'ليس لديك صلاحية لتعديل حسابات الإدارة العليا.');
       return;
@@ -257,6 +269,16 @@ export default function AdminUsersScreen({ navigation }: any) {
   const openDeleteModal = (u: UserRecord) => {
     if (!isOwner) {
       Alert.alert('غير مصرح', 'صلاحية حذف المستخدمين نهائياً مقتصرة على المالك فقط.');
+      return;
+    }
+    // 🛡️ Owner self-protection: Cannot delete own account
+    if (u.id === currentUser?.id) {
+      Alert.alert('غير مسموح ⚠️', 'لا يمكنك حذف حسابك الشخصي بصفتك مالك المنصة.');
+      return;
+    }
+    // 🛡️ Cannot delete another owner
+    if (normalizeRole(u.role) === 'owner') {
+      Alert.alert('غير مسموح ⚠️', 'لا يمكن حذف حساب مالك المنصة.');
       return;
     }
     setDeleteTargetUser(u);
@@ -327,6 +349,12 @@ export default function AdminUsersScreen({ navigation }: any) {
     // Manager privilege escalation check
     if (isManager && (formRole === 'owner' || formRole === 'manager')) {
       Alert.alert('غير مصرح', 'لا يمكنك تعيين رتبة المالك أو المدير.');
+      return;
+    }
+
+    // 🛡️ Owner self-protection: Cannot demote own account
+    if (isEditing && editId === currentUser?.id && isOwner && formRole !== 'owner') {
+      Alert.alert('غير مسموح ⚠️', 'لا يمكن للمالك تخفيض رتبة حسابه الشخصي.');
       return;
     }
 
