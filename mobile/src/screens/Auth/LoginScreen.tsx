@@ -12,6 +12,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
+import { getActiveBaseURL, setActiveBaseURL, resetBaseURL } from '../../api/client';
 import { Phone, Mail, Lock, ArrowRight, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 
@@ -337,6 +338,46 @@ export default function LoginScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
 
+            {/* Server Settings Button */}
+            <TouchableOpacity
+              onPress={() => {
+                const current = getActiveBaseURL();
+                if (Platform.OS === 'web') {
+                  const input = window.prompt('رابط السيرفر الحالي:', current);
+                  if (input !== null) {
+                    if (input.trim()) setActiveBaseURL(input);
+                    else resetBaseURL();
+                  }
+                } else {
+                  Alert.prompt(
+                    '⚙️ إعدادات ربط السيرفر',
+                    `رابط السيرفر الحالي:\n${current}\n\nأدخل رابط السيرفر الجديد أو اتركه فارغاً للافتراضي:`,
+                    [
+                      { text: 'إلغاء', style: 'cancel' },
+                      { text: 'إعادة ضبط للافتراضي', onPress: () => resetBaseURL() },
+                      {
+                        text: 'حفظ الرابط',
+                        onPress: (val?: string) => {
+                          if (val && val.trim()) setActiveBaseURL(val);
+                        },
+                      },
+                    ],
+                    'plain-text',
+                    current
+                  );
+                }
+              }}
+              style={{
+                marginTop: 12,
+                alignSelf: 'center',
+                paddingVertical: 6,
+                paddingHorizontal: 12,
+              }}
+            >
+              <Text style={{ color: '#71717A', fontSize: 11, textDecorationLine: 'underline' }}>
+                ⚙️ إعدادات اتصال السيرفر (Server Connection)
+              </Text>
+            </TouchableOpacity>
 
           </View>
         </ScrollView>
@@ -344,3 +385,4 @@ export default function LoginScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+

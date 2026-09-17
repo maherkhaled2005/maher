@@ -3,37 +3,64 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const getBaseURL = () => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
-    return 'http://' + window.location.hostname + ':5000/api';
-  }
-  return (
-    process.env.EXPO_PUBLIC_API_URL ||
-    'https://sunshine-hereby-ski-category.trycloudflare.com/api' ||
-    'http://10.128.200.45:5000/api'
-  );
+const LOCAL_PC_IP = '192.168.1.3';
+
+export const CANDIDATE_BASE_URLS = [
+  process.env.EXPO_PUBLIC_API_URL,
+  `http://${LOCAL_PC_IP}:5000/api`,
+  'http://10.0.2.2:5000/api',
+  'http://localhost:5000/api',
+  'https://api.tecnorexa.com/api',
+].filter(Boolean) as string[];
+
+let activeBaseURL = CANDIDATE_BASE_URLS[0] || `http://${LOCAL_PC_IP}:5000/api`;
+
+// Load saved custom or working API URL asynchronously
+AsyncStorage.getItem('custom_api_url').then((saved) => {
+  if (saved) activeBaseURL = saved;
+});
+
+export const getActiveBaseURL = () => activeBaseURL;
+
+export const setActiveBaseURL = async (url: string) => {
+  let cleanUrl = url.trim().replace(/\/+$/, '');
+  if (!cleanUrl.endsWith('/api')) cleanUrl += '/api';
+  activeBaseURL = cleanUrl;
+  api.defaults.baseURL = cleanUrl;
+  await AsyncStorage.setItem('custom_api_url', cleanUrl);
+};
+
+export const resetBaseURL = async () => {
+  await AsyncStorage.removeItem('custom_api_url');
+  activeBaseURL = CANDIDATE_BASE_URLS[0] || `http://${LOCAL_PC_IP}:5000/api`;
+  api.defaults.baseURL = activeBaseURL;
 };
 
 export const SOCKET_URL = (() => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
     return 'http://' + window.location.hostname + ':5000';
   }
-  return (
-    process.env.EXPO_PUBLIC_SOCKET_URL ||
-    'https://sunshine-hereby-ski-category.trycloudflare.com' ||
-    'http://10.128.200.45:5000'
-  );
+  return process.env.EXPO_PUBLIC_SOCKET_URL || `http://${LOCAL_PC_IP}:5000`;
 })();
 
 export const api = axios.create({
-  baseURL: getBaseURL(),
+  baseURL: activeBaseURL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 7000, // 7 seconds fast timeout to prevent infinite spinner hanging
+  timeout: 8000,
 });
 
-// Interceptor: إضافة الـ Token (يقرأ من tr_token أو auth-storage)
+// Sync baseURL on every request
 api.interceptors.request.use(
   async (config) => {
+    const custom = await AsyncStorage.getItem('custom_api_url');
+    if (custom && custom !== api.defaults.baseURL) {
+      activeBaseURL = custom;
+      api.defaults.baseURL = custom;
+      config.baseURL = custom;
+    } else {
+      config.baseURL = activeBaseURL;
+    }
+
     let token = await AsyncStorage.getItem('tr_token');
     if (!token) {
       try {
@@ -50,18 +77,34 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor: معالجة 401 و 403 (الحظر) + إعادة محاولة سريعة واحدة فقط
+// Interceptor: Auto-failover to alternative URLs on network errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const config = error.config;
-    
-    // إعادة محاولة سريعة واحدة عند حدوث خطأ شبكة لتجنب الانتظار الطويل
-    if (error.code === 'ECONNABORTED' || error.message?.includes('Network Error') || !error.response) {
-      if (!config._retryCount) {
-        config._retryCount = 1;
-        await new Promise((res) => setTimeout(res, 500));
-        return api(config);
+    const isNetworkError =
+      error.code === 'ECONNABORTED' ||
+      error.code === 'ERR_NETWORK' ||
+      error.message?.includes('Network Error') ||
+      !error.response;
+
+    if (isNetworkError && !config._candidateAttempted) {
+      config._candidateAttempted = true;
+
+      for (const candidate of CANDIDATE_BASE_URLS) {
+        if (candidate === activeBaseURL) continue;
+        try {
+          // Quick probe to test candidate
+          const probeRes = await axios.get(`${candidate}/health`, { timeout: 3000 });
+          if (probeRes.data?.status === 'ok') {
+            console.log(`⚡ [API FAILOVER] Switched active API URL to ${candidate}`);
+            await setActiveBaseURL(candidate);
+            config.baseURL = candidate;
+            return api(config);
+          }
+        } catch {
+          // Continue probing next candidate
+        }
       }
     }
 
@@ -103,5 +146,6 @@ export const uploadFile = async (endpoint: string, file: any) => {
 };
 
 export default api;
+
 
 
