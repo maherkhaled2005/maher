@@ -3,17 +3,27 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const LOCAL_PC_IP = '192.168.1.3';
+const LOCAL_PC_IPS = [
+  '192.168.1.2',
+  '192.168.1.3',
+  '192.168.1.4',
+  '192.168.1.5',
+  '192.168.1.6',
+  '192.168.1.7',
+  '192.168.1.8',
+  '192.168.1.9',
+  '192.168.1.10',
+];
 
 export const CANDIDATE_BASE_URLS = [
   process.env.EXPO_PUBLIC_API_URL,
-  `http://${LOCAL_PC_IP}:5000/api`,
+  ...LOCAL_PC_IPS.map((ip) => `http://${ip}:5000/api`),
   'http://10.0.2.2:5000/api',
   'http://localhost:5000/api',
   'https://api.tecnorexa.com/api',
 ].filter(Boolean) as string[];
 
-let activeBaseURL = CANDIDATE_BASE_URLS[0] || `http://${LOCAL_PC_IP}:5000/api`;
+let activeBaseURL = `http://192.168.1.2:5000/api`;
 
 // Load saved custom or working API URL asynchronously
 AsyncStorage.getItem('custom_api_url').then((saved) => {
@@ -32,7 +42,7 @@ export const setActiveBaseURL = async (url: string) => {
 
 export const resetBaseURL = async () => {
   await AsyncStorage.removeItem('custom_api_url');
-  activeBaseURL = CANDIDATE_BASE_URLS[0] || `http://${LOCAL_PC_IP}:5000/api`;
+  activeBaseURL = `http://192.168.1.2:5000/api`;
   api.defaults.baseURL = activeBaseURL;
 };
 
@@ -40,7 +50,7 @@ export const SOCKET_URL = (() => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
     return 'http://' + window.location.hostname + ':5000';
   }
-  return process.env.EXPO_PUBLIC_SOCKET_URL || `http://${LOCAL_PC_IP}:5000`;
+  return process.env.EXPO_PUBLIC_SOCKET_URL || `http://192.168.1.2:5000`;
 })();
 
 export const api = axios.create({
