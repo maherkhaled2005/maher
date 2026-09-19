@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 env:
-  EXPO_PUBLIC_API_URL: http://192.168.1.2:5000/api
-  EXPO_PUBLIC_SOCKET_URL: http://192.168.1.2:5000
+  EXPO_PUBLIC_API_URL: https://api.tecnorexa.com/api
+  EXPO_PUBLIC_SOCKET_URL: https://api.tecnorexa.com
 
 jobs:
   build:
@@ -37,8 +37,8 @@ jobs:
 
       - name: Prebuild Android
         env:
-          EXPO_PUBLIC_API_URL: http://192.168.1.2:5000/api
-          EXPO_PUBLIC_SOCKET_URL: http://192.168.1.2:5000
+          EXPO_PUBLIC_API_URL: https://api.tecnorexa.com/api
+          EXPO_PUBLIC_SOCKET_URL: https://api.tecnorexa.com
         run: |
           cd mobile
           npx expo prebuild --platform android --clean
@@ -53,8 +53,8 @@ jobs:
 
       - name: Build APK
         env:
-          EXPO_PUBLIC_API_URL: http://192.168.1.2:5000/api
-          EXPO_PUBLIC_SOCKET_URL: http://192.168.1.2:5000
+          EXPO_PUBLIC_API_URL: https://api.tecnorexa.com/api
+          EXPO_PUBLIC_SOCKET_URL: https://api.tecnorexa.com
         run: |
           cd mobile/android
           ./gradlew assembleRelease --no-daemon
