@@ -12,7 +12,6 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
-import { getActiveBaseURL, setActiveBaseURL, resetBaseURL } from '../../api/client';
 import { Phone, Mail, Lock, ArrowRight, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 
@@ -40,6 +39,7 @@ export default function LoginScreen({ navigation }: any) {
   const { login } = useAuthStore();
 
   const handleLogin = async () => {
+    if (isLoading) return;
     const cleanPhone = normalizePhone(phone);
     const cleanEmail = email.trim();
     if (!cleanPhone && !cleanEmail) {
@@ -53,7 +53,14 @@ export default function LoginScreen({ navigation }: any) {
     const effectiveId = cleanPhone || cleanEmail;
     setIsLoading(true);
     try {
-      await login(effectiveId, password);
+      const res = await login(effectiveId, password);
+      if (res?.requireOtp) {
+        navigation.navigate('OTP', {
+          tempToken: res.tempToken,
+          phone: res.phone || cleanPhone,
+          flow: 'login',
+        });
+      }
     } catch (err: any) {
       const msg = err.message || 'بيانات الدخول غير صحيحة. يرجى التأكد من رقم الهاتف أو كلمة المرور.';
       if (Platform.OS === 'web') window.alert('خطأ في تسجيل الدخول: ' + msg);
@@ -259,7 +266,7 @@ export default function LoginScreen({ navigation }: any) {
 
               {/* Forgot Password Link */}
               <TouchableOpacity
-                onPress={() => navigation.navigate('OTP', { phone: normalizePhone(phone) })}
+                onPress={() => navigation.navigate('ForgotPassword', { phone: normalizePhone(phone) })}
                 style={{ alignSelf: 'flex-start', marginTop: 8 }}
               >
                 <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '700' }}>
@@ -337,49 +344,6 @@ export default function LoginScreen({ navigation }: any) {
                 تواصل مع الدعم الفني والمساعدة 💬
               </Text>
             </TouchableOpacity>
-
-            {/* Server Settings Button (Only visible in development) */}
-            {__DEV__ && (
-              <TouchableOpacity
-                onPress={() => {
-                  const current = getActiveBaseURL();
-                  if (Platform.OS === 'web') {
-                    const input = window.prompt('رابط السيرفر الحالي:', current);
-                    if (input !== null) {
-                      if (input.trim()) setActiveBaseURL(input);
-                      else resetBaseURL();
-                    }
-                  } else {
-                    Alert.prompt(
-                      '⚙️ إعدادات ربط السيرفر',
-                      `رابط السيرفر الحالي:\n${current}\n\nأدخل رابط السيرفر الجديد أو اتركه فارغاً للافتراضي:`,
-                      [
-                        { text: 'إلغاء', style: 'cancel' },
-                        { text: 'إعادة ضبط للافتراضي', onPress: () => resetBaseURL() },
-                        {
-                          text: 'حفظ الرابط',
-                          onPress: (val?: string) => {
-                            if (val && val.trim()) setActiveBaseURL(val);
-                          },
-                        },
-                      ],
-                      'plain-text',
-                      current
-                    );
-                  }
-                }}
-                style={{
-                  marginTop: 12,
-                  alignSelf: 'center',
-                  paddingVertical: 6,
-                  paddingHorizontal: 12,
-                }}
-              >
-                <Text style={{ color: '#71717A', fontSize: 11, textDecorationLine: 'underline' }}>
-                  ⚙️ إعدادات اتصال السيرفر (Server Connection)
-                </Text>
-              </TouchableOpacity>
-            )}
 
           </View>
         </ScrollView>

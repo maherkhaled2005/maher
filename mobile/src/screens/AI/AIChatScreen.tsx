@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -90,34 +90,65 @@ export default function AIChatScreen({ navigation }: any) {
   const [estimatedCost, setEstimatedCost] = useState('0.00');
   const [tokensUsed, setTokensUsed] = useState('0');
 
-  // Vodafone Cash Paid Model for Customers
+  // AI Subscription State
+  const [subStatus, setSubStatus] = useState<{
+    isSubscribed: boolean;
+    startedAt: string | null;
+    expiresAt: string | null;
+    dailyRemaining: number;
+    monthlyRemaining: number;
+    price: number;
+    freePreviewsLeft: number;
+  }>({
+    isSubscribed: false,
+    startedAt: null,
+    expiresAt: null,
+    dailyRemaining: 0,
+    monthlyRemaining: 0,
+    price: 100,
+    freePreviewsLeft: 3,
+  });
+
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
-  const [questionsLeft, setQuestionsLeft] = useState(currentRole === 'customer' && (user?.balance || 0) <= 0 ? 0 : 5);
+  const [questionsLeft, setQuestionsLeft] = useState(3);
+
+  const loadSubscriptionStatus = useCallback(async () => {
+    try {
+      const res = await fetchApi('/ai/subscription/status');
+      if (res && typeof res === 'object') {
+        setSubStatus(res);
+        setQuestionsLeft(res.isSubscribed ? res.dailyRemaining : res.freePreviewsLeft);
+      }
+    } catch (err) {
+      console.warn('Failed to load AI subscription status:', err);
+    }
+  }, []);
 
   useEffect(() => {
-    if (currentRole === 'customer' && (user?.balance || 0) <= 0 && questionsLeft <= 0) {
-      setShowPackageModal(true);
-    }
-  }, [currentRole, user?.balance]);
+    loadSubscriptionStatus();
+  }, [loadSubscriptionStatus]);
 
   // Query Logs State (Owner only)
   const [queryLogs, setQueryLogs] = useState<any[]>([]);
 
-  const handleBuyPackage = async (packageId: string, amount: number, questions: number) => {
+  const handleSubscribe = async (paymentMethod: 'wallet' | 'vodafone_cash') => {
     setPurchasing(true);
     try {
-      const res = await fetchApi('/ai/purchase-package', {
+      const res = await fetchApi('/ai/subscription/subscribe', {
         method: 'POST',
-        data: { packageId, amount, questions, phone: user?.phone },
+        data: {
+          paymentMethod,
+          senderPhone: user?.phone,
+        },
       });
-      setQuestionsLeft((prev) => prev + questions);
+      await loadSubscriptionStatus();
       setShowPackageModal(false);
-      Alert.alert('🎉 تم بنجاح!', res?.message || `تم تفعيل باقة (${questions} استفسار ذكي) بنجاح.`);
+      Alert.alert('🎉 تم بنجاح!', res?.message || 'تم تفعيل اشتراك الذكاء الاصطناعي بنجاح.');
     } catch (err: any) {
       Alert.alert(
-        'عفواً',
-        err.message || 'رصيد المحفظة غير كافٍ. يرجى شحن محفظتك أولاً من خلال فودافون كاش (01064739664) ثم التواصل مع الدعم الفني لإضافة الرصيد.'
+        'تنبيه الدفع',
+        err.message || 'تعذر تفعيل الاشتراك. يرجى التأكد من رصيد المحفظة أو إتمام التحويل.'
       );
     } finally {
       setPurchasing(false);
@@ -127,17 +158,6 @@ export default function AIChatScreen({ navigation }: any) {
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
     if (!text || isTyping) return;
-
-    if (currentRole === 'customer' && questionsLeft <= 0 && !isOwner) {
-      setShowPackageModal(true);
-      return;
-    }
-
-    const todayUserMsgs = messages.filter((m) => m.role === 'user');
-    if (todayUserMsgs.length >= 50 && !isOwner) {
-      Alert.alert('تنبيه', 'لقد استهلكت الحد الأقصى المسموح به للاستفسارات اليومية (50 استفساراً). يمكنك حجز فني صيانة أو التواصل مع الدعم الفني.');
-      return;
-    }
 
     const userMsg: Message = {
       id: `user-${Date.now()}`,
@@ -150,11 +170,26 @@ export default function AIChatScreen({ navigation }: any) {
     setIsTyping(true);
 
     try {
-      const res = await fetchApi('/ai/troubleshoot', {
+      const res = await fetchApi('/ai/chat', {
         method: 'POST',
         data: { message: text },
       });
-      const aiText = res?.reply || res?.response || res?.suggestion || 'تم استلام استفسارك وتجهيز التشخيص الفني.';
+
+      if (res?.error === 'AI_SUBSCRIPTION_REQUIRED' || res?.error?.includes('اشتراك')) {
+        setShowPackageModal(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ai-${Date.now()}`,
+            role: 'ai',
+            text: 'عفواً، لقد استهلكت المعاينات المجانية. يتطلب استمرار تشخيص الأعطال بالذكاء الاصطناعي تفعيل الاشتراك الشهري (100 ج.م).',
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
+      const aiText = res?.reply || res?.response || 'تم استلام استفسارك وتجهيز التشخيص الفني.';
       const specialty = res?.specialty || detectSpecialtyFromText(text);
 
       setMessages((prev) => [
@@ -167,14 +202,22 @@ export default function AIChatScreen({ navigation }: any) {
           timestamp: new Date(),
         },
       ]);
-    } catch {
+
+      if (res?.dailyRemaining !== undefined) {
+        setQuestionsLeft(res.dailyRemaining);
+      }
+      loadSubscriptionStatus();
+    } catch (err: any) {
+      if (err.message?.includes('اشتراك') || err.message?.includes('الحد الأقصى')) {
+        setShowPackageModal(true);
+      }
       const fallbackSpecialty = detectSpecialtyFromText(text);
       setMessages((prev) => [
         ...prev,
         {
           id: `ai-${Date.now()}`,
           role: 'ai',
-          text: 'تم تحليل الاستفسار: تأكد أولاً من فصل مصدر الكهرباء، والتحقق من التوصيلات الأولية. وننصح بحجز فني صيانة معتمد لضمان السلامة وقطع الغيار الأصلية.',
+          text: err.message || 'تعذر الاتصال بخادم الذكاء الاصطناعي. يرجى التحقق من اتصال الإنترنت، أو حجز فني صيانة معتمد للسلامة.',
           specialty: fallbackSpecialty,
           timestamp: new Date(),
         },
@@ -289,17 +332,27 @@ export default function AIChatScreen({ navigation }: any) {
                     paddingHorizontal: 8,
                     paddingVertical: 5,
                     borderRadius: borderRadius.md,
-                    backgroundColor: 'rgba(230, 0, 0, 0.15)',
+                    backgroundColor: subStatus.isSubscribed
+                      ? 'rgba(16, 185, 129, 0.15)'
+                      : 'rgba(212, 175, 55, 0.15)',
                     borderWidth: 1,
-                    borderColor: '#E60000',
+                    borderColor: subStatus.isSubscribed ? '#10B981' : colors.primary,
                     flexDirection: 'row-reverse',
                     alignItems: 'center',
                     gap: 3,
                   }}
                 >
-                  <Smartphone size={12} color="#E60000" />
-                  <Text style={{ color: '#E60000', fontSize: 10, fontWeight: 'bold' }}>
-                    باقات كاش ({questionsLeft})
+                  <Sparkles size={12} color={subStatus.isSubscribed ? '#10B981' : colors.primary} />
+                  <Text
+                    style={{
+                      color: subStatus.isSubscribed ? '#10B981' : colors.primary,
+                      fontSize: 10,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {subStatus.isSubscribed
+                      ? `نشط (${subStatus.dailyRemaining})`
+                      : `تجريبي (${subStatus.freePreviewsLeft})`}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -318,12 +371,34 @@ export default function AIChatScreen({ navigation }: any) {
                 }}
               >
                 <Wrench size={13} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>طلب فني 🔧</Text>
+                <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>اطلب فني</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
       )}
+
+      {/* Online Status Bar */}
+      <View
+        style={{
+          backgroundColor: '#121212',
+          paddingVertical: 4,
+          paddingHorizontal: spacing.md,
+          flexDirection: 'row-reverse',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottomWidth: 1,
+          borderColor: '#1e1e1e',
+        }}
+      >
+        <Text style={{ color: colors.gray, fontSize: 10 }}>
+          ⚡ الذكاء الاصطناعي يعمل أونلاين فقط عبر خوادم TecnoRexa لضمان أحدث بيانات الصيانة
+        </Text>
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' }} />
+          <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>سيرفر متصل</Text>
+        </View>
+      </View>
 
       {/* 2. Owner-Only Tabs */}
       {isOwner && (
@@ -780,36 +855,13 @@ export default function AIChatScreen({ navigation }: any) {
             </View>
 
             <Text style={{ color: '#A1A1AA', fontSize: 12, textAlign: 'right', marginBottom: spacing.md, lineHeight: 18 }}>
-              لقد استهلكت رصيد الاستفسارات المجانية. اختر الباقة المناسبة لتشخيص الأعطال المنزلية فحصاً دقيقاً:
+              خدمة المساعد الذكي مدفوعة لتقديم أدق تشخيصات الأعطال والخطوات المعتمدة. قيمة الاشتراك {subStatus.price} ج.م شهرياً:
             </Text>
 
-            {/* Packages */}
+            {/* Subscription Options */}
             <View style={{ gap: spacing.sm, marginBottom: spacing.md }}>
               <TouchableOpacity
-                onPress={() => handleBuyPackage('ai_pkg_20', 20, 20)}
-                disabled={purchasing}
-                style={{
-                  backgroundColor: '#1C1917',
-                  borderWidth: 1,
-                  borderColor: '#444',
-                  borderRadius: borderRadius.lg,
-                  padding: spacing.md,
-                  flexDirection: 'row-reverse',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>باقة التوفير (20 استفساراً)</Text>
-                  <Text style={{ color: '#A1A1AA', fontSize: 11 }}>تشخيص متكامل لعدة أجهزة</Text>
-                </View>
-                <View style={{ backgroundColor: 'rgba(212,175,55,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.primary }}>
-                  <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 14 }}>20 ج.م</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => handleBuyPackage('ai_pkg_50', 45, 50)}
+                onPress={() => handleSubscribe('wallet')}
                 disabled={purchasing}
                 style={{
                   backgroundColor: '#1C1917',
@@ -822,27 +874,31 @@ export default function AIChatScreen({ navigation }: any) {
                   alignItems: 'center',
                 }}
               >
-                <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ alignItems: 'flex-end', flex: 1, paddingRight: 8 }}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>باقة العائلة (50 استفساراً)</Text>
+                    <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>
+                      تفعيل فوري من رصيد المحفظة
+                    </Text>
                     <View style={{ backgroundColor: '#10B98122', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ color: '#10B981', fontSize: 9, fontWeight: 'bold' }}>الأكثر توفيراً ⚡</Text>
+                      <Text style={{ color: '#10B981', fontSize: 9, fontWeight: 'bold' }}>فوري ⚡</Text>
                     </View>
                   </View>
-                  <Text style={{ color: '#A1A1AA', fontSize: 11 }}>مناسبة لجميع أعطال المنزل</Text>
+                  <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 2 }}>
+                    خصم {subStatus.price} ج.م وتفعيل 30 يوماً بلا انقطاع
+                  </Text>
                 </View>
-                <View style={{ backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: borderRadius.md }}>
-                  <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: 14 }}>45 ج.م</Text>
+                <View style={{ backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: borderRadius.md }}>
+                  <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: 14 }}>{subStatus.price} ج.م</Text>
                 </View>
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => handleBuyPackage('ai_pkg_unlimited', 99, 500)}
+                onPress={() => handleSubscribe('vodafone_cash')}
                 disabled={purchasing}
                 style={{
                   backgroundColor: '#1C1917',
                   borderWidth: 1,
-                  borderColor: '#8B5CF6',
+                  borderColor: '#E60000',
                   borderRadius: borderRadius.lg,
                   padding: spacing.md,
                   flexDirection: 'row-reverse',
@@ -850,12 +906,16 @@ export default function AIChatScreen({ navigation }: any) {
                   alignItems: 'center',
                 }}
               >
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>الباقة الملكية (غير محدودة شهرياً)</Text>
-                  <Text style={{ color: '#A1A1AA', fontSize: 11 }}>استشارات واستفسارات بلا حدود لمدة شهر</Text>
+                <View style={{ alignItems: 'flex-end', flex: 1, paddingRight: 8 }}>
+                  <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>
+                    تحويل فودافون كاش أو إنستاباي
+                  </Text>
+                  <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 2 }}>
+                    تحويل إلى محفظة المنصة 01000000000 وتأكيد الطلب
+                  </Text>
                 </View>
-                <View style={{ backgroundColor: 'rgba(139,92,246,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#8B5CF6' }}>
-                  <Text style={{ color: '#8B5CF6', fontWeight: '900', fontSize: 14 }}>99 ج.م</Text>
+                <View style={{ backgroundColor: 'rgba(230,0,0,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#E60000' }}>
+                  <Text style={{ color: '#E60000', fontWeight: '900', fontSize: 14 }}>{subStatus.price} ج.م</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -863,13 +923,13 @@ export default function AIChatScreen({ navigation }: any) {
             {/* Payment Method Details */}
             <View style={{ backgroundColor: '#0A0A0A', borderRadius: borderRadius.md, padding: spacing.sm, borderWidth: 1, borderColor: '#27272A', marginBottom: spacing.md }}>
               <Text style={{ color: '#E4E4E7', fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 2 }}>
-                طريقة الدفع فودافون كاش الرسمية:
+                بيانات التحويل الرسمي:
               </Text>
               <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '900', textAlign: 'right' }}>
-                رقم المحفظة: 01064739664
+                رقم المحفظة / إنستاباي: 01000000000
               </Text>
               <Text style={{ color: '#71717A', fontSize: 10, textAlign: 'right', marginTop: 2 }}>
-                * سيتم خصم القيمة تلقائياً من رصيد محفظتك بالتطبيق أو تفعيلها فور التحويل
+                * الذكاء الاصطناعي خدمة سحابية متصلة بالإنترنت حصراً وغير متوفرة أوفلاين
               </Text>
             </View>
 

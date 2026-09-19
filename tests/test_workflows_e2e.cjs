@@ -33,6 +33,10 @@ function request(path, options = {}) {
   });
 }
 
+const Database = require('better-sqlite3');
+const path = require('path');
+const db = new Database(path.join(__dirname, '..', 'tecnorexa.db'));
+
 const CREDENTIALS = {
   owner: { phone: '01000000001', password: 'Owner@123456' },
   manager: { phone: '01000000003', password: 'Manager@123456' },
@@ -49,8 +53,17 @@ async function loginRole(role) {
     method: 'POST',
     body: { phone: creds.phone, password: creds.password },
   });
-  if (!res.data?.token) throw new Error(`${role} login failed: ${JSON.stringify(res.data)}`);
-  return res.data;
+  let data = res.data;
+  if (data?.requireOtp && data?.tempToken) {
+    const row = db.prepare("SELECT otpCode FROM users WHERE phone = ?").get(creds.phone);
+    const otpRes = await request('/api/auth/verify-login-otp', {
+      method: 'POST',
+      body: { tempToken: data.tempToken, phone: creds.phone, otp: row?.otpCode },
+    });
+    data = otpRes.data;
+  }
+  if (!data?.token) throw new Error(`${role} login failed: ${JSON.stringify(data)}`);
+  return data;
 }
 
 async function runTests() {

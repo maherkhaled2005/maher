@@ -21,6 +21,7 @@ import LandingScreen from '../screens/Landing/LandingScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
 import OTPScreen from '../screens/Auth/OTPScreen';
+import ForgotPasswordScreen from '../screens/Auth/ForgotPasswordScreen';
 import BannedScreen from '../screens/Auth/BannedScreen';
 import PendingApprovalScreen from '../screens/Auth/PendingApprovalScreen';
 
@@ -69,6 +70,7 @@ import EditProfileScreen from '../screens/Profile/EditProfileScreen';
 import ChangePasswordScreen from '../screens/Profile/ChangePasswordScreen';
 import SettingsScreen from '../screens/Settings/SettingsScreen';
 import SubscriptionScreen from '../screens/Subscription/SubscriptionScreen';
+import AddressesScreen from '../screens/Profile/AddressesScreen';
 import PrivacyPolicyScreen from '../screens/Legal/PrivacyPolicyScreen';
 import TermsScreen from '../screens/Legal/TermsScreen';
 
@@ -144,7 +146,7 @@ const getTabsForRole = (role: string): TabDef[] => {
       { name: 'Home', label: 'الرئيسية', Icon: Home, screen: HomeScreen },
       { name: 'DevHub', label: 'المهام', Icon: Code, screen: DevHubScreen },
       { name: 'ErrorReports', label: 'الأخطاء', Icon: AlertTriangle, screen: ErrorReportsScreen },
-      { name: 'ChatList', label: 'الشات', Icon: MessageCircle, screen: ChatListScreen },
+      { name: 'DevChat', label: 'الشات', Icon: MessageCircle, screen: DevChatScreen },
       { name: 'Profile', label: 'حسابي', Icon: User, screen: ProfileScreen },
     ],
     // 🎧 خدمة العملاء: الرئيسية | التذاكر | الشات | الفنيين | حسابي
@@ -171,12 +173,12 @@ const getTabsForRole = (role: string): TabDef[] => {
       { name: 'Wallet', label: 'المحفظة', Icon: Wallet, screen: WalletScreen },
       { name: 'Profile', label: 'حسابي', Icon: User, screen: ProfileScreen },
     ],
-    // 👤 العميل: الرئيسية | السوق | الفنيين | الذكاء | حسابي
+    // 👤 العميل: الرئيسية | السوق | الفنيين | الذكاء الاصطناعي | حسابي
     customer: [
       { name: 'Home', label: 'الرئيسية', Icon: Home, screen: HomeScreen },
-      { name: 'Categories', label: 'الأقسام', Icon: ShoppingBag, screen: MarketplaceScreen },
-      { name: 'Orders', label: 'الطلبات', Icon: Package, screen: OrdersScreen },
-      { name: 'Cart', label: 'السلة', Icon: ShoppingCart, screen: CartScreen },
+      { name: 'Marketplace', label: 'السوق', Icon: ShoppingBag, screen: MarketplaceScreen },
+      { name: 'TechniciansTeam', label: 'الفنيين', Icon: Wrench, screen: TechniciansTeamScreen },
+      { name: 'AIChat', label: 'الذكاء الاصطناعي', Icon: Bot, screen: AIChatScreen },
       { name: 'Profile', label: 'حسابي', Icon: User, screen: ProfileScreen },
     ],
   };
@@ -287,6 +289,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="OTP" component={OTPScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
             <Stack.Screen name="Landing" component={LandingScreen} />
             <Stack.Screen name="Contact" component={ContactScreen} />
             <Stack.Screen name="FAQ" component={FAQScreen} />
@@ -317,6 +320,7 @@ export default function AppNavigator() {
             <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+            <Stack.Screen name="Addresses" component={AddressesScreen} />
             <Stack.Screen name="AdminCategories" component={AdminCategoriesScreen} />
             <Stack.Screen name="Warehouses" component={WarehousesScreen} />
             <Stack.Screen name="WarehouseInventory" component={WarehouseInventoryScreen} />

@@ -1,4 +1,8 @@
+const Database = require('better-sqlite3');
+const path = require('path');
+
 const BASE_URL = `http://localhost:${process.env.PORT || 5000}/api`;
+const db = new Database(path.join(__dirname, '..', 'tecnorexa.db'));
 
 const ROLES = [
   { role: 'owner', phone: '01000000001', pass: 'Owner@123456' },
@@ -24,26 +28,18 @@ async function runTests() {
       });
       let data = await res.json();
 
-      // If technician does not exist yet or password mismatched (clean zero state), reset tech password and approve
-      if (!res.ok && r.role === 'technician') {
-        const ownerToken = tokens['owner'];
-        if (ownerToken) {
-          // Ensure technician user exists & is active with Tech@123456
-          await fetch(`${BASE_URL}/admin/users/tech_lead`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
-            body: JSON.stringify({ status: 'active', role: 'technician', password: r.pass })
-          });
-        }
-        res = await fetch(`${BASE_URL}/auth/login`, {
+      if (data.requireOtp && data.tempToken) {
+        const row = db.prepare("SELECT otpCode FROM users WHERE phone = ?").get(r.phone);
+        const otpRes = await fetch(`${BASE_URL}/auth/verify-login-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: r.phone, password: r.pass }),
+          body: JSON.stringify({ tempToken: data.tempToken, phone: r.phone, otp: row?.otpCode }),
         });
-        data = await res.json();
+        data = await otpRes.json();
+        res = otpRes;
       }
 
-      if (res.ok) {
+      if (res.ok && data.token) {
         tokens[r.role] = data.token;
         console.log(`✅ [${r.role.toUpperCase()}] Login Success -> Token received, user: ${data.user?.name}`);
       } else {

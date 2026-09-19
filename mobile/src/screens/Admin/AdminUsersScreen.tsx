@@ -70,7 +70,7 @@ export default function AdminUsersScreen({ navigation }: any) {
   const currentRole = normalizeRole(currentUser?.role || '');
   const isOwner = currentRole === 'owner';
   const isManager = currentRole === 'manager';
-  const isLeadProgrammer = (currentRole === 'programmer' || currentUser?.role === 'programmer') && (currentUser?.developerRank === 'lead' || currentUser?.phone === '01064739664');
+  const isLeadProgrammer = (currentRole === 'programmer' || currentUser?.role === 'programmer') && (currentUser?.developerRank === 'lead' || (currentUser as any)?.programmerLevel === 'lead');
   const canAddUser = isOwner || isLeadProgrammer;
   const isReadOnly = !isOwner && !isManager && !isLeadProgrammer;
 
@@ -207,7 +207,7 @@ export default function AdminUsersScreen({ navigation }: any) {
       return;
     }
 
-    if (isManager && (targetNormRole === 'owner' || targetNormRole === 'manager')) {
+    if (isManager && targetNormRole === 'manager') {
       Alert.alert('غير مصرح', 'ليس لديك صلاحية لتعديل حسابات الإدارة العليا.');
       return;
     }

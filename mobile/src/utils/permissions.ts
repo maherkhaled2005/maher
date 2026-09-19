@@ -68,7 +68,7 @@ export const DEV_RANK_HIERARCHY: Record<string, number> = {
 export const isDevLead = (user: any) => {
   if (!user) return false;
   if (user.role === 'owner') return true;
-  return user.developerRank === 'lead' || user.phone === '01064739664' || user.name?.includes('ماهر');
+  return user.developerRank === 'lead' || user.programmerLevel === 'lead';
 };
 
 export const isDevAssistant = (user: any) => {

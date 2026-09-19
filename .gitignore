@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+*.db-shm
+*.db-wal
+scratch/
+uploads/

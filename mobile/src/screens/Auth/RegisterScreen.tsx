@@ -190,32 +190,27 @@ export default function RegisterScreen({ navigation }: any) {
 
       if (res.success || res.token) {
         triggerSuccessHaptic();
-        const devOtp = res.otpCode;
         if (role === 'customer') {
           Alert.alert(
-            'تم إرسال رمز التأكيد 📱',
-            devOtp
-              ? `تم إنشاء الحساب بنجاح!\n\nرمز التأكيد الخاص بك هو: ${devOtp}`
-              : 'تم إنشاء الحساب بنجاح! أدخل رمز التأكيد المرسل لهاتفك لتفعيل الحساب.',
+            'تم إنشاء الحساب بنجاح 📱',
+            'تم إرسال رمز التحقق إلى هاتفك عبر رسالة SMS. أدخل رمز التأكيد لتفعيل حسابك.',
             [
               {
-                text: 'إدخال الرمز',
+                text: 'إدخال رمز التحقق',
                 onPress: () =>
-                  navigation.navigate('OTP', { phone: cleanPhone, step: 'otp', devOtp }),
+                  navigation.navigate('OTP', { phone: cleanPhone, flow: 'register' }),
               },
             ]
           );
         } else {
           Alert.alert(
             'تم استلام طلبك بنجاح ✅',
-            devOtp
-              ? `تم تسجيل بياناتك بنجاح!\n\nرمز تأكيد الهاتف هو: ${devOtp}`
-              : 'تم تسجيل بياناتك وإرسال إيصال التحويل. سيقوم فريق الإدارة بمراجعة واعتماد حسابك خلال 5 إلى 30 دقيقة.',
+            'تم تسجيل بياناتك وإرسال رمز التحقق لهاتفك. يرجى تأكيد رقم هاتفك أولاً، ثم سيقوم فريق الإدارة بمراجعة الحساب والاعتماد.',
             [
               {
                 text: 'تأكيد رقم الهاتف',
                 onPress: () =>
-                  navigation.navigate('OTP', { phone: cleanPhone, step: 'otp', devOtp }),
+                  navigation.navigate('OTP', { phone: cleanPhone, flow: 'register' }),
               },
             ]
           );
@@ -271,6 +266,49 @@ export default function RegisterScreen({ navigation }: any) {
             >
               <ArrowRight color="#D4AF37" size={20} />
             </TouchableOpacity>
+          </View>
+
+          {/* Large Hero Visual Card */}
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 440,
+              alignSelf: 'center',
+              borderRadius: borderRadius.xl,
+              overflow: 'hidden',
+              marginBottom: spacing.lg,
+              borderWidth: 1.5,
+              borderColor: 'rgba(212, 175, 55, 0.3)',
+              backgroundColor: '#141416',
+              shadowColor: '#D4AF37',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 10,
+              elevation: 5,
+            }}
+          >
+            <Image
+              source={require('../../../assets/tecnorexa_sphere_showcase.jpg')}
+              style={{ width: '100%', height: 160 }}
+              resizeMode="cover"
+            />
+            <View
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: spacing.md,
+                backgroundColor: 'rgba(20, 20, 22, 0.95)',
+                borderTopWidth: 1,
+                borderTopColor: '#27272A',
+                alignItems: 'center',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={16} color="#D4AF37" />
+                <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '800' }}>
+                  عضوية احترافية موثوقة في كبرى منصات الصيانة
+                </Text>
+              </View>
+            </View>
           </View>
 
           {/* Role Selection */}
@@ -507,8 +545,8 @@ export default function RegisterScreen({ navigation }: any) {
               </View>
 
               <Text style={{ color: '#E4E4E7', fontSize: 12, lineHeight: 18, textAlign: 'right', marginBottom: 12 }}>
-                يرجى تحويل رسوم الانضمام عبر فودافون كاش أو إنستاباي إلى الرقم:{' '}
-                <Text style={{ color: '#10B981', fontWeight: '900' }}>01064739664</Text>
+                يرجى تحويل رسوم الانضمام عبر فودافون كاش أو إنستاباي إلى محفظة المنصة:{' '}
+                <Text style={{ color: '#10B981', fontWeight: '900' }}>01000000000</Text>
               </Text>
 
               {/* Sender Phone */}

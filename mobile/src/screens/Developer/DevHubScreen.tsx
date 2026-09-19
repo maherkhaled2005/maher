@@ -320,7 +320,7 @@ const CreateTaskModal = ({
 export default function DevHubScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
-  const isLead = isOwner || !!(user?.developerRank === 'lead' || user?.phone === '01064739664' || user?.name?.includes('ماهر') || user?.name?.toLowerCase().includes('maher'));
+  const isLead = isOwner || !!(user?.developerRank === 'lead' || (user as any)?.programmerLevel === 'lead');
   const isAssistant = isLead || !!(user?.developerRank === 'assistant' || user?.role === 'programmer_assistant');
   const canManageTasks = isLead || isAssistant;
   const currentUser = user?.name || '';
@@ -819,7 +819,7 @@ export default function DevHubScreen({ navigation }: any) {
           ) : (
             devTeam.map((member: any) => {
               const rank = member.developer_rank || member.developerRank || 'junior';
-              const isMemberLead = rank === 'lead' || member.phone === '01064739664';
+              const isMemberLead = rank === 'lead' || member.developerRank === 'lead' || member.programmerLevel === 'lead';
               const isMemberAssistant = rank === 'assistant';
               const isMemberJunior = !isMemberLead && !isMemberAssistant;
 

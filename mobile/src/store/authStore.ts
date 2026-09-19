@@ -29,14 +29,27 @@ interface User {
   createdAt: string;
 }
 
+export interface LoginResult {
+  requireOtp: boolean;
+  tempToken?: string;
+  phone?: string;
+  message?: string;
+  user?: User;
+  token?: string;
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<LoginResult>;
+  verifyLoginOTP: (tempToken: string, phone: string, otp: string) => Promise<void>;
   loginWithOTP: (phone: string, otp: string) => Promise<void>;
-  register: (data: any) => Promise<void>;
+  resendOTP: (tempToken?: string, phone?: string) => Promise<any>;
+  forgotPassword: (phone: string) => Promise<any>;
+  resetPassword: (phone: string, otp: string, newPassword: string) => Promise<any>;
+  register: (data: any) => Promise<any>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   quickAccess: (role: string) => Promise<void>;
@@ -95,10 +108,19 @@ export const useAuthStore = create<AuthState>()(
             method: 'POST',
             data: { phone: cleanId, email: cleanId, password },
           });
-          if (data?.success || data?.token) {
+          set({ isLoading: false });
+          if (data?.requireOtp) {
+            return {
+              requireOtp: true,
+              tempToken: data.tempToken,
+              phone: data.phone || cleanId,
+              message: data.message || 'تم إرسال رمز التحقق إلى هاتفك',
+            };
+          }
+          if (data?.success && data?.token) {
             await saveSession(data.token, data.user);
             set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
-            return;
+            return { requireOtp: false, user: data.user, token: data.token };
           }
           throw new Error(data?.error || 'بيانات الدخول غير صحيحة');
         } catch (error: any) {
@@ -107,11 +129,14 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      loginWithOTP: async (phone, otp) => {
+      verifyLoginOTP: async (tempToken, phone, otp) => {
         set({ isLoading: true });
         try {
-          const data = await fetchApi('/auth/verify-otp', { method: 'POST', data: { phone, otp } });
-          if (data?.success || data?.token) {
+          const data = await fetchApi('/auth/verify-login-otp', {
+            method: 'POST',
+            data: { tempToken, phone, otp },
+          });
+          if (data?.token && data?.user) {
             await saveSession(data.token, data.user);
             set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
             return;
@@ -123,14 +148,75 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      loginWithOTP: async (phone, otp) => {
+        set({ isLoading: true });
+        try {
+          const data = await fetchApi('/auth/verify-otp', { method: 'POST', data: { phone, otp } });
+          if (data?.success && (data?.token || data?.user)) {
+            if (data.token && data.user) {
+              await saveSession(data.token, data.user);
+              set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
+            } else {
+              set({ isLoading: false });
+            }
+            return;
+          }
+          throw new Error(data?.error || 'رمز التحقق غير صحيح');
+        } catch (error: any) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      resendOTP: async (tempToken, phone) => {
+        try {
+          const data = await fetchApi('/auth/resend-otp', {
+            method: 'POST',
+            data: { tempToken, phone },
+          });
+          return data;
+        } catch (error: any) {
+          throw error;
+        }
+      },
+
+      forgotPassword: async (phone) => {
+        set({ isLoading: true });
+        try {
+          const data = await fetchApi('/auth/forgot-password', {
+            method: 'POST',
+            data: { phone },
+          });
+          set({ isLoading: false });
+          return data;
+        } catch (error: any) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      resetPassword: async (phone, otp, newPassword) => {
+        set({ isLoading: true });
+        try {
+          const data = await fetchApi('/auth/reset-password', {
+            method: 'POST',
+            data: { phone, otp, newPassword },
+          });
+          set({ isLoading: false });
+          return data;
+        } catch (error: any) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
       register: async (formData) => {
         set({ isLoading: true });
         try {
           const res = await fetchApi('/auth/register', { method: 'POST', data: formData });
-          if (res?.success || res?.token) {
-            await saveSession(res.token, res.user);
-            set({ user: res.user, token: res.token, isAuthenticated: true, isLoading: false });
-            return;
+          set({ isLoading: false });
+          if (res?.requireOtp || res?.success) {
+            return res;
           }
           throw new Error(res?.error || 'فشل تسجيل الحساب');
         } catch (error: any) {

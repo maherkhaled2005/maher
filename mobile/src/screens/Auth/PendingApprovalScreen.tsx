@@ -53,7 +53,7 @@ export default function PendingApprovalScreen() {
   };
 
   const handleContactAdmin = () => {
-    const phone = '01064739664';
+    const phone = '01000000000';
     Linking.openURL(`tel:${phone}`).catch(() => {
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.open(`https://wa.me/20${phone.slice(1)}?text=${encodeURIComponent('السلام عليكم، قمت بسداد اشتراك TecnoRexa وبرجاء تفعيل حسابي.')}`, '_blank');
@@ -164,7 +164,7 @@ export default function PendingApprovalScreen() {
           </View>
           <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
             <Text style={{ color: colors.gray, fontSize: 12 }}>فودافون كاش المنصة:</Text>
-            <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 13 }}>01064739664</Text>
+            <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 13 }}>01000000000</Text>
           </View>
           <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
             <Text style={{ color: colors.gray, fontSize: 12 }}>حالة الطلب:</Text>
@@ -213,7 +213,7 @@ export default function PendingApprovalScreen() {
           >
             <PhoneCall size={18} color="#FFFFFF" />
             <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>
-              التواصل مع الإدارة (01064739664)
+              التواصل مع الإدارة والدعم الفني
             </Text>
           </TouchableOpacity>
 

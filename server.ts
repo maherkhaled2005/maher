@@ -18,6 +18,7 @@ import Stripe from "stripe";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import multer from "multer";
+import crypto from "crypto";
 
 process.on("uncaughtException", (err) => {
   console.error("🛡️ [SERVER PROTECT] Uncaught Exception caught, keeping server alive:", err);
@@ -1040,6 +1041,11 @@ async function runMigrations() {
     { name: "banReason", def: "TEXT" },
     { name: "rating", def: "REAL DEFAULT 0" },
     { name: "jobs", def: "INTEGER DEFAULT 0" },
+    { name: "programmerLevel", def: "TEXT DEFAULT 'none'" },
+    { name: "phoneVerified", def: "INTEGER DEFAULT 0" },
+    { name: "lastOtpSentAt", def: "TEXT" },
+    { name: "otpAttempts", def: "INTEGER DEFAULT 0" },
+    { name: "otpCode", def: "TEXT" },
   ];
 
   for (const col of missingColumns) {
@@ -1134,7 +1140,7 @@ async function runMigrations() {
         VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, 0, ?, ?, datetime('now'))
       `).run(cu.id, cu.name, cu.phone, cu.email, cu.role, cu.developerRank || 'none', hash, cu.specialty || '', cu.isPro ? 1 : 0);
     } else if (cu.id === 'programmer_lead') {
-      await db.prepare("UPDATE users SET phone = ?, developerRank = 'lead' WHERE id = ?").run('01064739664', cu.id);
+      await db.prepare("UPDATE users SET phone = ?, developerRank = 'lead', programmerLevel = 'lead' WHERE id = ?").run('01064739664', cu.id);
     } else if (cu.id === 'programmer_assistant') {
       await db.prepare("UPDATE users SET developerRank = 'assistant' WHERE id = ?").run(cu.id);
     } else if (cu.id === 'programmer_junior') {
@@ -1179,6 +1185,32 @@ function normalizePhone(input: any): string {
   return digits;
 }
 
+function maskPhone(p: string): string {
+  if (!p) return '';
+  const digits = normalizePhone(p);
+  if (digits.length >= 11) {
+    return digits.substring(0, 3) + '******' + digits.substring(digits.length - 2);
+  }
+  return p;
+}
+
+function sanitizeUser(user: any) {
+  if (!user) return null;
+  const { password: _p, otp: _o, otpCode: _oc, otpExpires: _oe, otpAttempts: _oa, ...safeUser } = user;
+  return {
+    ...safeUser,
+    verified: safeUser.verified === 1,
+    phoneVerified: safeUser.phoneVerified === 1 ? 1 : 0,
+  };
+}
+
+function parseUtcDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null;
+  const s = String(dateStr).trim();
+  if (s.endsWith('Z') || s.includes('+')) return new Date(s);
+  return new Date(s.replace(' ', 'T') + 'Z');
+}
+
 app.post("/api/auth/login", async (req, res) => {
   const { email, phone, password } = req.body;
   const loginIdentifier = (phone || email || "").trim();
@@ -1190,24 +1222,288 @@ app.post("/api/auth/login", async (req, res) => {
     .prepare("SELECT * FROM users WHERE email = ? OR phone = ? OR phone = ? OR phone LIKE ?")
     .get(loginIdentifier, loginIdentifier, normalizedPhone, `%${normalizedPhone.slice(-10)}%`) as any;
 
-  const pwValid = user && (await bcrypt.compare(password, user.password));
+  if (!user) {
+    return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+  }
 
-  if (user && pwValid) {
-    if (user.status === 'banned' || user.status === 'suspended') {
-      return res.status(403).json({
-        error: "🚫 تم حظر هذا الحساب من قبل إدارة المنصة. يرجى مراجعة الإدارة أو التواصل مع الدعم الفني.",
-        isBanned: true,
-      });
+  // Verify password with bcrypt
+  const validPassword = await bcrypt.compare(password, user.password);
+  if (!validPassword) {
+    return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+  }
+
+  // Check ban status
+  if (user.status === 'banned' || user.isBanned === 1) {
+    return res.status(403).json({
+      error: "🚫 تم حظر هذا الحساب من قبل إدارة المنصة. يرجى مراجعة الإدارة أو التواصل مع الدعم الفني.",
+      isBanned: true,
+    });
+  }
+
+  // Generate 6-digit cryptographically random OTP
+  const otp = crypto.randomInt(100000, 1000000).toString();
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+  // Save OTP & reset attempts in database
+  db.prepare("UPDATE users SET otpCode = ?, otp = ?, otpExpires = ?, lastOtpSentAt = ?, otpAttempts = 0 WHERE id = ?").run(otp, otp, otpExpires, new Date().toISOString(), user.id);
+
+  // Generate temporary JWT token for OTP verification stage (10m lifespan)
+  const tempToken = jwt.sign(
+    { id: user.id, phone: user.phone, purpose: 'login_otp' },
+    JWT_SECRET,
+    { expiresIn: '10m' }
+  );
+
+  const cleanPhone = user.phone || normalizedPhone;
+  console.log(`📱 [Login OTP Generated] ${cleanPhone} -> ${otp}`);
+  await sendRealSMS(cleanPhone, `رمز التحقق لتسجيل الدخول إلى TecnoRexa هو: ${otp}`);
+
+  res.json({
+    success: true,
+    requireOtp: true,
+    tempToken,
+    phone: maskPhone(cleanPhone),
+    message: "تم إرسال رمز التحقق (OTP) إلى هاتفك",
+  });
+});
+
+app.post("/api/auth/verify-login-otp", async (req, res) => {
+  const { tempToken, phone, otp } = req.body;
+  if (!otp || (!tempToken && !phone)) {
+    return res.status(400).json({ error: "رمز التحقق وجلسة الدخول مطلوبة" });
+  }
+
+  try {
+    let userId: string | null = null;
+    let cleanPhone = normalizePhone(phone);
+
+    if (tempToken) {
+      try {
+        const decoded = jwt.verify(tempToken, JWT_SECRET) as any;
+        if (decoded && decoded.id && decoded.purpose === 'login_otp') {
+          userId = decoded.id;
+        }
+      } catch (tokenErr) {
+        return res.status(401).json({ error: "جلسة التحقق غير صالحة أو انتهت صلاحيتها، يرجى إعادة تسجيل الدخول" });
+      }
     }
-    const { password: _pw, otp: _otp, otpExpires: _e, ...safeUser } = user;
-    const frontendUser = { ...safeUser, verified: safeUser.verified === 1 };
+
+    let user: any = null;
+    if (userId) {
+      user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+    } else if (cleanPhone) {
+      user = db.prepare("SELECT * FROM users WHERE phone = ? OR phone LIKE ?").get(cleanPhone, `%${cleanPhone.slice(-10)}%`) as any;
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "المستخدم غير موجود" });
+    }
+
+    if (user.status === 'banned' || user.status === 'suspended') {
+      return res.status(403).json({ error: "🚫 تم حظر هذا الحساب من قبل إدارة المنصة." });
+    }
+
+    // Max 5 attempts
+    if (user.otpAttempts && user.otpAttempts >= 5) {
+      return res.status(429).json({ error: "تم تجاوز الحد الأقصى للمحاولات الخاطئة (5 محاولات). يرجى طلب رمز جديد." });
+    }
+
+    // Expiration check
+    const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
+    if (!expiresAt || expiresAt < Date.now()) {
+      return res.status(400).json({ error: "انتهت صلاحية رمز التحقق، يرجى طلب رمز جديد" });
+    }
+
+    const cleanInputOtp = String(otp).trim();
+    const isMatch = (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp);
+
+    if (!isMatch) {
+      db.prepare("UPDATE users SET otpAttempts = COALESCE(otpAttempts, 0) + 1 WHERE id = ?").run(user.id);
+      return res.status(400).json({ error: "رمز التحقق غير صحيح، يرجى المحاولة مرة أخرى" });
+    }
+
+    // Mark phone verified and clear OTP credentials
+    db.prepare(`
+      UPDATE users SET 
+        phoneVerified = 1, 
+        verified = 1, 
+        otpCode = NULL, 
+        otp = NULL, 
+        otpExpires = NULL, 
+        otpAttempts = 0 
+      WHERE id = ?
+    `).run(user.id);
+
+    const freshUser = db.prepare("SELECT * FROM users WHERE id = ?").get(user.id) as any;
     const token = jwt.sign(
-      { id: user.id, role: user.role, name: user.name },
+      { id: freshUser.id, role: freshUser.role, name: freshUser.name },
       JWT_SECRET,
-      { expiresIn: "30d" },
+      { expiresIn: "30d" }
     );
-    res.json({ success: true, token, user: frontendUser });
-  } else res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+
+    res.json({
+      success: true,
+      token,
+      user: sanitizeUser(freshUser),
+      message: "تم التحقق بنجاح",
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/resend-otp", async (req, res) => {
+  const { tempToken, phone } = req.body;
+  if (!tempToken && !phone) {
+    return res.status(400).json({ error: "رقم الهاتف أو الجلسة المؤقتة مطلوبة" });
+  }
+
+  try {
+    let userId: string | null = null;
+    let cleanPhone = normalizePhone(phone);
+
+    if (tempToken) {
+      try {
+        const decoded = jwt.verify(tempToken, JWT_SECRET) as any;
+        if (decoded && decoded.id) userId = decoded.id;
+      } catch {}
+    }
+
+    let user: any = null;
+    if (userId) {
+      user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+    } else if (cleanPhone) {
+      user = db.prepare("SELECT * FROM users WHERE phone = ? OR phone LIKE ?").get(cleanPhone, `%${cleanPhone.slice(-10)}%`) as any;
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "لم يتم العثور على الحساب" });
+    }
+
+    // 60-second cooldown check
+    if (user.lastOtpSentAt) {
+      const lastSent = parseUtcDate(user.lastOtpSentAt);
+      if (lastSent && !isNaN(lastSent.getTime())) {
+        const elapsedSeconds = (Date.now() - lastSent.getTime()) / 1000;
+        if (elapsedSeconds < 60) {
+          const waitTime = Math.ceil(60 - elapsedSeconds);
+          return res.status(429).json({
+            error: `يرجى الانتظار ${waitTime} ثانية قبل طلب رمز جديد`,
+            cooldown: true,
+            remainingSeconds: waitTime,
+          });
+        }
+      }
+    }
+
+    // Generate new OTP
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    db.prepare("UPDATE users SET otpCode = ?, otp = ?, otpExpires = ?, lastOtpSentAt = ?, otpAttempts = 0 WHERE id = ?").run(otp, otp, otpExpires, new Date().toISOString(), user.id);
+
+    const newTempToken = jwt.sign(
+      { id: user.id, phone: user.phone, purpose: 'login_otp' },
+      JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+
+    const targetPhone = user.phone || cleanPhone;
+    console.log(`📱 [Resend OTP] ${targetPhone} -> ${otp}`);
+    await sendRealSMS(targetPhone, `رمز التحقق الجديد الخاص بك هو: ${otp}`);
+
+    res.json({
+      success: true,
+      tempToken: newTempToken,
+      phone: maskPhone(targetPhone),
+      message: "تم إعادة إرسال رمز التحقق بنجاح",
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: "رقم الهاتف مطلوب" });
+
+  try {
+    const cleanPhone = normalizePhone(phone);
+    const user = db.prepare("SELECT * FROM users WHERE phone = ? OR phone LIKE ?").get(cleanPhone, `%${cleanPhone.slice(-10)}%`) as any;
+    if (!user) {
+      return res.status(404).json({ error: "رقم الهاتف غير مسجل لدينا" });
+    }
+
+    // Cooldown check
+    if (user.lastOtpSentAt) {
+      const lastSent = parseUtcDate(user.lastOtpSentAt);
+      if (lastSent && !isNaN(lastSent.getTime())) {
+        const elapsedSeconds = (Date.now() - lastSent.getTime()) / 1000;
+        if (elapsedSeconds < 60) {
+          const waitTime = Math.ceil(60 - elapsedSeconds);
+          return res.status(429).json({
+            error: `يرجى الانتظار ${waitTime} ثانية قبل إعادة المحاولة`,
+            cooldown: true,
+            remainingSeconds: waitTime,
+          });
+        }
+      }
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    db.prepare("UPDATE users SET otpCode = ?, otp = ?, otpExpires = ?, lastOtpSentAt = ?, otpAttempts = 0 WHERE id = ?").run(otp, otp, otpExpires, new Date().toISOString(), user.id);
+
+    console.log(`📱 [Forgot Password OTP] ${cleanPhone} -> ${otp}`);
+    await sendRealSMS(cleanPhone, `رمز استعادة كلمة المرور الخاص بك في TecnoRexa هو: ${otp}`);
+
+    res.json({
+      success: true,
+      message: "تم إرسال رمز استعادة كلمة المرور إلى هاتفك عبر رسالة SMS",
+      phone: maskPhone(cleanPhone),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { phone, otp, newPassword } = req.body;
+  if (!phone || !otp || !newPassword) {
+    return res.status(400).json({ error: "رقم الهاتف ورمز التحقق وكلمة المرور الجديدة مطلوبة" });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: "كلمة المرور يجب أن لا تقل عن 6 أحرف أو أرقام" });
+  }
+
+  try {
+    const cleanPhone = normalizePhone(phone);
+    const user = db.prepare("SELECT * FROM users WHERE phone = ? OR phone LIKE ?").get(cleanPhone, `%${cleanPhone.slice(-10)}%`) as any;
+    if (!user) {
+      return res.status(404).json({ error: "المستخدم غير موجود" });
+    }
+
+    const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
+    if (!expiresAt || expiresAt < Date.now()) {
+      return res.status(400).json({ error: "انتهت صلاحية رمز التحقق، يرجى طلب رمز جديد" });
+    }
+
+    const cleanInputOtp = String(otp).trim();
+    const isMatch = (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp);
+    if (!isMatch) {
+      return res.status(400).json({ error: "رمز التحقق غير صحيح" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    db.prepare("UPDATE users SET password = ?, otpCode = NULL, otp = NULL, otpExpires = NULL, otpAttempts = 0 WHERE id = ?").run(hashedPassword, user.id);
+
+    res.json({
+      success: true,
+      message: "تم تعيين كلمة المرور بنجاح، يمكنك الآن تسجيل الدخول",
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── SMS GATEWAY DISPATCHER ──────────────────────────────────────────
@@ -1358,10 +1654,10 @@ app.post("/api/auth/request-otp", async (req: any, res) => {
 });
 
 app.post("/api/auth/verify-otp", async (req, res) => {
-  const { phone, otp, name, role } = req.body;
+  const { phone, otp, name } = req.body;
 
   if (!phone || !otp) {
-    return res.status(400).json({ error: "Phone and OTP are required" });
+    return res.status(400).json({ error: "رقم الهاتف ورمز التحقق مطلوبان" });
   }
 
   try {
@@ -1373,15 +1669,15 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       .prepare("SELECT * FROM users WHERE phone = ? OR phone = ? OR phone = ? OR phone LIKE ?")
       .get(cleanPhone, phone, rawDigits, `%${cleanPhone.slice(-10)}%`) as any;
     if (!user) {
-      return res.status(401).json({ error: "OTP verification failed - لم يتم العثور على المستخدم" });
+      return res.status(404).json({ error: "لم يتم العثور على المستخدم" });
     }
 
     const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
-    // 🛡️ Strict OTP verification (No master backdoor)
-    const isValid = user.otp === cleanOtp && expiresAt >= Date.now();
+    const isMatch = (user.otpCode && user.otpCode === cleanOtp) || (user.otp && user.otp === cleanOtp);
+    const isValid = isMatch && expiresAt >= Date.now();
 
     if (!isValid) {
-      return res.status(401).json({ error: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
+      return res.status(400).json({ error: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
     }
 
     if (user.status === 'banned' || user.status === 'suspended') {
@@ -1392,20 +1688,23 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     const updatedName = name ? name : user.name || phone;
-    // 🛡️ Do NOT allow role elevation during OTP verification (keep existing user.role)
+    // Set phoneVerified = 1, verified = 1, clear OTP fields. Retain existing status!
     await db.prepare(
-      "UPDATE users SET verified = 1, otp = NULL, otpExpires = NULL, name = ? WHERE id = ?",
+      "UPDATE users SET phoneVerified = 1, verified = 1, otp = NULL, otpCode = NULL, otpExpires = NULL, otpAttempts = 0, name = ? WHERE id = ?"
     ).run(updatedName, user.id);
 
-    user = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id) as any;
-    const { password: _pw, otp: _otp, otpExpires: _otpExp, ...safeUser } = user;
-    const frontendUser = { ...safeUser, verified: safeUser.verified === 1 };
+    const freshUser = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id) as any;
     const token = jwt.sign(
-      { id: user.id, role: user.role, name: user.name },
+      { id: freshUser.id, role: freshUser.role, name: freshUser.name },
       JWT_SECRET,
       { expiresIn: "30d" },
     );
-    res.json({ success: true, token, user: frontendUser });
+    res.json({
+      success: true,
+      token,
+      user: sanitizeUser(freshUser),
+      message: "تم تأكيد رقم الهاتف بنجاح"
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1418,6 +1717,15 @@ app.post("/api/auth/register", async (req, res) => {
     return res
       .status(400)
       .json({ error: "الاسم ورقم الهاتف وكلمة المرور مطلوبة للتسجيل" });
+  }
+
+  // 🛡️ Enforce strict 403 Forbidden for internal/admin roles:
+  const allowedPublicRoles = ['customer', 'technician', 'merchant'];
+  const reqRole = (role || 'customer').toLowerCase();
+  if (!allowedPublicRoles.includes(reqRole)) {
+    return res.status(403).json({
+      error: `التسجيل في رتبة (${role}) غير متاح للتسجيل العام. هذه الرتبة إدارية حساسة وتتطلب تعييناً مباشراً من المالك.`
+    });
   }
 
   try {
@@ -1436,36 +1744,33 @@ app.post("/api/auth/register", async (req, res) => {
     const userId = `user_${Date.now()}`;
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 🛡️ Privilege Escalation Prevention: Only non-administrative roles can be registered publicly
-    const allowedPublicRoles = ['customer', 'technician', 'merchant'];
-    const normalizedReqRole = normalizeRoleShared(role || 'customer');
-    const assignedRole = allowedPublicRoles.includes(normalizedReqRole) ? normalizedReqRole : 'customer';
+    const isProfessionalRole = reqRole === 'technician' || reqRole === 'merchant';
+    const initialStatus = isProfessionalRole ? 'pending_approval' : 'active';
 
     // Generate 6-digit verification confirmation code
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-    const isPendingApproval = assignedRole === 'technician' || assignedRole === 'merchant';
-    const initialStatus = isPendingApproval ? 'pending_approval' : 'active';
-
     db.prepare(
-      `INSERT INTO users (id, email, phone, name, password, role, status, verified, balance, otp, otpExpires, specialty, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, email, phone, name, password, role, status, verified, phoneVerified, isPro, balance, otp, otpCode, otpExpires, lastOtpSentAt, specialty, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?)`
     ).run(
       userId,
       cleanEmail,
       cleanPhone,
       name.trim(),
       hashedPassword,
-      assignedRole,
+      reqRole,
       initialStatus,
       otp,
+      otp,
       otpExpires,
-      specialties ? (Array.isArray(specialties) ? specialties.join(', ') : String(specialties)) : null,
       new Date().toISOString(),
+      specialties ? (Array.isArray(specialties) ? specialties.join(', ') : String(specialties)) : null,
+      new Date().toISOString()
     );
 
-    if (isPendingApproval && transferReceipt) {
+    if (isProfessionalRole && transferReceipt) {
       try {
         db.prepare(`
           INSERT INTO approval_requests (id, userId, type, details, status, createdAt)
@@ -1473,9 +1778,9 @@ app.post("/api/auth/register", async (req, res) => {
         `).run(
           `appr_${Date.now()}`,
           userId,
-          `upgrade_${assignedRole}`,
+          `upgrade_${reqRole}`,
           JSON.stringify({
-            fee: assignedRole === 'technician' ? 300 : 100,
+            fee: reqRole === 'technician' ? 300 : 100,
             senderPhone: senderPhone || cleanPhone,
             transferReceipt,
             specialties,
@@ -1486,25 +1791,23 @@ app.post("/api/auth/register", async (req, res) => {
     }
 
     console.log(`📱 [Registration Confirmation Code] ${cleanPhone} -> ${otp}`);
-    const regSms = await sendRealSMS(cleanPhone, `مرحباً بك في TecnoRexa! رمز تأكيد حسابك هو: ${otp}`);
+    await sendRealSMS(cleanPhone, `مرحباً بك في TecnoRexa! رمز تأكيد حسابك هو: ${otp}`);
 
-    const user = db
-      .prepare(
-        "SELECT id, email, name, role, phone, balance, status FROM users WHERE id = ?",
-      )
-      .get(userId) as any;
+    const freshUser = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
     const token = jwt.sign(
-      { id: user?.id, role: user?.role, name: user?.name },
+      { id: freshUser?.id, role: freshUser?.role, name: freshUser?.name },
       JWT_SECRET,
       { expiresIn: "30d" },
     );
 
-    res.json({
+    res.status(201).json({
       success: true,
       token,
-      user: { ...user, verified: false },
-      otpSent: true,
-      otpCode: (!regSms.success || process.env.NODE_ENV !== "production") ? otp : undefined,
+      requireOtp: true,
+      user: sanitizeUser(freshUser),
+      message: isProfessionalRole 
+        ? "تم تسجيل بياناتك بنجاح. يرجى توثيق رقم هاتفك أولاً، ثم سيقوم فريق الإدارة بمراجعة الحساب والاعتماد." 
+        : "تم إنشاء الحساب بنجاح! أدخل رمز التأكيد لتفعيل الحساب."
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -3035,8 +3338,8 @@ app.post("/api/suggestions/:id/approve", authenticateToken, requireOwner, async 
         .run(notifId, suggestion.userId, 'تمت الموافقة على اقتراحك ✅', `اقتراحك "${suggestion.title}" تمت الموافقة عليه من المالك وسيتم تحويله لفريق التطوير.`, 'suggestion', '/notifications', new Date().toISOString());
     } catch (e) {}
 
-    // Find Main Programmer (developerRank = 'lead') and create a task for them
-    const lead = db.prepare("SELECT id FROM users WHERE role = 'programmer' AND (developerRank = 'lead' OR phone = '01064739664') LIMIT 1").get() as any;
+    // Find Main Programmer (developerRank = 'lead' or programmerLevel = 'lead') and create a task for them
+    const lead = db.prepare("SELECT id FROM users WHERE role = 'programmer' AND (developerRank = 'lead' OR programmerLevel = 'lead') LIMIT 1").get() as any;
     const taskId = `task_sug_${Date.now()}`;
     try {
       db.prepare(`
@@ -3276,9 +3579,9 @@ app.get("/api/programmer/team", authenticateToken,async (req: any, res) => {
 
 app.post("/api/programmer/promote-developer", authenticateToken,async (req: any, res) => {
   try {
-    const isMaher = req.user?.phone === '01064739664' || req.user?.developerRank === 'lead' || (req.user?.name && req.user.name.includes('ماهر'));
-    if (!isMaher && req.user?.role !== 'owner') {
-      return res.status(403).json({ error: 'صلاحية الترقية مقتصرة حصرياً على قائد التطوير المهندس ماهر خالد.' });
+    const isLeadDev = req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead';
+    if (!isLeadDev && req.user?.role !== 'owner') {
+      return res.status(403).json({ error: 'صلاحية الترقية مقتصرة حصرياً على قائد التطوير أو المالك.' });
     }
     const { userId, newRank } = req.body;
     await db.prepare("UPDATE users SET developerRank = ? WHERE id = ?").run(newRank || 'assistant', userId);
@@ -3290,9 +3593,9 @@ app.post("/api/programmer/promote-developer", authenticateToken,async (req: any,
 
 app.post("/api/programmer/ban-user", authenticateToken,async (req: any, res) => {
   try {
-    const isMaher = req.user?.phone === '01064739664' || req.user?.developerRank === 'lead' || (req.user?.name && req.user.name.includes('ماهر'));
-    if (!isMaher && req.user?.role !== 'owner' && req.user?.role !== 'manager') {
-      return res.status(403).json({ error: 'صلاحية الحظر المباشر مقتصرة على القائد ماهر أو إدارة المنصة.' });
+    const isLeadDev = req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead';
+    if (!isLeadDev && req.user?.role !== 'owner' && req.user?.role !== 'manager') {
+      return res.status(403).json({ error: 'صلاحية الحظر المباشر مقتصرة على قائد التطوير أو إدارة المنصة.' });
     }
     const { userId, reason } = req.body;
     const targetUser = await db.prepare("SELECT id, role FROM users WHERE id = ?").get(userId) as any;
@@ -5158,9 +5461,9 @@ app.post(
   "/api/admin/users", authenticateToken,async (req: any, res) => {
     const role = normalizeRoleServer(req.user?.role);
     const isOwner = role === 'owner';
-    const isLeadProgrammer = (role === 'programmer' || role === 'lead_developer') && (req.user?.developerRank === 'lead' || req.user?.phone === '01064739664' || (req.user?.name && req.user.name.includes('ماهر')));
+    const isLeadProgrammer = (role === 'programmer' || role === 'lead_developer') && (req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead');
     if (!isOwner && !isLeadProgrammer) {
-      return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة حصرياً على المالك وقائد المبرمجين (المهندس ماهر خالد)." });
+      return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة حصرياً على المالك وقائد المبرمجين." });
     }
     const { name, phone, email, role: userRole } = req.body;
     if (!name || !phone)
@@ -10335,8 +10638,8 @@ app.post(
         `[تم تصعيد التذكرة للمبرمجين]\nملاحظة: ${note || 'مشكلة برمجية تحتاج فحص المطورين'}`
       );
 
-      // Find lead programmer (Maher Khaled)
-      const lead = db.prepare("SELECT id, name FROM users WHERE role = 'programmer' AND (developerRank = 'lead' OR phone = '01064739664') LIMIT 1").get() as any;
+      // Find lead programmer (developerRank = 'lead' or programmerLevel = 'lead')
+      const lead = db.prepare("SELECT id, name FROM users WHERE role = 'programmer' AND (developerRank = 'lead' OR programmerLevel = 'lead') LIMIT 1").get() as any;
 
       // Create developer task
       const taskId = `task_${Date.now()}`;

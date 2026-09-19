@@ -41,7 +41,7 @@ export default function ProgrammerDashboard({ navigation }: any) {
   const [tasksCount, setTasksCount] = useState(0);
 
   const isOwner = user?.role === 'owner';
-  const isLead = isOwner || user?.developerRank === 'lead' || user?.phone === '01064739664' || user?.name?.includes('ماهر');
+  const isLead = isOwner || user?.developerRank === 'lead' || (user as any)?.programmerLevel === 'lead';
   const isAssistant = isLead || user?.developerRank === 'assistant' || user?.role === 'programmer_assistant';
 
   const rankBadgeText = isLead
