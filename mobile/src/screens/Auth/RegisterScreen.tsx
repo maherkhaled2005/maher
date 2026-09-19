@@ -17,13 +17,10 @@ import {
   Phone,
   Mail,
   Lock,
-  ArrowRight,
   Eye,
   EyeOff,
-  ShieldCheck,
   Upload,
   CheckCircle2,
-  AlertCircle,
   Sparkles,
 } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -237,152 +234,85 @@ export default function RegisterScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
-            <View style={{ width: 42 }} />
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '900' }}>
-                إنشاء حساب جديد
-              </Text>
-              <Text style={{ color: '#A1A1AA', fontSize: 12, marginTop: 2 }}>
-                انضم إلى منظومة TecnoRexa المتكاملة
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => {
-                triggerSelectionHaptic();
-                navigation?.canGoBack?.() ? navigation.goBack() : navigation.navigate('Login');
-              }}
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 12,
-                backgroundColor: '#18181B',
-                borderWidth: 1,
-                borderColor: '#27272A',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <ArrowRight color="#D4AF37" size={20} />
-            </TouchableOpacity>
+          {/* Clean Header */}
+          <View style={{ alignItems: 'center', marginBottom: spacing.md, marginTop: spacing.xs }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 }}>
+              إنشاء حساب جديد
+            </Text>
+            <Text style={{ color: '#A1A1AA', fontSize: 12, marginTop: 4 }}>
+              انضم إلى منصة TecnoRexa
+            </Text>
           </View>
 
-          {/* Large Hero Visual Card */}
-          <View
-            style={{
-              width: '100%',
-              maxWidth: 440,
-              alignSelf: 'center',
-              borderRadius: borderRadius.xl,
-              overflow: 'hidden',
-              marginBottom: spacing.lg,
-              borderWidth: 1.5,
-              borderColor: 'rgba(212, 175, 55, 0.3)',
-              backgroundColor: '#141416',
-              shadowColor: '#D4AF37',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.25,
-              shadowRadius: 10,
-              elevation: 5,
-            }}
-          >
-            <Image
-              source={require('../../../assets/tecnorexa_sphere_showcase.jpg')}
-              style={{ width: '100%', height: 160 }}
-              resizeMode="cover"
-            />
+          {/* Role Selection - Compact Horizontal Segmented Bar */}
+          <View style={{ width: '100%', maxWidth: 440, alignSelf: 'center', marginBottom: spacing.md }}>
             <View
               style={{
-                paddingVertical: 10,
-                paddingHorizontal: spacing.md,
-                backgroundColor: 'rgba(20, 20, 22, 0.95)',
-                borderTopWidth: 1,
-                borderTopColor: '#27272A',
-                alignItems: 'center',
+                flexDirection: 'row',
+                backgroundColor: '#141416',
+                borderRadius: 14,
+                padding: 4,
+                borderWidth: 1,
+                borderColor: '#27272A',
+                gap: 4,
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Sparkles size={16} color="#D4AF37" />
-                <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '800' }}>
-                  عضوية احترافية موثوقة في كبرى منصات الصيانة
+              {ACCOUNT_TYPES.map((t) => {
+                const isSelected = role === t.role;
+                return (
+                  <TouchableOpacity
+                    key={t.role}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      triggerSelectionHaptic();
+                      setRole(t.role);
+                    }}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      backgroundColor: isSelected ? '#D4AF37' : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 18 }}>{t.icon}</Text>
+                    <Text
+                      style={{
+                        color: isSelected ? '#0A0A0A' : '#D4D4D8',
+                        fontWeight: '800',
+                        fontSize: 12,
+                      }}
+                    >
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Role Helper Badge */}
+            {role !== 'customer' && (
+              <View
+                style={{
+                  marginTop: 8,
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  backgroundColor: '#1C1917',
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: 'rgba(212, 175, 55, 0.3)',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#D4AF37', fontSize: 11, fontWeight: '700' }}>
+                  {role === 'technician'
+                    ? '🔧 فني صيانة معتمد — رسوم اشتراك وتفعيل 300 ج.م'
+                    : '🏪 تاجر قطع غيار — رسوم اشتراك وتفعيل 100 ج.م'}
                 </Text>
               </View>
-            </View>
-          </View>
-
-          {/* Role Selection */}
-          <Text style={{ color: '#E4E4E7', fontWeight: '800', fontSize: 14, textAlign: 'right', marginBottom: spacing.sm }}>
-            اختر نوع العضوية
-          </Text>
-          <View style={{ gap: spacing.sm, marginBottom: spacing.xl }}>
-            {ACCOUNT_TYPES.map((t) => {
-              const isSelected = role === t.role;
-              return (
-                <TouchableOpacity
-                  key={t.role}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    triggerSelectionHaptic();
-                    setRole(t.role);
-                  }}
-                  style={{
-                    backgroundColor: isSelected ? '#1C1917' : '#141416',
-                    padding: spacing.md,
-                    borderRadius: borderRadius.lg,
-                    borderWidth: 1.5,
-                    borderColor: isSelected ? '#D4AF37' : '#27272A',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: spacing.md,
-                  }}
-                >
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <View
-                        style={{
-                          backgroundColor: isSelected ? '#D4AF3722' : '#27272A',
-                          paddingHorizontal: 8,
-                          paddingVertical: 2,
-                          borderRadius: 6,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: isSelected ? '#D4AF37' : '#A1A1AA',
-                            fontSize: 10,
-                            fontWeight: '800',
-                          }}
-                        >
-                          {t.badge}
-                        </Text>
-                      </View>
-                      <Text
-                        style={{
-                          color: isSelected ? '#FFFFFF' : '#D4D4D8',
-                          fontWeight: '900',
-                          fontSize: 15,
-                        }}
-                      >
-                        {t.label}
-                      </Text>
-                    </View>
-                    <Text style={{ color: '#71717A', fontSize: 12, textAlign: 'right' }}>
-                      {t.desc}
-                    </Text>
-                  </View>
-
-                  <Text style={{ fontSize: 26 }}>{t.icon}</Text>
-                  {isSelected && (
-                    <ShieldCheck
-                      color="#D4AF37"
-                      size={18}
-                      style={{ position: 'absolute', top: 10, left: 10 }}
-                    />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+            )}
           </View>
 
           {/* Form Fields */}
