@@ -12,7 +12,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
-import { Phone, Mail, Lock, ArrowRight, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
+import { Phone, Lock, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 
 
@@ -91,73 +91,52 @@ export default function LoginScreen({ navigation }: any) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Back button */}
-          <TouchableOpacity
-            onPress={() => (navigation?.canGoBack?.() ? navigation.goBack() : navigation.navigate('Landing'))}
-            style={{
-              position: 'absolute',
-              top: Platform.OS === 'ios' ? 10 : 20,
-              right: 20,
-              width: 42,
-              height: 42,
-              borderRadius: 12,
-              backgroundColor: '#18181B',
-              borderWidth: 1,
-              borderColor: '#27272A',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-            }}
-          >
-            <ArrowRight color="#D4AF37" size={20} />
-          </TouchableOpacity>
-
-          {/* Header & Logo Section 18.1 */}
-          <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
+          {/* Header & Logo Section */}
+          <View style={{ alignItems: 'center', marginBottom: spacing.md }}>
             <View
               style={{
-                width: 80,
-                height: 80,
-                borderRadius: 24,
+                width: 52,
+                height: 52,
+                borderRadius: 16,
                 backgroundColor: '#141414',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginBottom: spacing.md,
+                marginBottom: 8,
                 borderWidth: 1.5,
                 borderColor: '#D4AF37',
                 shadowColor: '#D4AF37',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.35,
-                shadowRadius: 10,
-                elevation: 8,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 6,
+                elevation: 4,
               }}
             >
-              <Wrench color="#D4AF37" size={38} />
+              <Wrench color="#D4AF37" size={26} />
             </View>
 
             <Text
               style={{
                 color: '#D4AF37',
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: '900',
                 letterSpacing: 1,
-                marginBottom: 4,
+                marginBottom: 2,
               }}
             >
               TecnoRexa
             </Text>
 
-            <Text style={{ color: '#A1A1AA', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>
+            <Text style={{ color: '#A1A1AA', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
               منصة الصيانة الأولى في مصر
             </Text>
           </View>
 
           {/* Form */}
-          <View style={{ gap: spacing.md, width: '100%', maxWidth: 440, alignSelf: 'center', marginBottom: spacing.lg }}>
+          <View style={{ gap: spacing.md, width: '100%', maxWidth: 440, alignSelf: 'center', marginBottom: spacing.md }}>
             {/* Phone Input (Mandatory) */}
             <View>
-              <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 8 }}>
-                رقم الهاتف (إجباري) *
+              <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                رقم الهاتف المسجل <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
               <View
                 style={{
@@ -168,7 +147,7 @@ export default function LoginScreen({ navigation }: any) {
                   borderColor: '#27272A',
                   borderRadius: borderRadius.lg,
                   paddingHorizontal: spacing.md,
-                  height: 54,
+                  height: 50,
                 }}
               >
                 <TextInput
@@ -190,46 +169,10 @@ export default function LoginScreen({ navigation }: any) {
               </View>
             </View>
 
-            {/* Email Input (Optional) */}
-            <View>
-              <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', textAlign: 'right', marginBottom: 8 }}>
-                البريد الإلكتروني (اختياري)
-              </Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: '#18181B',
-                  borderWidth: 1,
-                  borderColor: '#27272A',
-                  borderRadius: borderRadius.lg,
-                  paddingHorizontal: spacing.md,
-                  height: 54,
-                }}
-              >
-                <TextInput
-                  style={{
-                    flex: 1,
-                    textAlign: 'right',
-                    color: '#FFFFFF',
-                    fontSize: 15,
-                    fontWeight: '600',
-                  }}
-                  placeholder="name@example.com"
-                  placeholderTextColor="#71717A"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  value={email}
-                  onChangeText={setEmail}
-                />
-                <Mail color="#71717A" size={18} style={{ marginLeft: 8 }} />
-              </View>
-            </View>
-
             {/* Password Input */}
             <View>
-              <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 8 }}>
-                كلمة المرور (إجباري) *
+              <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                كلمة المرور <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
               <View
                 style={{
@@ -240,7 +183,7 @@ export default function LoginScreen({ navigation }: any) {
                   borderColor: '#27272A',
                   borderRadius: borderRadius.lg,
                   paddingHorizontal: spacing.md,
-                  height: 54,
+                  height: 50,
                 }}
               >
                 <TouchableOpacity onPress={() => setShowPass(!showPass)} style={{ padding: 4 }}>
@@ -267,9 +210,9 @@ export default function LoginScreen({ navigation }: any) {
               {/* Forgot Password Link */}
               <TouchableOpacity
                 onPress={() => navigation.navigate('ForgotPassword', { phone: normalizePhone(phone) })}
-                style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                style={{ alignSelf: 'flex-start', marginTop: 6 }}
               >
-                <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '700' }}>
+                <Text style={{ color: '#D4AF37', fontSize: 12, fontWeight: '700' }}>
                   نسيت كلمة المرور؟
                 </Text>
               </TouchableOpacity>

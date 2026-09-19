@@ -3,14 +3,17 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const CANDIDATE_BASE_URLS = [
-  'http://10.128.200.45:5000/api',
+  'https://timely-instructions-logical-thesis.trycloudflare.com/api',
   'https://api.tecnorexa.com/api',
+  'http://10.128.200.45:5000/api',
   'http://192.168.1.2:5000/api',
   'http://10.0.2.2:5000/api',
   'http://localhost:5000/api',
 ];
 
-let activeBaseURL = process.env.EXPO_PUBLIC_API_URL || 'http://10.128.200.45:5000/api';
+let activeBaseURL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  'https://timely-instructions-logical-thesis.trycloudflare.com/api';
 
 AsyncStorage.getItem('custom_api_url').then((saved) => {
   if (saved) activeBaseURL = saved;
