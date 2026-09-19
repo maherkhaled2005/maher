@@ -2,15 +2,23 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const PRODUCTION_API_URL = (
-  process.env.EXPO_PUBLIC_API_URL || 'https://api.tecnorexa.com/api'
-).replace(/\/+$/, '');
+export const CANDIDATE_BASE_URLS = [
+  'http://10.128.200.45:5000/api',
+  'https://api.tecnorexa.com/api',
+  'http://192.168.1.2:5000/api',
+  'http://10.0.2.2:5000/api',
+  'http://localhost:5000/api',
+];
 
-export const CANDIDATE_BASE_URLS = [PRODUCTION_API_URL];
+let activeBaseURL = process.env.EXPO_PUBLIC_API_URL || 'http://10.128.200.45:5000/api';
+
+AsyncStorage.getItem('custom_api_url').then((saved) => {
+  if (saved) activeBaseURL = saved;
+});
 
 export const api = axios.create({
-  baseURL: PRODUCTION_API_URL,
-  timeout: 15000,
+  baseURL: activeBaseURL,
+  timeout: 8000,
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -18,26 +26,30 @@ export const api = axios.create({
 });
 
 export const apiClient = api;
-export const getActiveBaseURL = () => PRODUCTION_API_URL;
+export const getActiveBaseURL = () => activeBaseURL;
 
-// لا تسمح للمستخدم العادي بتغيير عنوان السيرفر
-export const setActiveBaseURL = async (_url: string) => {
-  if (__DEV__) {
-    console.warn('[API] setActiveBaseURL is disabled in production.');
-  }
+export const setActiveBaseURL = async (url: string) => {
+  let cleanUrl = url.trim().replace(/\/+$/, '');
+  if (!cleanUrl.endsWith('/api')) cleanUrl += '/api';
+  activeBaseURL = cleanUrl;
+  api.defaults.baseURL = cleanUrl;
+  await AsyncStorage.setItem('custom_api_url', cleanUrl);
 };
 
 export const resetBaseURL = async () => {
-  // حذف أي إعدادات قديمة من النسخ السابقة
   await AsyncStorage.removeItem('custom_api_url');
+  activeBaseURL = CANDIDATE_BASE_URLS[0];
+  api.defaults.baseURL = activeBaseURL;
 };
 
 export const SOCKET_URL =
-  process.env.EXPO_PUBLIC_SOCKET_URL || 'https://api.tecnorexa.com';
+  process.env.EXPO_PUBLIC_SOCKET_URL ||
+  activeBaseURL.replace(/\/api$/, '');
 
 // Authentication
 api.interceptors.request.use(
   async (config) => {
+    config.baseURL = activeBaseURL;
     try {
       let token = await AsyncStorage.getItem('tr_token');
       if (!token) {
@@ -61,17 +73,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Response handling
+// Response handling & Auto-Failover to working server
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const config = error.config;
     const status = error?.response?.status;
+
     if (status === 401) {
       await AsyncStorage.multiRemove(['tr_token', 'tr_user']);
     }
 
-    // 403 ليس Network Error
-    // لا تحاول تبديل السيرفر عند 403
     if (status === 403) {
       const message =
         error?.response?.data?.error ||
@@ -82,14 +94,26 @@ api.interceptors.response.use(
       return Promise.reject(normalizedError);
     }
 
-    if (__DEV__) {
-      console.error('[API ERROR]', {
-        url: error?.config?.url,
-        method: error?.config?.method,
-        status,
-        message: error?.message,
-        response: error?.response?.data,
-      });
+    const isNetworkError =
+      error.code === 'ECONNABORTED' ||
+      error.code === 'ERR_NETWORK' ||
+      error.message?.includes('Network Error') ||
+      !error.response;
+
+    if (isNetworkError && config && !config._candidateAttempted) {
+      config._candidateAttempted = true;
+
+      for (const candidate of CANDIDATE_BASE_URLS) {
+        if (candidate === activeBaseURL) continue;
+        try {
+          const probeRes = await axios.get(`${candidate}/health`, { timeout: 3000 });
+          if (probeRes.data?.status === 'ok') {
+            await setActiveBaseURL(candidate);
+            config.baseURL = candidate;
+            return api(config);
+          }
+        } catch {}
+      }
     }
 
     return Promise.reject(error);
@@ -107,7 +131,7 @@ export const fetchApi = async (endpoint: string, options?: any) => {
     const message =
       error?.response?.data?.error ||
       error?.response?.data?.message ||
-      (error?.response ? `HTTP ${error.response.status}` : 'تعذر الاتصال بالخادم');
+      (error?.response ? `HTTP ${error.response.status}` : 'تعذر الاتصال بالخادم، يرجى التأكد من تشغيل السيرفر');
     const err = new Error(message);
     (err as any).response = error.response;
     throw err;
