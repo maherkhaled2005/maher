@@ -57,6 +57,57 @@ export const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL ||
   activeBaseURL.replace(/\/api$/, '');
 
+const GITHUB_API_URL_ENDPOINT =
+  'https://raw.githubusercontent.com/maherkhaled2005/maher/main/api_url.txt';
+
+export const findFastestServer = async (): Promise<string | null> => {
+  const urlsToProbe = new Set<string>();
+
+  for (const u of CANDIDATE_BASE_URLS) {
+    urlsToProbe.add(u);
+  }
+
+  try {
+    const ghRes = await axios.get(`${GITHUB_API_URL_ENDPOINT}?t=${Date.now()}`, {
+      timeout: 3500,
+    });
+    if (ghRes.data && typeof ghRes.data === 'string') {
+      let remoteUrl = ghRes.data.trim().replace(/\/+$/, '');
+      if (remoteUrl.startsWith('http')) {
+        if (!remoteUrl.endsWith('/api')) remoteUrl += '/api';
+        urlsToProbe.add(remoteUrl);
+      }
+    }
+  } catch {}
+
+  const probePromises = Array.from(urlsToProbe).map(async (url) => {
+    try {
+      const res = await axios.get(`${url}/health`, { timeout: 3500 });
+      if (res.data?.status === 'ok') {
+        return url;
+      }
+    } catch {}
+    throw new Error('Unreachable: ' + url);
+  });
+
+  try {
+    const fastest = await Promise.any(probePromises);
+    if (fastest) {
+      await setActiveBaseURL(fastest);
+      return fastest;
+    }
+  } catch {}
+
+  return null;
+};
+
+// Background probe on native app startup
+if (Platform.OS !== 'web') {
+  setTimeout(() => {
+    findFastestServer().catch(() => {});
+  }, 100);
+}
+
 // Authentication
 api.interceptors.request.use(
   async (config) => {
@@ -113,17 +164,10 @@ api.interceptors.response.use(
 
     if (isNetworkError && config && !config._candidateAttempted) {
       config._candidateAttempted = true;
-
-      for (const candidate of CANDIDATE_BASE_URLS) {
-        if (candidate === activeBaseURL) continue;
-        try {
-          const probeRes = await axios.get(`${candidate}/health`, { timeout: 3000 });
-          if (probeRes.data?.status === 'ok') {
-            await setActiveBaseURL(candidate);
-            config.baseURL = candidate;
-            return api(config);
-          }
-        } catch {}
+      const workingServer = await findFastestServer();
+      if (workingServer) {
+        config.baseURL = workingServer;
+        return api(config);
       }
     }
 

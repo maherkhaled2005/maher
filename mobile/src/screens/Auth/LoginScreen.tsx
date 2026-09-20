@@ -11,12 +11,11 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
+import { Modal } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
-import { Phone, Lock, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
+import { Phone, Lock, Eye, EyeOff, MessageSquare, Wrench, Wifi, RefreshCw, Check, Globe } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
-
-
-
+import { getActiveBaseURL, setActiveBaseURL, findFastestServer } from '../../api/client';
 
 function normalizePhone(input: any): string {
   if (!input) return '';
@@ -36,7 +35,60 @@ export default function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [serverUrl, setServerUrl] = useState(getActiveBaseURL());
+  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
+  const [isProbing, setIsProbing] = useState(false);
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [customInputUrl, setCustomInputUrl] = useState(getActiveBaseURL());
   const { login } = useAuthStore();
+
+  React.useEffect(() => {
+    let active = true;
+    findFastestServer().then((fastest) => {
+      if (!active) return;
+      if (fastest) {
+        setServerUrl(fastest);
+        setCustomInputUrl(fastest);
+        setServerOnline(true);
+      } else {
+        setServerOnline(false);
+      }
+    });
+    return () => { active = false; };
+  }, []);
+
+  const handleProbeServer = async () => {
+    setIsProbing(true);
+    try {
+      const fastest = await findFastestServer();
+      if (fastest) {
+        setServerUrl(fastest);
+        setCustomInputUrl(fastest);
+        setServerOnline(true);
+        if (Platform.OS === 'web') window.alert('✅ تم الاتصال بنجاح بالخادم الأسرع: ' + fastest);
+        else Alert.alert('نجاح', '✅ تم الاتصال بنجاح بالخادم الأسرع:\n' + fastest);
+      } else {
+        setServerOnline(false);
+        if (Platform.OS === 'web') window.alert('⚠️ تعذر العثور على خادم متاح حالياً.');
+        else Alert.alert('تنبيه', '⚠️ تعذر العثور على خادم متاح حالياً. يرجى التأكد من تشغيل السيرفر أو إدخال عنوان يدوي.');
+      }
+    } finally {
+      setIsProbing(false);
+    }
+  };
+
+  const handleSaveCustomUrl = async () => {
+    if (!customInputUrl.trim()) return;
+    try {
+      await setActiveBaseURL(customInputUrl.trim());
+      setServerUrl(getActiveBaseURL());
+      setShowServerModal(false);
+      if (Platform.OS === 'web') window.alert('✅ تم حفظ عنوان الخادم بنجاح');
+      else Alert.alert('تم الحفظ', '✅ تم تعيين رابط الخادم بنجاح');
+    } catch (e: any) {
+      Alert.alert('خطأ', 'تعذر حفظ العنوان: ' + e.message);
+    }
+  };
 
   const handleLogin = async () => {
     if (isLoading) return;
@@ -62,6 +114,32 @@ export default function LoginScreen({ navigation }: any) {
         });
       }
     } catch (err: any) {
+      // Auto failover and retry once if network issue
+      const isNetErr =
+        err?.message?.includes('اتصال') ||
+        err?.message?.includes('الإنترنت') ||
+        err?.message?.includes('Network') ||
+        !err?.response;
+
+      if (isNetErr) {
+        try {
+          const fastest = await findFastestServer();
+          if (fastest) {
+            setServerUrl(fastest);
+            setServerOnline(true);
+            const retryRes = await login(effectiveId, password);
+            if (retryRes?.requireOtp) {
+              navigation.navigate('OTP', {
+                tempToken: retryRes.tempToken,
+                phone: retryRes.phone || cleanPhone,
+                flow: 'login',
+              });
+              return;
+            }
+          }
+        } catch {}
+      }
+
       const msg = err.message || 'بيانات الدخول غير صحيحة. يرجى التأكد من رقم الهاتف أو كلمة المرور.';
       if (Platform.OS === 'web') window.alert('خطأ في تسجيل الدخول: ' + msg);
       else Alert.alert('خطأ في تسجيل الدخول', msg);
@@ -288,10 +366,152 @@ export default function LoginScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
 
+              {/* Server Status Badge & Modal Trigger */}
+              <TouchableOpacity
+                onPress={() => setShowServerModal(true)}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  marginTop: spacing.md,
+                  paddingVertical: 6,
+                }}
+              >
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: serverOnline ? '#10B981' : serverOnline === false ? '#EF4444' : '#F59E0B',
+                  }}
+                />
+                <Text style={{ color: '#71717A', fontSize: 11 }}>
+                  {serverOnline ? 'حالة السيرفر: متصل بنجاح 🟢' : serverOnline === false ? 'تعذر الاتصال بالخادم - اضغط للإصلاح 🔴' : 'جاري فحص الاتصال بالخادم... 🟡'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Server Configuration Modal */}
+              <Modal
+                visible={showServerModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowServerModal(false)}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0,0,0,0.75)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: 20,
+                  }}
+                >
+                  <View
+                    style={{
+                      backgroundColor: '#18181B',
+                      borderRadius: borderRadius.lg,
+                      padding: 20,
+                      width: '100%',
+                      maxWidth: 400,
+                      borderWidth: 1,
+                      borderColor: '#27272A',
+                    }}
+                  >
+                    <Text style={{ color: '#F4F4F5', fontSize: 16, fontWeight: 'bold', marginBottom: 12, textAlign: 'right' }}>
+                      ⚙️ إعدادات اتصال الخادم
+                    </Text>
+                    <Text style={{ color: '#A1A1AA', fontSize: 12, marginBottom: 8, textAlign: 'right' }}>
+                      الرابط النشط حالياً:
+                    </Text>
+                    <View style={{ backgroundColor: '#09090B', padding: 10, borderRadius: 8, marginBottom: 14 }}>
+                      <Text style={{ color: '#10B981', fontSize: 11, textAlign: 'left' }} numberOfLines={2}>
+                        {serverUrl}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={handleProbeServer}
+                      disabled={isProbing}
+                      style={{
+                        backgroundColor: '#27272A',
+                        paddingVertical: 10,
+                        borderRadius: borderRadius.md,
+                        alignItems: 'center',
+                        marginBottom: 16,
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      {isProbing ? (
+                        <ActivityIndicator size="small" color="#D4AF37" />
+                      ) : (
+                        <>
+                          <RefreshCw size={14} color="#D4AF37" />
+                          <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '700' }}>
+                            فحص وتبديل تلقائي لأسرع خادم 🔄
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    <Text style={{ color: '#A1A1AA', fontSize: 12, marginBottom: 6, textAlign: 'right' }}>
+                      أو كتابة رابط خادم مخصص (Custom URL):
+                    </Text>
+                    <TextInput
+                      value={customInputUrl}
+                      onChangeText={setCustomInputUrl}
+                      placeholder="https://... أو http://192.168.1.17:5000/api"
+                      placeholderTextColor="#52525B"
+                      autoCapitalize="none"
+                      style={{
+                        backgroundColor: '#09090B',
+                        color: '#FFF',
+                        padding: 10,
+                        borderRadius: borderRadius.md,
+                        fontSize: 12,
+                        borderWidth: 1,
+                        borderColor: '#3F3F46',
+                        marginBottom: 16,
+                        textAlign: 'left',
+                      }}
+                    />
+
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <TouchableOpacity
+                        onPress={handleSaveCustomUrl}
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#D4AF37',
+                          paddingVertical: 10,
+                          borderRadius: borderRadius.md,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: 13 }}>حفظ وتطبيق</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setShowServerModal(false)}
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#27272A',
+                          paddingVertical: 10,
+                          borderRadius: borderRadius.md,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: '#A1A1AA', fontWeight: '700', fontSize: 13 }}>إغلاق</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
