@@ -1747,6 +1747,24 @@ app.post("/api/auth/register", async (req, res) => {
     const isProfessionalRole = reqRole === 'technician' || reqRole === 'merchant';
     const initialStatus = isProfessionalRole ? 'pending_approval' : 'active';
 
+    const ALLOWED_TECH_SPECIALTIES = [
+      'غسالات ملابس وأطباق',
+      'ثلاجات وديب فريزر',
+      'بوتاجازات وأفران',
+      'ميكروويف وأجهزة طهي',
+      'تكييف وتبريد',
+    ];
+    if (reqRole === 'technician') {
+      const specsList = Array.isArray(specialties) ? specialties : (specialties ? String(specialties).split(',').map(s => s.trim()) : []);
+      if (specsList.length === 0) {
+        return res.status(400).json({ error: "يرجى تحديد تخصص صيانة أجهزة منزلية واحد على الأقل" });
+      }
+      const hasInvalid = specsList.some((s: string) => !ALLOWED_TECH_SPECIALTIES.includes(s));
+      if (hasInvalid) {
+        return res.status(400).json({ error: "التخصصات محصورة في صيانة الأجهزة المنزلية المعتمدة فقط" });
+      }
+    }
+
     // Generate 6-digit verification confirmation code
     const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
@@ -6888,6 +6906,64 @@ app.get("/api/support/tickets", authenticateToken,async (req: any, res) => {
     res.json(ticketsWithMessages);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/support/guest-ticket", async (req: any, res) => {
+  const name = (req.body.name || req.body.customerName || 'زائر').trim();
+  const phone = normalizePhone(req.body.phone || req.body.customerPhone || '');
+  const email = (req.body.email || '').trim();
+  const subject = (req.body.subject || req.body.title || 'طلب مساعدة من زائر المنصة').trim();
+  const description = (req.body.description || req.body.message || '').trim();
+  const priority = req.body.priority || 'medium';
+
+  if (!name || !phone || !description) {
+    return res.status(400).json({ error: 'الاسم ورقم الهاتف وتفاصيل الرسالة مطلوبة' });
+  }
+
+  const ticketId = `ticket_guest_${Date.now()}_${crypto.randomInt(1000, 9999)}`;
+  const guestId = `guest_${phone}`;
+
+  try {
+    db.prepare(
+      `INSERT INTO support_tickets (id, customerId, subject, description, category, priority, status, customerName, customerPhone, email, createdAt)
+      VALUES (?, ?, ?, ?, 'inquiry', ?, 'open', ?, ?, ?, ?)`
+    ).run(
+      ticketId,
+      guestId,
+      subject,
+      description,
+      priority,
+      name,
+      phone,
+      email || null,
+      new Date().toISOString()
+    );
+
+    db.prepare(
+      `INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, text, isFromSupport, createdAt)
+      VALUES (?, ?, ?, ?, 'customer', ?, ?, 0, ?)`
+    ).run(
+      `tmsg_${Date.now()}`,
+      ticketId,
+      guestId,
+      name,
+      description,
+      description,
+      new Date().toISOString()
+    );
+
+    try {
+      io.emit("new_ticket", { ticketId, subject, customerName: name, priority });
+    } catch {}
+
+    res.json({
+      success: true,
+      message: 'تم استلام تذكرتك بنجاح ✅ سيتواصل معك فريق الدعم الفني عبر الهاتف في أقرب وقت.',
+      ticketId,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'تعذر حفظ التذكرة، يرجى المحاولة لاحقاً' });
   }
 });
 

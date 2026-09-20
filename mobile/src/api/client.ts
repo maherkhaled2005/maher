@@ -3,6 +3,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const CANDIDATE_BASE_URLS = [
+  'https://robin-highest-structure-established.trycloudflare.com/api',
   'https://timely-instructions-logical-thesis.trycloudflare.com/api',
   'https://api.tecnorexa.com/api',
   'http://10.128.200.45:5000/api',
@@ -13,7 +14,7 @@ export const CANDIDATE_BASE_URLS = [
 
 let activeBaseURL =
   process.env.EXPO_PUBLIC_API_URL ||
-  'https://timely-instructions-logical-thesis.trycloudflare.com/api';
+  'https://robin-highest-structure-established.trycloudflare.com/api';
 
 AsyncStorage.getItem('custom_api_url').then((saved) => {
   if (saved) activeBaseURL = saved;
@@ -123,6 +124,46 @@ api.interceptors.response.use(
   },
 );
 
+function sanitizeErrorMessage(error: any): string {
+  if (!error) return 'تعذر إتمام الطلب، يرجى المحاولة مرة أخرى';
+
+  const serverMsg = error?.response?.data?.error || error?.response?.data?.message;
+  if (serverMsg && typeof serverMsg === 'string') {
+    const raw = serverMsg.trim();
+    const isTechRaw =
+      raw.toLowerCase().includes('sql') ||
+      raw.toLowerCase().includes('jwt') ||
+      raw.toLowerCase().includes('syntaxerror') ||
+      raw.toLowerCase().includes('unauthorized') ||
+      raw.toLowerCase().includes('internal server') ||
+      raw.startsWith('<!doctype') ||
+      raw.startsWith('<html');
+
+    if (!isTechRaw) {
+      return raw;
+    }
+  }
+
+  const status = error?.response?.status;
+  if (status === 401) {
+    return 'انتهت الجلسة، يرجى تسجيل الدخول مجدداً للمتابعة';
+  }
+  if (status === 403) {
+    return 'غير مصرح بهذا الإجراء أو ليس لديك الصلاحية';
+  }
+  if (status === 404) {
+    return 'البيانات المطلوبة غير متوفرة حالياً';
+  }
+  if (status === 429) {
+    return 'يرجى الانتظار قليلاً قبل إعادة المحاولة';
+  }
+  if (status && status >= 500) {
+    return 'حدث خطأ في معالجة طلبك، يرجى المحاولة مرة أخرى لاحقاً';
+  }
+
+  return 'تعذر الاتصال حالياً، يرجى التأكد من اتصال الإنترنت والمحاولة لاحقاً';
+}
+
 export const fetchApi = async (endpoint: string, options?: any) => {
   try {
     const response = await api({
@@ -131,10 +172,7 @@ export const fetchApi = async (endpoint: string, options?: any) => {
     });
     return response.data;
   } catch (error: any) {
-    const message =
-      error?.response?.data?.error ||
-      error?.response?.data?.message ||
-      (error?.response ? `HTTP ${error.response.status}` : 'تعذر الاتصال بالخادم، يرجى التأكد من تشغيل السيرفر');
+    const message = sanitizeErrorMessage(error);
     const err = new Error(message);
     (err as any).response = error.response;
     throw err;

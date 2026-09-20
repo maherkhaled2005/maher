@@ -42,6 +42,7 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  isCheckingAuth: boolean;
   isAuthenticated: boolean;
   login: (identifier: string, password: string) => Promise<LoginResult>;
   verifyLoginOTP: (tempToken: string, phone: string, otp: string) => Promise<void>;
@@ -98,6 +99,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isLoading: false,
+      isCheckingAuth: true,
       isAuthenticated: false,
 
       login: async (identifier, password) => {
@@ -254,7 +256,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
-        set({ isLoading: true });
+        set({ isCheckingAuth: true });
         try {
           const token = await AsyncStorage.getItem('tr_token');
           const userStr = await AsyncStorage.getItem('tr_user');
@@ -272,12 +274,12 @@ export const useAuthStore = create<AuthState>()(
                 await AsyncStorage.setItem('tr_user', JSON.stringify(user));
               }
             }
-            set({ user, token, isAuthenticated: true, isLoading: false });
+            set({ user, token, isAuthenticated: true, isCheckingAuth: false, isLoading: false });
           } else {
-            set({ isLoading: false });
+            set({ isCheckingAuth: false, isLoading: false });
           }
         } catch {
-          set({ isLoading: false });
+          set({ isCheckingAuth: false, isLoading: false });
         }
       },
 

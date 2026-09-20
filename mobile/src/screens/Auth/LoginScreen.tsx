@@ -126,8 +126,8 @@ export default function LoginScreen({ navigation }: any) {
               TecnoRexa
             </Text>
 
-            <Text style={{ color: '#A1A1AA', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
-              منصة الصيانة الأولى في مصر
+            <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
+              منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
             </Text>
           </View>
 

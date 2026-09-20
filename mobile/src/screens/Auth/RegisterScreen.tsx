@@ -85,6 +85,7 @@ export default function RegisterScreen({ navigation }: any) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Paywall & Verification State for Tech/Merchant
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
@@ -93,6 +94,7 @@ export default function RegisterScreen({ navigation }: any) {
 
   const toggleSpecialty = (item: string) => {
     triggerSelectionHaptic();
+    setErrors((prev) => ({ ...prev, specialties: '' }));
     if (selectedSpecialties.includes(item)) {
       setSelectedSpecialties(selectedSpecialties.filter((s) => s !== item));
     } else {
@@ -102,6 +104,7 @@ export default function RegisterScreen({ navigation }: any) {
 
   const handlePickReceipt = async () => {
     triggerSelectionHaptic();
+    setErrors((prev) => ({ ...prev, receiptImage: '' }));
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -121,49 +124,47 @@ export default function RegisterScreen({ navigation }: any) {
     const cleanName = name.trim();
     const cleanPhone = normalizePhone(phone);
     const cleanEmail = email.trim();
+    const newErrors: Record<string, string> = {};
 
     if (!cleanName) {
-      Alert.alert('تنبيه', 'يرجى إدخال الاسم بالكامل');
-      return;
+      newErrors.name = 'يرجى إدخال الاسم بالكامل';
     }
     if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith('01')) {
-      Alert.alert('تنبيه', 'يرجى إدخال رقم هاتف مصري صحيح (11 رقماً يبدأ بـ 01)');
-      return;
+      newErrors.phone = 'يرجى إدخال رقم هاتف مصري صحيح (11 رقماً يبدأ بـ 01)';
     }
     if (!password || password.length < 6) {
-      Alert.alert('تنبيه', 'كلمة المرور يجب أن لا تقل عن 6 أحرف أو أرقام');
-      return;
+      newErrors.password = 'كلمة المرور يجب أن لا تقل عن 6 أحرف أو أرقام';
     }
     if (password !== confirmPassword) {
-      Alert.alert('تنبيه', 'كلمة المرور وتأكيدها غير متطابقين');
-      return;
+      newErrors.confirmPassword = 'كلمة المرور وتأكيدها غير متطابقين';
     }
 
     if (role === 'technician') {
       if (selectedSpecialties.length === 0) {
-        Alert.alert('تنبيه', 'يرجى تحديد تخصص صيانة واحد على الأقل');
-        return;
+        newErrors.specialties = 'يرجى تحديد تخصص صيانة أجهزة منزلية واحد على الأقل';
       }
       if (!senderPhone.trim()) {
-        Alert.alert('تنبيه', 'يرجى إدخال رقم المحفظة المحول منها رسوم الاشتراك (300 ج.م)');
-        return;
+        newErrors.senderPhone = 'يرجى إدخال رقم المحفظة المحول منها رسوم الاشتراك (300 ج.م)';
       }
       if (!receiptImage) {
-        Alert.alert('تنبيه', 'يرجى إرفاق صورة إيصال التحويل للمتابعة والاعتماد');
-        return;
+        newErrors.receiptImage = 'يرجى إرفاق صورة إيصال التحويل للمتابعة والاعتماد';
       }
     }
 
     if (role === 'merchant') {
       if (!senderPhone.trim()) {
-        Alert.alert('تنبيه', 'يرجى إدخال رقم المحفظة المحول منها رسوم الاشتراك (100 ج.م)');
-        return;
+        newErrors.senderPhone = 'يرجى إدخال رقم المحفظة المحول منها رسوم الاشتراك (100 ج.م)';
       }
       if (!receiptImage) {
-        Alert.alert('تنبيه', 'يرجى إرفاق صورة إيصال التحويل للمتابعة والاعتماد');
-        return;
+        newErrors.receiptImage = 'يرجى إرفاق صورة إيصال التحويل للمتابعة والاعتماد';
       }
     }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
 
     setIsLoading(true);
     try {
@@ -322,16 +323,20 @@ export default function RegisterScreen({ navigation }: any) {
               <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
                 الاسم بالكامل <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
-              <View style={styles.inputWrap}>
+              <View style={[styles.inputWrap, errors.name && { borderColor: '#EF4444' }]}>
                 <TextInput
                   style={styles.input}
                   placeholder="مثال: أحمد محمد علي"
                   placeholderTextColor="#71717A"
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(val) => {
+                    setName(val);
+                    if (errors.name) setErrors((prev) => ({ ...prev, name: '' }));
+                  }}
                 />
                 <User color="#D4AF37" size={18} />
               </View>
+              {errors.name ? <Text style={{ color: '#EF4444', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{errors.name}</Text> : null}
             </View>
 
             {/* Phone Number (Mandatory) */}
@@ -339,17 +344,21 @@ export default function RegisterScreen({ navigation }: any) {
               <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
                 رقم الهاتف (أساسي للدخول والتفعيل) <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
-              <View style={styles.inputWrap}>
+              <View style={[styles.inputWrap, errors.phone && { borderColor: '#EF4444' }]}>
                 <TextInput
                   style={styles.input}
                   placeholder="01xxxxxxxxx"
                   placeholderTextColor="#71717A"
                   keyboardType="numeric"
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={(val) => {
+                    setPhone(val);
+                    if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+                  }}
                 />
                 <Phone color="#D4AF37" size={18} />
               </View>
+              {errors.phone ? <Text style={{ color: '#EF4444', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{errors.phone}</Text> : null}
             </View>
 
             {/* Email (Optional) */}
@@ -376,7 +385,7 @@ export default function RegisterScreen({ navigation }: any) {
               <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
                 كلمة المرور <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
-              <View style={styles.inputWrap}>
+              <View style={[styles.inputWrap, errors.password && { borderColor: '#EF4444' }]}>
                 <TouchableOpacity onPress={() => {
                 triggerSelectionHaptic();
                 setShowPass(!showPass);
@@ -389,10 +398,14 @@ export default function RegisterScreen({ navigation }: any) {
                   placeholderTextColor="#71717A"
                   secureTextEntry={!showPass}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(val) => {
+                    setPassword(val);
+                    if (errors.password) setErrors((prev) => ({ ...prev, password: '' }));
+                  }}
                 />
                 <Lock color="#D4AF37" size={18} />
               </View>
+              {errors.password ? <Text style={{ color: '#EF4444', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{errors.password}</Text> : null}
             </View>
 
             {/* Confirm Password */}
@@ -400,17 +413,21 @@ export default function RegisterScreen({ navigation }: any) {
               <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
                 تأكيد كلمة المرور <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
-              <View style={styles.inputWrap}>
+              <View style={[styles.inputWrap, errors.confirmPassword && { borderColor: '#EF4444' }]}>
                 <TextInput
                   style={styles.input}
                   placeholder="••••••••"
                   placeholderTextColor="#71717A"
                   secureTextEntry={!showPass}
                   value={confirmPassword}
-                  onChangeText={setConfirmPassword}
+                  onChangeText={(val) => {
+                    setConfirmPassword(val);
+                    if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: '' }));
+                  }}
                 />
                 <Lock color="#D4AF37" size={18} />
               </View>
+              {errors.confirmPassword ? <Text style={{ color: '#EF4444', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{errors.confirmPassword}</Text> : null}
             </View>
           </View>
 
@@ -449,6 +466,7 @@ export default function RegisterScreen({ navigation }: any) {
                   );
                 })}
               </View>
+              {errors.specialties ? <Text style={{ color: '#EF4444', fontSize: 11, textAlign: 'right', marginTop: 6 }}>{errors.specialties}</Text> : null}
             </View>
           )}
 
@@ -474,9 +492,10 @@ export default function RegisterScreen({ navigation }: any) {
                 <Sparkles size={16} color="#D4AF37" />
               </View>
 
-              <Text style={{ color: '#E4E4E7', fontSize: 12, lineHeight: 18, textAlign: 'right', marginBottom: 12 }}>
-                يرجى تحويل رسوم الانضمام عبر فودافون كاش أو إنستاباي إلى محفظة المنصة:{' '}
-                <Text style={{ color: '#10B981', fontWeight: '900' }}>01000000000</Text>
+              <Text style={{ color: '#E4E4E7', fontSize: 12, lineHeight: 20, textAlign: 'right', marginBottom: 12 }}>
+                يرجى تحويل رسوم الانضمام عبر فودافون كاش أو إنستاباي إلى محفظة المنصة المعتمدة:{'\n'}
+                📱 كاش: <Text style={{ color: '#10B981', fontWeight: '900' }}>01064739664</Text>{'   '}
+                ⚡ إنستاباي: <Text style={{ color: '#10B981', fontWeight: '900' }}>tecnorexa@instapay</Text>
               </Text>
 
               {/* Sender Phone */}
@@ -485,13 +504,17 @@ export default function RegisterScreen({ navigation }: any) {
                   رقم المحفظة / الهاتف المحول منه <Text style={{ color: '#EF4444' }}>*</Text>
                 </Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: '#121214', borderWidth: 1, borderColor: '#27272A', borderRadius: 10, padding: 10 }]}
+                  style={[styles.input, { backgroundColor: '#121214', borderWidth: 1, borderColor: errors.senderPhone ? '#EF4444' : '#27272A', borderRadius: 10, padding: 10 }]}
                   placeholder="01xxxxxxxxx"
                   placeholderTextColor="#71717A"
                   keyboardType="numeric"
                   value={senderPhone}
-                  onChangeText={setSenderPhone}
+                  onChangeText={(val) => {
+                    setSenderPhone(val);
+                    if (errors.senderPhone) setErrors((prev) => ({ ...prev, senderPhone: '' }));
+                  }}
                 />
+                {errors.senderPhone ? <Text style={{ color: '#EF4444', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{errors.senderPhone}</Text> : null}
               </View>
 
               {/* Receipt Upload */}
@@ -501,7 +524,7 @@ export default function RegisterScreen({ navigation }: any) {
                 style={{
                   backgroundColor: '#121214',
                   borderWidth: 1.5,
-                  borderColor: receiptImage ? '#10B981' : '#3F3F46',
+                  borderColor: errors.receiptImage ? '#EF4444' : (receiptImage ? '#10B981' : '#3F3F46'),
                   borderStyle: receiptImage ? 'solid' : 'dashed',
                   borderRadius: 12,
                   padding: spacing.md,
@@ -531,6 +554,7 @@ export default function RegisterScreen({ navigation }: any) {
                   </View>
                 )}
               </TouchableOpacity>
+              {errors.receiptImage ? <Text style={{ color: '#EF4444', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{errors.receiptImage}</Text> : null}
             </View>
           )}
 

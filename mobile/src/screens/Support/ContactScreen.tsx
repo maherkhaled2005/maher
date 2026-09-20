@@ -31,6 +31,7 @@ import { useAuthStore } from '../../store/authStore';
 export default function ContactScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const [name, setName] = useState(user?.name || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [email, setEmail] = useState(user?.email || '');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -42,53 +43,75 @@ export default function ContactScreen({ navigation }: any) {
       Alert.alert('تنبيه', 'يرجى إدخال الاسم وتفاصيل الرسالة');
       return;
     }
+    if (!user && (!phone.trim() || phone.trim().length < 11)) {
+      Alert.alert('تنبيه', 'يرجى إدخال رقم هاتف صحيح للتواصل معك');
+      return;
+    }
 
     setLoading(true);
     try {
-      // Create a support conversation
-      const conv = await fetchApi('/conversations', {
-        method: 'POST',
-        data: {
-          name: 'تذكرة دعم: ' + (subject.trim() || 'رسالة تواصل'),
-          type: 'support',
-          participants: [] // Will automatically include current user and support admins
-        },
-      });
-
-      // Send the actual message
-      if (conv && conv.id) {
-        await fetchApi('/messages', {
+      if (!user) {
+        // Guest Support Flow (No login required)
+        const res = await fetchApi('/support/guest-ticket', {
           method: 'POST',
           data: {
-            conversationId: conv.id,
-            content: `[تذكرة دعم من ${name.trim()}]\n\n${message.trim()}`,
-            type: 'text'
-          }
-        });
-        
-        // Also create a ticket for backend dashboard tracking
-        await fetchApi('/support/tickets', {
-          method: 'POST',
-          data: {
-            title: subject.trim() || 'رسالة تواصل من صفحة اتصل بنا',
-            subject: subject.trim() || 'رسالة تواصل',
-            customerName: name.trim(),
-            email: email.trim(),
+            name: name.trim(),
+            phone: phone.trim(),
+            email: email.trim() || undefined,
+            subject: subject.trim() || 'طلب مساعدة من زائر المنصة',
             description: message.trim(),
-            type: 'inquiry',
-            priority: 'medium',
           },
-        }).catch(() => {}); // ignore ticket failure if chat succeeded
-
-        setSuccess(true);
-        setTimeout(() => {
-          navigation.replace('Chat', { conversationId: conv.id });
-        }, 1500);
+        });
+        if (res?.success) {
+          setSuccess(true);
+        } else {
+          throw new Error(res?.error || 'تعذر إرسال التذكرة');
+        }
       } else {
-        throw new Error('فشل إنشاء المحادثة مع الدعم');
+        // Authenticated User Flow
+        const conv = await fetchApi('/conversations', {
+          method: 'POST',
+          data: {
+            name: 'تذكرة دعم: ' + (subject.trim() || 'رسالة تواصل'),
+            type: 'support',
+            participants: [],
+          },
+        });
+
+        if (conv && conv.id) {
+          await fetchApi('/messages', {
+            method: 'POST',
+            data: {
+              conversationId: conv.id,
+              content: `[تذكرة دعم من ${name.trim()}]\n\n${message.trim()}`,
+              type: 'text',
+            },
+          });
+
+          await fetchApi('/support/tickets', {
+            method: 'POST',
+            data: {
+              title: subject.trim() || 'رسالة تواصل من صفحة اتصل بنا',
+              subject: subject.trim() || 'رسالة تواصل',
+              customerName: name.trim(),
+              customerPhone: phone.trim() || user.phone,
+              email: email.trim(),
+              description: message.trim(),
+              type: 'inquiry',
+              priority: 'medium',
+            },
+          }).catch(() => {});
+
+          setSuccess(true);
+          setTimeout(() => {
+            navigation.replace('Chat', { conversationId: conv.id });
+          }, 1500);
+        } else {
+          throw new Error('فشل إنشاء المحادثة مع الدعم');
+        }
       }
     } catch (err: any) {
-      Alert.alert('خطأ', err.message || 'تعذر إرسال الرسالة، يرجى المحاولة لاحقاً');
+      Alert.alert('تنبيه', err.message || 'تعذر إرسال الرسالة حالياً، يرجى المحاولة لاحقاً');
     } finally {
       setLoading(false);
     }
@@ -121,9 +144,22 @@ export default function ContactScreen({ navigation }: any) {
         >
           تم إرسال رسالتك بنجاح! 🚀
         </Text>
-        <Text style={{ color: colors.gray, fontSize: 13, textAlign: 'center', lineHeight: 22 }}>
-          شكراً لتواصلك مع TecnoRexa، سيقوم فريق الدعم الفني بالرد على استفسارك في أقرب وقت.
+        <Text style={{ color: colors.gray, fontSize: 13, textAlign: 'center', lineHeight: 22, marginBottom: spacing.lg }}>
+          شكراً لتواصلك مع TecnoRexa، سيقوم فريق الدعم الفني بالرد على استفسارك ومساعدتك في أقرب وقت.
         </Text>
+        <TouchableOpacity
+          onPress={() => (navigation?.canGoBack?.() ? navigation.goBack() : navigation.navigate('Login'))}
+          style={{
+            backgroundColor: colors.primary,
+            paddingHorizontal: 28,
+            paddingVertical: 12,
+            borderRadius: borderRadius.md,
+          }}
+        >
+          <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 14 }}>
+            الرجوع إلى تسجيل الدخول
+          </Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -204,7 +240,7 @@ export default function ContactScreen({ navigation }: any) {
             }}
           >
             <TouchableOpacity
-              onPress={() => openLink('tel:+201000000000')}
+              onPress={() => openLink('tel:+201064739664')}
               style={{
                 flex: 1,
                 minWidth: '47%',
@@ -365,6 +401,30 @@ export default function ContactScreen({ navigation }: any) {
                   placeholderTextColor={colors.gray}
                   value={name}
                   onChangeText={setName}
+                />
+              </View>
+
+              <View>
+                <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
+                  رقم الهاتف للتواصل {!user && <Text style={{ color: colors.danger }}>*</Text>}
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: '#0A0A0A',
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    color: colors.white,
+                    textAlign: 'right',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    fontSize: 13,
+                  }}
+                  placeholder="01xxxxxxxxx"
+                  placeholderTextColor={colors.gray}
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  maxLength={11}
                 />
               </View>
 

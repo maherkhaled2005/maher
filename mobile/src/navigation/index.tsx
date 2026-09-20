@@ -3,7 +3,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ActivityIndicator, Platform, Image } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { normalizeRole } from '../utils/permissions';
 import { colors, typography, spacing, borderRadius } from '../theme';
@@ -266,17 +266,22 @@ function BottomTabs() {
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
-  const { isAuthenticated, isLoading, user } = useAuthStore();
+  const { isAuthenticated, isCheckingAuth, user } = useAuthStore();
   const isBanned = !!(user && (user.status === 'banned' || user.status === 'suspended'));
   const isPendingApproval = !!(user && (user.status === 'pending_approval' || ((user.role === 'technician' || user.role === 'merchant') && !user.isPro && user.status !== 'active')));
 
-  if (isLoading) {
+  if (isCheckingAuth) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.dark, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: colors.primary, fontSize: 28, fontWeight: '900', letterSpacing: 2 }}>
+      <View style={{ flex: 1, backgroundColor: '#0A0A0A', alignItems: 'center', justifyContent: 'center' }}>
+        <Image
+          source={require('../../assets/splash-icon.jpg')}
+          style={{ width: 130, height: 130, borderRadius: 24, marginBottom: 18 }}
+          resizeMode="contain"
+        />
+        <Text style={{ color: '#D4AF37', fontSize: 26, fontWeight: '900', letterSpacing: 1.5 }}>
           TecnoRexa
         </Text>
-        <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+        <ActivityIndicator color="#D4AF37" style={{ marginTop: 20 }} />
       </View>
     );
   }

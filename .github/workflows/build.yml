@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 env:
-  EXPO_PUBLIC_API_URL: https://timely-instructions-logical-thesis.trycloudflare.com/api
-  EXPO_PUBLIC_SOCKET_URL: https://timely-instructions-logical-thesis.trycloudflare.com
+  EXPO_PUBLIC_API_URL: https://robin-highest-structure-established.trycloudflare.com/api
+  EXPO_PUBLIC_SOCKET_URL: https://robin-highest-structure-established.trycloudflare.com
 
 jobs:
   build:
@@ -37,8 +37,8 @@ jobs:
 
       - name: Prebuild Android
         env:
-          EXPO_PUBLIC_API_URL: https://timely-instructions-logical-thesis.trycloudflare.com/api
-          EXPO_PUBLIC_SOCKET_URL: https://timely-instructions-logical-thesis.trycloudflare.com
+          EXPO_PUBLIC_API_URL: https://robin-highest-structure-established.trycloudflare.com/api
+          EXPO_PUBLIC_SOCKET_URL: https://robin-highest-structure-established.trycloudflare.com
         run: |
           cd mobile
           npx expo prebuild --platform android --clean
@@ -53,8 +53,8 @@ jobs:
 
       - name: Build APK
         env:
-          EXPO_PUBLIC_API_URL: https://timely-instructions-logical-thesis.trycloudflare.com/api
-          EXPO_PUBLIC_SOCKET_URL: https://timely-instructions-logical-thesis.trycloudflare.com
+          EXPO_PUBLIC_API_URL: https://robin-highest-structure-established.trycloudflare.com/api
+          EXPO_PUBLIC_SOCKET_URL: https://robin-highest-structure-established.trycloudflare.com
         run: |
           cd mobile/android
           ./gradlew assembleRelease --no-daemon
