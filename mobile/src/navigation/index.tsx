@@ -266,25 +266,13 @@ function BottomTabs() {
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
-  const { isAuthenticated, isCheckingAuth, user } = useAuthStore();
+  const { isAuthenticated, user, checkAuth } = useAuthStore();
   const isBanned = !!(user && (user.status === 'banned' || user.status === 'suspended'));
   const isPendingApproval = !!(user && (user.status === 'pending_approval' || ((user.role === 'technician' || user.role === 'merchant') && !user.isPro && user.status !== 'active')));
 
-  if (isCheckingAuth) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0A0A0A', alignItems: 'center', justifyContent: 'center' }}>
-        <Image
-          source={require('../../assets/splash-icon.jpg')}
-          style={{ width: 130, height: 130, borderRadius: 24, marginBottom: 18 }}
-          resizeMode="contain"
-        />
-        <Text style={{ color: '#D4AF37', fontSize: 26, fontWeight: '900', letterSpacing: 1.5 }}>
-          TecnoRexa
-        </Text>
-        <ActivityIndicator color="#D4AF37" style={{ marginTop: 20 }} />
-      </View>
-    );
-  }
+  React.useEffect(() => {
+    checkAuth?.();
+  }, []);
 
   return (
     <NavigationContainer>

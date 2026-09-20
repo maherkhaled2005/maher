@@ -99,7 +99,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isLoading: false,
-      isCheckingAuth: true,
+      isCheckingAuth: false,
       isAuthenticated: false,
 
       login: async (identifier, password) => {
@@ -256,25 +256,29 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
-        set({ isCheckingAuth: true });
         try {
           const token = await AsyncStorage.getItem('tr_token');
           const userStr = await AsyncStorage.getItem('tr_user');
           if (token && userStr) {
             let user = JSON.parse(userStr);
-            try {
-              const res = await fetchApi('/auth/me');
+            set({ user, token, isAuthenticated: true, isCheckingAuth: false, isLoading: false });
+            // Silently refresh profile in background without blocking UI
+            fetchApi('/auth/me').then(async (res) => {
               if (res?.user) {
                 user = { ...user, ...res.user };
                 await AsyncStorage.setItem('tr_user', JSON.stringify(user));
+                set({ user });
               }
-            } catch (err: any) {
-              if (err?.response?.status === 403 && err?.response?.data?.isBanned) {
+            }).catch(async (err) => {
+              if (err?.response?.status === 401) {
+                await AsyncStorage.multiRemove(['tr_token', 'tr_user']);
+                set({ user: null, token: null, isAuthenticated: false });
+              } else if (err?.response?.status === 403 && err?.response?.data?.isBanned) {
                 user.status = 'banned';
                 await AsyncStorage.setItem('tr_user', JSON.stringify(user));
+                set({ user });
               }
-            }
-            set({ user, token, isAuthenticated: true, isCheckingAuth: false, isLoading: false });
+            });
           } else {
             set({ isCheckingAuth: false, isLoading: false });
           }

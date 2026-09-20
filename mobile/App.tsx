@@ -91,31 +91,43 @@ export default function App() {
   }, [notification]);
 
   useEffect(() => {
-    // Sequence: 
-    // 1. Sudden Shrink (Big to Normal)
-    // 2. Fade in text and button
-    // 3. Wait, then enter app
-    Animated.sequence([
-      Animated.spring(splashLogoScale, {
-        toValue: 1, // Shrink to normal size
-        friction: 5,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(splashContentOpacity, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.delay(2000),
-    ]).start(() => {
+    // Safety fallback: guaranteed entry after short timeout
+    const fallbackTimer = setTimeout(() => {
       setAppReady(true);
-    });
+    }, Platform.OS === 'web' ? 600 : 2500);
+
+    // Run animation
+    try {
+      Animated.sequence([
+        Animated.spring(splashLogoScale, {
+          toValue: 1,
+          friction: 5,
+          tension: 80,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(splashContentOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.delay(Platform.OS === 'web' ? 400 : 1500),
+      ]).start(() => {
+        setAppReady(true);
+      });
+    } catch {
+      setAppReady(true);
+    }
+
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
   if (!appReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' }}>
+      <TouchableOpacity 
+        activeOpacity={1} 
+        onPress={() => setAppReady(true)}
+        style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' }}
+      >
         <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
         
         {/* Animated Circular Image Logo */}
@@ -154,27 +166,31 @@ export default function App() {
           </Text>
 
           {/* Gold Loading Button */}
-          <View style={{ 
-            marginTop: 50,
-            backgroundColor: '#D4AF37', // Gold color
-            borderRadius: 30, 
-            paddingVertical: 14, 
-            paddingHorizontal: 40,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 12,
-            shadowColor: '#D4AF37',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.4,
-            shadowRadius: 15,
-            elevation: 10,
-          }}>
+          <TouchableOpacity 
+            onPress={() => setAppReady(true)}
+            activeOpacity={0.8}
+            style={{ 
+              marginTop: 50,
+              backgroundColor: '#D4AF37', // Gold color
+              borderRadius: 30, 
+              paddingVertical: 14, 
+              paddingHorizontal: 40,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              shadowColor: '#D4AF37',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.4,
+              shadowRadius: 15,
+              elevation: 10,
+            }}
+          >
             <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800', letterSpacing: 1 }}>جاري التحميل...</Text>
-          </View>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800', letterSpacing: 1 }}>دخول التطبيق</Text>
+          </TouchableOpacity>
         </Animated.View>
-      </View>
+      </TouchableOpacity>
     );
   }
 
