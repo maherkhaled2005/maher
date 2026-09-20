@@ -1,24 +1,30 @@
 // mobile/src/api/client.ts
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 export const CANDIDATE_BASE_URLS = [
-  'https://int-joshua-miracle-raymond.trycloudflare.com/api',
-  'https://robin-highest-structure-established.trycloudflare.com/api',
-  'https://timely-instructions-logical-thesis.trycloudflare.com/api',
-  'https://api.tecnorexa.com/api',
-  'http://10.128.200.45:5000/api',
-  'http://192.168.1.2:5000/api',
-  'http://10.0.2.2:5000/api',
+  'https://neighbors-pure-governor-commissioner.trycloudflare.com/api',
+  'http://192.168.1.17:5000/api',
   'http://localhost:5000/api',
+  'http://10.0.2.2:5000/api',
+  'https://api.tecnorexa.com/api',
 ];
 
-let activeBaseURL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  'https://int-joshua-miracle-raymond.trycloudflare.com/api';
+const getInitialBaseURL = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/api`;
+  }
+  return (
+    process.env.EXPO_PUBLIC_API_URL ||
+    'https://neighbors-pure-governor-commissioner.trycloudflare.com/api'
+  );
+};
+
+let activeBaseURL = getInitialBaseURL();
 
 AsyncStorage.getItem('custom_api_url').then((saved) => {
-  if (saved) activeBaseURL = saved;
+  if (saved && Platform.OS !== 'web') activeBaseURL = saved;
 });
 
 export const api = axios.create({

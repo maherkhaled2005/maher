@@ -9,7 +9,7 @@ import Database from "better-sqlite3";
 import pg from "pg";
 const { Pool } = pg;
 import { Server } from "socket.io";
-import { createServer } from "http";
+import http, { createServer } from "http";
 import { GoogleGenAI } from "@google/genai";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -87,45 +87,11 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
 });
 
-// Root portal & Auto-redirect to Frontend UI
-app.get("/", async (req: any, res) => {
-  if (req.accepts("html")) {
-    const host = req.hostname || "localhost";
-    return res.send(`
-      <!DOCTYPE html>
-      <html lang="ar" dir="rtl">
-      <head>
-        <meta charset="utf-8">
-        <title>TecnoRexa API - تكنوريكسا</title>
-        <meta http-equiv="refresh" content="2;url=http://${host}:19006">
-        <style>
-          body { background-color: #0a0a0a; color: #fff; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-          .card { background: #141414; padding: 36px; border-radius: 16px; border: 1px solid #d4af37; max-width: 500px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
-          h1 { color: #d4af37; margin: 12px 0; font-size: 24px; font-weight: 900; }
-          p { color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 16px 0 24px; }
-          .btn { background: #d4af37; color: #0a0a0a; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 15px; display: inline-block; }
-          .btn:hover { background: #f5a623; }
-          .status { display: inline-block; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid #10b981; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="status">● خادم البيانات والـ API يعمل بنجاح (Port 5000)</div>
-          <h1>منصة TecnoRexa 🚀</h1>
-          <p>أنت تتصفح منفذ البيانات الخلفي (Backend Server).<br>واجهة التطبيق الكاملة تعمل على المنفذ <strong>19006</strong>.<br>جاري تحويلك تلقائياً خلال ثانيتين...</p>
-          <a class="btn" href="http://${host}:19006">فتح واجهة التطبيق الآن 👈</a>
-        </div>
-      </body>
-      </html>
-    `);
-  }
-  res.json({
-    status: "online",
-    name: "TecnoRexa API Server",
-    version: "1.0.0",
-    frontend: `http://${req.hostname || "localhost"}:19006`,
-  });
-});
+// Serve mobile web static assets
+const mobileDistPath = path.join(__dirname, "mobile", "dist");
+if (fs.existsSync(mobileDistPath)) {
+  app.use(express.static(mobileDistPath));
+}
 
 // ========== CONVENIENCE & FEATURE ROUTES ==========
 app.get("/api/wallet/transactions", authenticateToken,async (req: any, res) => {
@@ -11110,6 +11076,23 @@ app.get("/api/technicians/:id/specialties", authenticateToken,async (req, res) =
   res.json([{ id: 1, name: "غسالات" }, { id: 2, name: "تكييف" }]);
 });
 
+
+// Serve the Mobile/Web App Frontend on any client-side routes (SPA fallback)
+app.get("*", (req: any, res: any, next: any) => {
+  if (
+    req.path.startsWith("/api") ||
+    req.path.startsWith("/uploads") ||
+    req.path.startsWith("/socket.io") ||
+    req.path.startsWith("/health")
+  ) {
+    return next();
+  }
+  const indexPath = path.join(__dirname, "mobile", "dist", "index.html");
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  next();
+});
 
 async function startServer() {
   try {
