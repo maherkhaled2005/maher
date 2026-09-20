@@ -1046,6 +1046,7 @@ async function runMigrations() {
     { name: "lastOtpSentAt", def: "TEXT" },
     { name: "otpAttempts", def: "INTEGER DEFAULT 0" },
     { name: "otpCode", def: "TEXT" },
+    { name: "mustChangePassword", def: "INTEGER DEFAULT 0" },
   ];
 
   for (const col of missingColumns) {
@@ -1201,6 +1202,7 @@ function sanitizeUser(user: any) {
     ...safeUser,
     verified: safeUser.verified === 1,
     phoneVerified: safeUser.phoneVerified === 1 ? 1 : 0,
+    mustChangePassword: safeUser.mustChangePassword === 1,
   };
 }
 
@@ -1908,7 +1910,9 @@ function requirePermission(permission: string) {
 // Legacy Middleware (for compatibility, can be phased out)
 function requireAdmin(req: any, res: any, next: any) {
   const role = normalizeRoleServer(req.user.role);
-  if (role === "owner" || role === "manager") return next();
+  const isLeadProgrammer = (role === "programmer" || role === "lead_developer") && 
+    (req.user?.developerRank === "lead" || req.user?.programmerLevel === "lead" || req.user?.phone === "01064739664");
+  if (role === "owner" || role === "manager" || isLeadProgrammer) return next();
   res.status(403).json({ error: "Admin access required" });
 }
 
@@ -5476,55 +5480,96 @@ app.get(
 );
 
 app.post(
-  "/api/admin/users", authenticateToken,async (req: any, res) => {
+  "/api/admin/users", authenticateToken, async (req: any, res) => {
     const role = normalizeRoleServer(req.user?.role);
     const isOwner = role === 'owner';
-    const isLeadProgrammer = (role === 'programmer' || role === 'lead_developer') && (req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead');
-    if (!isOwner && !isLeadProgrammer) {
-      return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة حصرياً على المالك وقائد المبرمجين." });
+    const isLeadProgrammer = (role === 'programmer' || role === 'lead_developer') && 
+      (req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead' || req.user?.phone === '01064739664');
+    const isManager = role === 'manager';
+
+    if (!isOwner && !isLeadProgrammer && !isManager) {
+      return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة على الإدارة وقائد المبرمجين." });
     }
-    const { name, phone, email, role: userRole } = req.body;
-    if (!name || !phone)
+
+    const { name, phone, email, role: userRole, password, developerRank } = req.body;
+    if (!name || !phone) {
       return res.status(400).json({ error: "الاسم ورقم الهاتف مطلوبان" });
-      try {
-        const cleanPhone = String(phone).trim();
-        const cleanEmail = email && String(email).trim() ? String(email).trim() : null;
-        const existing = cleanEmail
-          ? db
-              .prepare("SELECT id FROM users WHERE phone = ? OR email = ?")
-              .get(cleanPhone, cleanEmail)
-          : await db.prepare("SELECT id FROM users WHERE phone = ?").get(cleanPhone);
-        if (existing)
-          return res.status(400).json({ error: "رقم الهاتف أو البريد الإلكتروني مسجل بالفعل" });
-        const userId = `user_${Date.now()}`;
-        const normalizedRole = normalizeRoleServer(userRole || "customer");
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const otpExpires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        const tempHashed = await bcrypt.hash(`pending_first_login_${Date.now()}`, 10);
-        db.prepare(
-          "INSERT INTO users (id, name, phone, email, password, role, developerRank, status, verified, balance, otp, otpExpires, createdAt) VALUES (?, ?, ?, ?, ?, ?, 'none', 'active', 1, 0, ?, ?, ?)",
-        ).run(
-          userId,
-          name.trim(),
-          cleanPhone,
-          cleanEmail,
-          tempHashed,
-          normalizedRole,
-          otp,
-          otpExpires,
-          new Date().toISOString(),
-        );
+    }
+
+    const cleanPhone = normalizePhone(phone);
+    if (!cleanPhone || cleanPhone.length < 11) {
+      return res.status(400).json({ error: "يرجى إدخال رقم هاتف صحيح مكون من 11 رقماً" });
+    }
+
+    // Lead Programmer phone is unique and exclusive
+    if (cleanPhone === '01064739664') {
+      return res.status(400).json({ error: "رقم هاتف قائد المبرمجين مسجل بالفعل وحصري للمسؤول التقني." });
+    }
+
+    const normalizedRole = normalizeRoleServer(userRole || "customer");
+
+    // Restrictions: Only Owner can create Owner or Manager
+    if (['owner', 'manager'].includes(normalizedRole) && !isOwner) {
+      return res.status(403).json({ error: "فقط المالك يمكنه إنشاء حسابات المالك أو المدير." });
+    }
+
+    // Assign developerRank for programmers
+    let devRank = 'none';
+    if (normalizedRole === 'programmer') {
+      devRank = 'junior'; // مبرمج عادي
+    }
+
+    try {
+      const cleanEmail = email && String(email).trim() ? String(email).trim() : null;
+      const existing = cleanEmail
+        ? db.prepare("SELECT id FROM users WHERE phone = ? OR email = ?").get(cleanPhone, cleanEmail)
+        : db.prepare("SELECT id FROM users WHERE phone = ?").get(cleanPhone);
+
+      if (existing) {
+        return res.status(400).json({ error: "رقم الهاتف أو البريد الإلكتروني مسجل بالفعل" });
+      }
+
+      const initialPassword = String(password || '123456').trim();
+      const hashedPassword = bcrypt.hashSync(initialPassword, 10);
+      const userId = `user_${Date.now()}`;
+
+      db.prepare(`
+        INSERT INTO users (
+          id, name, phone, email, password, role, developerRank, programmerLevel,
+          status, verified, phoneVerified, balance, mustChangePassword, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, 1, 0, 1, datetime('now'))
+      `).run(
+        userId,
+        name.trim(),
+        cleanPhone,
+        cleanEmail,
+        hashedPassword,
+        normalizedRole,
+        devRank,
+        devRank,
+      );
+
       const logId = `audit_${Date.now()}`;
       db.prepare(
-        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'USER_CREATE', ?, ?, ?, ?)",
+        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'إنشاء مستخدم جديد', ?, ?, ?, datetime('now'))",
       ).run(
         logId,
         userId,
         req.user.id,
-        JSON.stringify({ name, phone, role: normalizedRole }),
-        new Date().toISOString(),
+        JSON.stringify({
+          name: name.trim(),
+          phone: cleanPhone,
+          role: normalizedRole,
+          developerRank: devRank,
+          createdBy: req.user.name,
+        }),
       );
-      res.json({ success: true, id: userId });
+
+      res.json({
+        success: true,
+        id: userId,
+        message: `تم إنشاء حساب (${name.trim()}) برتبة "${normalizedRole === 'programmer' ? 'مبرمج عادي' : normalizedRole}" بنجاح. كلمة المرور الأولية: (${initialPassword}).`,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5533,7 +5578,7 @@ app.post(
 
 app.put(
   "/api/admin/users/:id", authenticateToken, requireAdmin, async (req: any, res) => {
-    const { role, status, banReason } = req.body;
+    const { name, phone, email, role, status, banReason, password, developerRank, balance } = req.body;
     const targetId = req.params.id;
     const currentUser = req.user;
     try {
@@ -5546,77 +5591,125 @@ app.put(
       const normalizedCurrentRole = normalizeRoleServer(currentUser.role || "customer");
       const normalizedTargetRole = normalizeRoleServer(role || oldUser.role || "customer");
       const oldUserRole = normalizeRoleServer(oldUser.role || "customer");
+      const isLeadProgrammer = (normalizedCurrentRole === 'programmer' || currentUser.role === 'lead_developer') && 
+        (currentUser.developerRank === 'lead' || currentUser.programmerLevel === 'lead' || currentUser.phone === '01064739664');
+      const isOwner = normalizedCurrentRole === 'owner';
 
-      // 🛡️ OWNER SELF-PROTECTION: Cannot modify own account status
+      // 🛡️ OWNER SELF-PROTECTION
       if (targetId === currentUser.id && (status === "banned" || status === "suspended")) {
         return res.status(400).json({ error: "لا يمكنك حظر حسابك الخاص" });
       }
-
-      // 🛡️ OWNER SELF-PROTECTION: Cannot change own role to lower role
       if (targetId === currentUser.id && normalizedCurrentRole === "owner" && normalizedTargetRole !== "owner") {
         return res.status(400).json({ error: "لا يمكن للمالك تخفيض رتبة حسابه الخاص" });
+      }
+
+      // 🛡️ Lead Programmer Protection: Cannot be banned or demoted
+      if ((oldUser.id === 'programmer_lead' || oldUser.phone === '01064739664') && targetId !== currentUser.id) {
+        if (status === 'banned' || status === 'suspended' || (normalizedTargetRole !== 'programmer' && !isOwner)) {
+          return res.status(403).json({ error: "لا يمكن حظر أو تعديل رتبة قائد المبرمجين والمسؤول التقني 🛡️" });
+        }
       }
 
       // 🛡️ Cannot ban any owner account
       if (oldUserRole === "owner" && (status === "banned" || status === "suspended")) {
         return res.status(403).json({ error: "لا يمكن حظر حساب المالك" });
       }
-
-      // 🛡️ Cannot change owner's role without being owner
-      if (oldUserRole === "owner" && normalizedCurrentRole !== "owner") {
+      if (oldUserRole === "owner" && !isOwner) {
         return res.status(403).json({ error: "لا يمكنك تعديل صلاحيات المالك" });
       }
 
-      // 🛡️ Only owner can assign owner or manager roles
+      // Only owner can assign owner or manager roles
       const highLevelRoles = ["owner", "manager"];
-      if (highLevelRoles.includes(normalizedTargetRole) && normalizedCurrentRole !== "owner") {
+      if (highLevelRoles.includes(normalizedTargetRole) && !isOwner) {
         return res.status(403).json({ error: "فقط المالك يمكنه تعيين الملاك أو المديرين" });
-      }
-
-      // 🛡️ Only owner can modify high level roles (except self-editing)
-      if (
-        highLevelRoles.includes(oldUserRole) &&
-        normalizedCurrentRole !== "owner" &&
-        targetId !== currentUser.id
-      ) {
-        return res.status(403).json({ error: "لا يمكنك تعديل صلاحيات المدير أو المالك" });
       }
 
       const finalStatus = status || oldUser.status;
       const isBannedFlag = (finalStatus === 'banned' || finalStatus === 'suspended') ? 1 : 0;
       const finalBanReason = isBannedFlag === 1 ? (banReason || 'حظر إداري') : null;
 
-      await db.prepare("UPDATE users SET role = ?, status = ?, banned = ?, banReason = ? WHERE id = ?").run(
+      // Handle programmer developerRank:
+      let finalDevRank = oldUser.developerRank || 'none';
+      if (normalizedTargetRole === 'programmer') {
+        if (oldUser.id === 'programmer_lead' || oldUser.phone === '01064739664') {
+          finalDevRank = 'lead';
+        } else {
+          finalDevRank = developerRank || 'junior'; // مبرمج عادي
+        }
+      } else {
+        finalDevRank = 'none';
+      }
+
+      const finalName = name ? name.trim() : oldUser.name;
+      const finalPhone = phone ? normalizePhone(phone) : oldUser.phone;
+      const finalEmail = email !== undefined ? (email ? email.trim() : null) : oldUser.email;
+
+      // Password update if provided by admin
+      let finalPassword = oldUser.password;
+      let finalMustChangePassword = oldUser.mustChangePassword || 0;
+      if (password && String(password).trim().length >= 4) {
+        finalPassword = bcrypt.hashSync(String(password).trim(), 10);
+        finalMustChangePassword = 1;
+      }
+
+      // Balance update (only owner can adjust balance directly)
+      const finalBalance = (isOwner && balance !== undefined && !isNaN(Number(balance))) 
+        ? Number(balance) 
+        : oldUser.balance;
+
+      await db.prepare(`
+        UPDATE users SET
+          name = ?,
+          phone = ?,
+          email = ?,
+          role = ?,
+          developerRank = ?,
+          programmerLevel = ?,
+          status = ?,
+          banned = ?,
+          banReason = ?,
+          password = ?,
+          mustChangePassword = ?,
+          balance = ?
+        WHERE id = ?
+      `).run(
+        finalName,
+        finalPhone,
+        finalEmail,
         normalizedTargetRole,
+        finalDevRank,
+        finalDevRank,
         finalStatus,
         isBannedFlag,
         finalBanReason,
+        finalPassword,
+        finalMustChangePassword,
+        finalBalance,
         targetId,
       );
 
       const logId = `audit_${Date.now()}`;
-      // Build human-readable Arabic action
       let arabicAction = 'تحديث بيانات مستخدم';
       if (isBannedFlag === 1) arabicAction = `حظر مستخدم${finalBanReason ? ' - السبب: ' + finalBanReason : ''}`;
       else if (oldUser.status === 'banned' && finalStatus === 'active') arabicAction = 'رفع الحظر عن مستخدم';
-      else if (oldUser.role !== normalizedTargetRole) arabicAction = `تغيير رتبة من ${oldUser.role} إلى ${normalizedTargetRole}`;
+      else if (oldUser.role !== normalizedTargetRole) arabicAction = `تغيير رتبة إلى ${normalizedTargetRole === 'programmer' ? 'مبرمج عادي' : normalizedTargetRole}`;
 
       db.prepare(
-        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))",
       ).run(
         logId,
         arabicAction,
         targetId,
         currentUser.id,
         JSON.stringify({
-          targetName: oldUser.name,
+          targetName: finalName,
           oldRole: oldUser.role,
           newRole: normalizedTargetRole,
+          developerRank: finalDevRank,
           oldStatus: oldUser.status,
           newStatus: finalStatus,
           banReason: finalBanReason,
         }),
-        new Date().toISOString(),
       );
 
       // Notify user via socket
@@ -5624,17 +5717,14 @@ app.put(
         newRole: normalizedTargetRole,
         newStatus: finalStatus,
       });
-      if (isBannedFlag === 1) {
-        io.to(targetId).emit("force_banned", {
-          reason: finalBanReason || "تم حظر هذا الحساب من قبل إدارة المنصة.",
-        });
-      }
-      res.json({ success: true });
+
+      res.json({ success: true, message: "تم تحديث بيانات المستخدم بنجاح" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   },
 );
+
 
 app.delete(
   "/api/admin/users/:id",
@@ -5835,24 +5925,38 @@ app.post("/api/wallet/topup", authenticateToken, async (req: any, res) => {
 });
 
 app.post(
-  "/api/user/change-password", authenticateToken,async (req: any, res) => {
+  "/api/user/change-password", authenticateToken, async (req: any, res) => {
     const currentPassword = req.body.currentPassword || req.body.oldPassword;
     const newPassword = req.body.newPassword;
 
     try {
       const user = db
-        .prepare("SELECT password FROM users WHERE id = ?")
+        .prepare("SELECT * FROM users WHERE id = ?")
         .get(req.user.id) as any;
-      if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
-        return res.status(401).json({ error: "Current password is incorrect" });
+      if (!user) return res.status(404).json({ error: "المستخدم غير موجود" });
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: "كلمة المرور الجديدة يجب أن تكون 6 خانات على الأقل" });
+      }
+
+      // If user must change password, allow without current or verify if provided
+      if (currentPassword) {
+        const valid = await bcrypt.compare(currentPassword, user.password);
+        if (!valid && user.mustChangePassword !== 1) {
+          return res.status(401).json({ error: "كلمة المرور الحالية غير صحيحة" });
+        }
+      } else if (user.mustChangePassword !== 1) {
+        return res.status(400).json({ error: "يرجى إدخال كلمة المرور الحالية" });
       }
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await db.prepare("UPDATE users SET password = ? WHERE id = ?").run(
+      db.prepare("UPDATE users SET password = ?, mustChangePassword = 0 WHERE id = ?").run(
         hashedPassword,
         req.user.id,
       );
-      res.json({ success: true });
+
+      const updatedUser = sanitizeUser(db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id));
+      res.json({ success: true, message: "تم تغيير كلمة المرور بنجاح ✅", user: updatedUser });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -10896,41 +11000,6 @@ app.delete("/api/owner/users/:id", authenticateToken, requireOwner, async (req: 
   }
 });
 
-// Add User by Staff (Default password: 123456 if unspecified)
-app.post("/api/admin/users", authenticateToken, requireAdmin, async (req: any, res) => {
-  const { name, phone, email, role, password } = req.body;
-  if (!name || !phone) return res.status(400).json({ error: "الاسم ورقم الهاتف مطلوبان" });
-
-  // 🛡️ Privilege Escalation Prevention: Only Owner can create Owner or Manager accounts
-  if (req.user.role === 'manager' && (role === 'owner' || role === 'manager')) {
-    return res.status(403).json({ error: "لا يمتلك المدير صلاحية إنشاء حسابات إدارية عليا (مالك أو مدير)" });
-  }
-
-  try {
-    const defaultPass = password || '123456';
-    const hash = bcrypt.hashSync(defaultPass, 10);
-    const userId = `user_${Date.now()}`;
-    const userRole = role || 'customer';
-    const userEmail = email || `${phone}@tecnorexa.com`;
-
-    db.prepare(`
-      INSERT INTO users (id, name, phone, email, password, role, status, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'))
-    `).run(userId, name, phone, userEmail, hash, userRole);
-
-    db.prepare(
-      "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'إنشاء حساب مستخدم', ?, ?, ?, datetime('now'))"
-    ).run(`audit_${Date.now()}`, userId, req.user.id, `إنشاء حساب ${name} برتبة ${userRole}`);
-
-    res.json({
-      success: true,
-      id: userId,
-      message: `تم إنشاء حساب ${name} بنجاح. كلمة المرور الافتراضية: (${defaultPass})`
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Live Header Badges (Unread notifications & chat messages)
 app.get("/api/header/badges", authenticateToken,async (req: any, res) => {

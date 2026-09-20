@@ -11,11 +11,15 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { ChevronRight, Lock, CheckCircle2 } from 'lucide-react-native';
+import { ChevronRight, Lock, CheckCircle2, ShieldAlert } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { api } from '../../api/client';
+import { useAuthStore } from '../../store/authStore';
 
 export default function ChangePasswordScreen({ navigation }: any) {
+  const { user: currentUser, updateUser } = useAuthStore();
+  const isForcedChange = !!currentUser?.mustChangePassword;
+
   const [form, setForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -24,8 +28,12 @@ export default function ChangePasswordScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
 
   const handleUpdate = async () => {
-    if (!form.currentPassword) {
+    if (!isForcedChange && !form.currentPassword) {
       Alert.alert('تنبيه', 'يرجى إدخال كلمة المرور الحالية ⚠️');
+      return;
+    }
+    if (!form.newPassword) {
+      Alert.alert('خطأ', 'يرجى كتابة كلمة المرور الجديدة ❌');
       return;
     }
     if (form.newPassword !== form.confirmPassword) {
@@ -39,14 +47,32 @@ export default function ChangePasswordScreen({ navigation }: any) {
 
     try {
       setLoading(true);
-      await api.post('/user/change-password', {
-        currentPassword: form.currentPassword,
+      const res = await api.post('/user/change-password', {
+        currentPassword: form.currentPassword || undefined,
         newPassword: form.newPassword,
       });
 
-      const msg = 'تم تحديث كلمة المرور بنجاح ✅';
+      if (currentUser) {
+        updateUser({ ...currentUser, mustChangePassword: false });
+      }
+
+      const msg = isForcedChange
+        ? 'تم تعيين كلمة المرور الجديدة بنجاح! تم فتح حسابك للدخول الآن 🚀'
+        : 'تم تحديث كلمة المرور بنجاح ✅';
+
       Alert.alert('تم بنجاح', msg, [
-        { text: 'حسناً', onPress: () => navigation.goBack() },
+        {
+          text: 'متابعة',
+          onPress: () => {
+            if (isForcedChange) {
+              navigation?.navigate?.('Main');
+            } else if (navigation?.canGoBack?.()) {
+              navigation.goBack();
+            } else {
+              navigation?.navigate?.('Profile');
+            }
+          },
+        },
       ]);
     } catch (err: any) {
       const errorMsg = err.response?.data?.error || err.message || 'تعذر تحديث كلمة المرور';
@@ -60,7 +86,6 @@ export default function ChangePasswordScreen({ navigation }: any) {
     <SafeAreaView
       style={[
         { flex: 1, backgroundColor: colors.dark },
-        
       ]}
     >
       {/* Header */}
@@ -76,23 +101,27 @@ export default function ChangePasswordScreen({ navigation }: any) {
           borderColor: '#222',
         }}
       >
-        <TouchableOpacity
-          onPress={() => (navigation?.canGoBack?.() ? navigation.goBack() : navigation.navigate('Profile'))}
-          style={{
-            width: 40,
-            height: 40,
-            backgroundColor: '#1A1A1A',
-            borderWidth: 1,
-            borderColor: '#333',
-            borderRadius: borderRadius.md,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <ChevronRight color={colors.primary} size={22} />
-        </TouchableOpacity>
+        {!isForcedChange ? (
+          <TouchableOpacity
+            onPress={() => (navigation?.canGoBack?.() ? navigation.goBack() : navigation.navigate('Profile'))}
+            style={{
+              width: 40,
+              height: 40,
+              backgroundColor: '#1A1A1A',
+              borderWidth: 1,
+              borderColor: '#333',
+              borderRadius: borderRadius.md,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ChevronRight color={colors.primary} size={22} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
         <Text style={{ fontSize: 18, fontWeight: '900', color: colors.primary }}>
-          تغيير كلمة المرور
+          {isForcedChange ? 'تعيين كلمة مرور جديدة للحساب' : 'تغيير كلمة المرور'}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -115,8 +144,31 @@ export default function ChangePasswordScreen({ navigation }: any) {
             >
               <Lock color={colors.primary} size={36} />
             </View>
+            {isForcedChange && (
+              <View
+                style={{
+                  backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                  borderWidth: 1,
+                  borderColor: colors.primary,
+                  borderRadius: borderRadius.lg,
+                  padding: spacing.md,
+                  marginHorizontal: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '900', textAlign: 'right', marginBottom: 4 }}>
+                  🔒 تنبيه أمني: تعيين كلمة المرور الأولية
+                </Text>
+                <Text style={{ color: colors.white, fontSize: 12, textAlign: 'right', lineHeight: 18 }}>
+                  تم تسجيل حسابك من قبل الإدارة بكلمة مرور مؤقتة. يرجى تعيين كلمة مرور شخصية جديدة خاصة بك للمتابعة والدخول إلى المنظومة.
+                </Text>
+              </View>
+            )}
+
             <Text style={{ color: colors.gray, textAlign: 'center', paddingHorizontal: 20, fontSize: 13, lineHeight: 20 }}>
-              يُرجى إدخال كلمة المرور الحالية لتأكيد هويتك، ثم إدخال كلمة المرور الجديدة وتأكيدها.
+              {isForcedChange
+                ? 'أهلاً بك! لسلامة وأمان حسابك، يُرجى كتابة كلمة مرور جديدة قوية خاصة بك لإتمام تفعيل الحساب.'
+                : 'يُرجى إدخال كلمة المرور الحالية لتأكيد هويتك، ثم إدخال كلمة المرور الجديدة وتأكيدها.'}
             </Text>
           </View>
 
@@ -132,29 +184,31 @@ export default function ChangePasswordScreen({ navigation }: any) {
               alignSelf: 'center',
             }}
           >
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ color: colors.white, fontWeight: '800', textAlign: 'right', marginBottom: 8, fontSize: 13 }}>
-                كلمة المرور الحالية
-              </Text>
-              <TextInput
-                style={{
-                  backgroundColor: '#1A1A1A',
-                  borderWidth: 1,
-                  borderColor: '#333',
-                  borderRadius: borderRadius.md,
-                  padding: 12,
-                  textAlign: 'right',
-                  color: colors.white,
-                  fontWeight: '600',
-                  fontSize: 14,
-                }}
-                secureTextEntry
-                placeholder="********"
-                placeholderTextColor={colors.gray}
-                value={form.currentPassword}
-                onChangeText={(t) => setForm({ ...form, currentPassword: t })}
-              />
-            </View>
+            {!isForcedChange && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: colors.white, fontWeight: '800', textAlign: 'right', marginBottom: 8, fontSize: 13 }}>
+                  كلمة المرور الحالية
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: '#1A1A1A',
+                    borderWidth: 1,
+                    borderColor: '#333',
+                    borderRadius: borderRadius.md,
+                    padding: 12,
+                    textAlign: 'right',
+                    color: colors.white,
+                    fontWeight: '600',
+                    fontSize: 14,
+                  }}
+                  secureTextEntry
+                  placeholder="********"
+                  placeholderTextColor={colors.gray}
+                  value={form.currentPassword}
+                  onChangeText={(t) => setForm({ ...form, currentPassword: t })}
+                />
+              </View>
+            )}
 
             <View style={{ marginBottom: 16 }}>
               <Text style={{ color: colors.white, fontWeight: '800', textAlign: 'right', marginBottom: 8, fontSize: 13 }}>

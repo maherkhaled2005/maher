@@ -208,11 +208,18 @@ export function normalizeRole(role: string): ValidRole {
 }
 
 /** الحصول على الاسم العربي للرتبة */
-export function getRoleLabel(role: string): string {
+export function getRoleLabel(role: string, developerRank?: string, phone?: string): string {
+  const norm = normalizeRole(role);
+  if (norm === "programmer") {
+    if (phone === "01064739664" || developerRank === "lead") {
+      return "المسؤول التقني وقائد المبرمجين 💻";
+    }
+    return "مبرمج عادي 💻";
+  }
   const labels: Record<string, string> = {
     owner: "المالك 👑",
     manager: "المدير 👔",
-    programmer: "المبرمج 💻",
+    programmer: "مبرمج عادي 💻",
     customer_support: "دعم العملاء 🎧",
     technician: "فني صيانة 🔧",
     merchant: "تاجر معتمد 🏪",
@@ -222,7 +229,7 @@ export function getRoleLabel(role: string): string {
     content_creator: "فني صيانة 🔧",
     user: "عميل 👤",
   };
-  return labels[role] || "عميل";
+  return labels[norm] || "عميل";
 }
 
 /** الحصول على لون الرتبة (hex) */

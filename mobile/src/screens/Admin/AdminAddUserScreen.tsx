@@ -11,7 +11,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { UserPlus, ChevronDown, Sparkles, Shield, Phone, Mail, User, Info } from 'lucide-react-native';
+import { UserPlus, ChevronDown, Sparkles, Shield, Phone, Mail, User, Info, Lock } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { normalizeRole } from '../../roles';
 import { fetchApi } from '../../api/client';
@@ -19,8 +19,8 @@ import { colors, spacing, borderRadius } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
 
 const ALL_ROLES = [
+  { id: 'programmer', label: 'مبرمج عادي', icon: '💻', ownerOnly: false },
   { id: 'manager', label: 'المدير', icon: '👔', ownerOnly: true },
-  { id: 'programmer', label: 'المبرمج', icon: '💻', ownerOnly: true },
   { id: 'customer_support', label: 'خدمة العملاء', icon: '🎧', ownerOnly: false },
   { id: 'technician', label: 'فني صيانة معتمد', icon: '🔧', ownerOnly: false },
   { id: 'merchant', label: 'تاجر قطع غيار', icon: '🏪', ownerOnly: false },
@@ -31,21 +31,25 @@ export default function AdminAddUserScreen({ navigation }: any) {
   const { user: currentUser } = useAuthStore();
   const currentRole = normalizeRole(currentUser?.role || '');
   const isOwner = currentRole === 'owner';
+  const isLeadProgrammer = (currentRole === 'programmer' || currentUser?.role === 'programmer') && 
+    (currentUser?.developerRank === 'lead' || currentUser?.phone === '01064739664');
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('customer');
+  const [password, setPassword] = useState('123456');
+  const [role, setRole] = useState('programmer');
   const [showRoles, setShowRoles] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const availableRoles = ALL_ROLES.filter((r) => !r.ownerOnly || isOwner);
-  const selectedRoleObj = ALL_ROLES.find((r) => r.id === role) || availableRoles[availableRoles.length - 1];
+  const selectedRoleObj = ALL_ROLES.find((r) => r.id === role) || availableRoles[0];
 
   const handleSave = async () => {
     const cleanName = name.trim();
     const cleanPhone = phone.trim().replace(/\s+/g, '');
     const cleanEmail = email.trim();
+    const cleanPassword = password.trim() || '123456';
 
     if (!cleanName) {
       Alert.alert('تنبيه', 'يرجى كتابة اسم العضو بالكامل');
@@ -53,6 +57,10 @@ export default function AdminAddUserScreen({ navigation }: any) {
     }
     if (!cleanPhone || cleanPhone.length < 11) {
       Alert.alert('تنبيه', 'يرجى إدخال رقم هاتف صحيح (11 رقماً)');
+      return;
+    }
+    if (cleanPhone === '01064739664') {
+      Alert.alert('تنبيه', 'رقم الهاتف 01064739664 مخصص حصرياً للمسؤول التقني وقائد المبرمجين ولا يمكن تكراره.');
       return;
     }
 
@@ -65,12 +73,14 @@ export default function AdminAddUserScreen({ navigation }: any) {
           phone: cleanPhone,
           email: cleanEmail || undefined,
           role,
+          password: cleanPassword,
+          developerRank: role === 'programmer' ? 'junior' : undefined,
         },
       });
 
       Alert.alert(
         '✅ تم إضافة العضو',
-        `تم تسجيل الحساب بنجاح برتبة "${selectedRoleObj.label}". كلمة المرور الافتراضية للدخول هي (123456) ويمكن للعضو تغييرها لاحقاً.`,
+        `تم تسجيل الحساب بنجاح برتبة "${selectedRoleObj.label}". كلمة المرور الأولية المحددة هي (${cleanPassword}). سيتوجب على العضو تغيير كلمة المرور عند تسجيل الدخول لأول مرة لضمان الأمان.`,
         [{ text: 'تم', onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
@@ -186,6 +196,31 @@ export default function AdminAddUserScreen({ navigation }: any) {
                 />
                 <Mail color="#71717A" size={18} />
               </View>
+            </View>
+
+            {/* Initial Password */}
+            <View style={{ marginBottom: 20 }}>
+              <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={{ color: '#E4E4E7', fontWeight: '800', textAlign: 'right', fontSize: 13 }}>
+                  كلمة المرور الأولية للحساب <Text style={{ color: '#EF4444' }}>*</Text>
+                </Text>
+                <Text style={{ color: '#D4AF37', fontSize: 11, fontWeight: '700' }}>
+                  (سيتوجب عليه تغييرها)
+                </Text>
+              </View>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="مثال: 123456"
+                  placeholderTextColor="#71717A"
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <Lock color="#D4AF37" size={18} />
+              </View>
+              <Text style={{ color: '#A1A1AA', fontSize: 11, textAlign: 'right', marginTop: 4 }}>
+                💡 يمكنك كتابة أي كلمة مرور أولية من اختيارك، وسيقوم النظام بإجبار المستخدم على تغييرها فور تسجيل دخوله.
+              </Text>
             </View>
 
             {/* Role Dropdown */}

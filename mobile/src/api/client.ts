@@ -3,6 +3,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const CANDIDATE_BASE_URLS = [
+  'https://int-joshua-miracle-raymond.trycloudflare.com/api',
   'https://robin-highest-structure-established.trycloudflare.com/api',
   'https://timely-instructions-logical-thesis.trycloudflare.com/api',
   'https://api.tecnorexa.com/api',
@@ -14,7 +15,7 @@ export const CANDIDATE_BASE_URLS = [
 
 let activeBaseURL =
   process.env.EXPO_PUBLIC_API_URL ||
-  'https://robin-highest-structure-established.trycloudflare.com/api';
+  'https://int-joshua-miracle-raymond.trycloudflare.com/api';
 
 AsyncStorage.getItem('custom_api_url').then((saved) => {
   if (saved) activeBaseURL = saved;

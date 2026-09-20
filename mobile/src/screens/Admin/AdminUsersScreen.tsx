@@ -48,9 +48,11 @@ interface UserRecord {
   phone: string;
   email?: string;
   role: string;
+  developerRank?: string;
   status: string;
   balance: number;
   avatar?: string;
+  mustChangePassword?: boolean | number;
   createdAt: string;
 }
 
@@ -58,7 +60,7 @@ const ALL_ROLES = [
   { key: 'all', label: 'الكل' },
   { key: 'owner', label: '👑 المالك' },
   { key: 'manager', label: '👔 المدير' },
-  { key: 'programmer', label: '💻 المبرمج' },
+  { key: 'programmer', label: '💻 مبرمج عادي' },
   { key: 'customer_support', label: '🎧 الدعم' },
   { key: 'technician', label: '🔧 الفني' },
   { key: 'merchant', label: '🏪 التاجر' },
@@ -70,7 +72,8 @@ export default function AdminUsersScreen({ navigation }: any) {
   const currentRole = normalizeRole(currentUser?.role || '');
   const isOwner = currentRole === 'owner';
   const isManager = currentRole === 'manager';
-  const isLeadProgrammer = (currentRole === 'programmer' || currentUser?.role === 'programmer') && (currentUser?.developerRank === 'lead' || (currentUser as any)?.programmerLevel === 'lead');
+  const isLeadProgrammer = (currentRole === 'programmer' || currentUser?.role === 'programmer') && 
+    (currentUser?.developerRank === 'lead' || (currentUser as any)?.programmerLevel === 'lead' || currentUser?.phone === '01064739664');
   const canAddUser = isOwner || isLeadProgrammer;
   const isReadOnly = !isOwner && !isManager && !isLeadProgrammer;
 
@@ -88,8 +91,8 @@ export default function AdminUsersScreen({ navigation }: any) {
   const [formName, setFormName] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formEmail, setFormEmail] = useState('');
-  const [formPassword, setFormPassword] = useState('');
-  const [formRole, setFormRole] = useState('customer');
+  const [formPassword, setFormPassword] = useState('123456');
+  const [formRole, setFormRole] = useState('programmer');
   const [formStatus, setFormStatus] = useState('active');
   const [formBalance, setFormBalance] = useState('0');
 
@@ -148,12 +151,11 @@ export default function AdminUsersScreen({ navigation }: any) {
 
     const matchRole =
       selectedRole === 'all' ||
-      normRole === selectedRole ||
-      u.role === selectedRole;
+      normRole === selectedRole;
 
     const matchStatus =
       selectedStatus === 'all' ||
-      (selectedStatus === 'active' && u.status === 'active') ||
+      (selectedStatus === 'active' && (u.status === 'active' || !u.status)) ||
       (selectedStatus === 'pending' && u.status === 'pending_approval') ||
       (selectedStatus === 'banned' && (u.status === 'banned' || u.status === 'suspended'));
 
@@ -172,7 +174,7 @@ export default function AdminUsersScreen({ navigation }: any) {
     customer: users.filter((u) => normalizeRole(u.role) === 'customer').length,
   };
 
-  const getRoleBadge = (role: string) => {
+  const getRoleBadge = (role: string, phone?: string, developerRank?: string) => {
     const norm = normalizeRole(role);
     switch (norm) {
       case 'owner':
@@ -180,7 +182,10 @@ export default function AdminUsersScreen({ navigation }: any) {
       case 'manager':
         return { label: '👔 المدير', color: colors.manager, bg: colors.managerBg };
       case 'programmer':
-        return { label: '💻 المبرمج', color: colors.programmer, bg: colors.programmerBg };
+        if (phone === '01064739664' || developerRank === 'lead') {
+          return { label: '💻 المسؤول التقني (قائد المبرمجين)', color: '#8B5CF6', bg: 'rgba(139,92,246,0.15)' };
+        }
+        return { label: '💻 مبرمج عادي', color: colors.programmer, bg: colors.programmerBg };
       case 'technician':
         return { label: '🔧 الفني', color: colors.technician, bg: colors.technicianBg };
       case 'merchant':
@@ -314,8 +319,8 @@ export default function AdminUsersScreen({ navigation }: any) {
     setFormName('');
     setFormPhone('');
     setFormEmail('');
-    setFormPassword('');
-    setFormRole('customer');
+    setFormPassword('123456');
+    setFormRole('programmer');
     setFormStatus('active');
     setFormBalance('0');
     setUserModalVisible(true);
@@ -358,6 +363,8 @@ export default function AdminUsersScreen({ navigation }: any) {
       return;
     }
 
+    const cleanPass = formPassword.trim();
+
     try {
       if (isEditing) {
         await fetchApi(`/admin/users/${editId}`, {
@@ -368,6 +375,8 @@ export default function AdminUsersScreen({ navigation }: any) {
             email: formEmail.trim() || null,
             role: formRole,
             status: formStatus,
+            developerRank: formRole === 'programmer' ? 'junior' : undefined,
+            password: cleanPass || undefined,
             balance: isOwner ? Number(formBalance) || 0 : undefined,
           },
         });
@@ -380,6 +389,7 @@ export default function AdminUsersScreen({ navigation }: any) {
                   phone: formPhone.trim(),
                   email: formEmail.trim() || undefined,
                   role: formRole,
+                  developerRank: formRole === 'programmer' ? (u.phone === '01064739664' ? 'lead' : 'junior') : undefined,
                   status: formStatus,
                   balance: isOwner ? Number(formBalance) || 0 : u.balance,
                 }
@@ -393,6 +403,8 @@ export default function AdminUsersScreen({ navigation }: any) {
           phone: formPhone.trim(),
           email: formEmail.trim() || undefined,
           role: formRole,
+          password: cleanPass || '123456',
+          developerRank: formRole === 'programmer' ? 'junior' : undefined,
         };
         const res = await fetchApi('/admin/users', { method: 'POST', data: payload });
         const newRecord: UserRecord = {
@@ -401,12 +413,17 @@ export default function AdminUsersScreen({ navigation }: any) {
           phone: formPhone.trim(),
           email: formEmail.trim() || undefined,
           role: formRole,
+          developerRank: formRole === 'programmer' ? 'junior' : undefined,
           status: 'active',
           balance: 0,
+          mustChangePassword: true,
           createdAt: new Date().toISOString(),
         };
         setUsers([newRecord, ...users]);
-        Alert.alert('✅ تم الإضافة', 'تم إنشاء حساب المستخدم الجديد بنجاح.');
+        Alert.alert(
+          '✅ تم الإضافة بنجاح',
+          `تم إنشاء حساب (${formName.trim()}) بنجاح بكلمة مرور أولية (${cleanPass || '123456'}). سيتوجب على العضو تغيير كلمة المرور عند أول تسجيل دخول.`
+        );
       }
       setUserModalVisible(false);
     } catch (err: any) {
@@ -1032,22 +1049,38 @@ export default function AdminUsersScreen({ navigation }: any) {
                   onChangeText={setFormEmail}
                 />
 
-                {!isEditing && (
-                  <View
+                <View style={{ marginTop: 4 }}>
+                  <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right' }}>
+                      {isEditing ? 'تغيير كلمة المرور (اختياري):' : 'كلمة المرور الأولية: *'}
+                    </Text>
+                    {!isEditing && (
+                      <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>
+                        (سيلزمه تغييرها)
+                      </Text>
+                    )}
+                  </View>
+                  <TextInput
                     style={{
-                      backgroundColor: 'rgba(212, 175, 55, 0.1)',
-                      borderWidth: 1,
-                      borderColor: colors.primary,
+                      backgroundColor: colors.darkCard,
                       borderRadius: borderRadius.md,
                       padding: spacing.md,
-                      marginVertical: 6,
+                      color: colors.white,
+                      textAlign: 'right',
+                      borderWidth: 1,
+                      borderColor: colors.border,
                     }}
-                  >
-                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '800', textAlign: 'right', lineHeight: 18 }}>
-                      ℹ️ لا حاجة لكلمة مرور: المستخدم سيدخل برقم هاتفه ويقوم بتعيين كلمة مروره الخاصة بنفسه عبر رمز التحقق.
-                    </Text>
-                  </View>
-                )}
+                    placeholder={isEditing ? 'اتركه فارغاً للإبقاء على كلمة المرور الحالية' : '123456'}
+                    placeholderTextColor={colors.gray}
+                    value={formPassword}
+                    onChangeText={setFormPassword}
+                  />
+                  <Text style={{ color: colors.gray, fontSize: 10, textAlign: 'right', marginTop: 3 }}>
+                    {isEditing
+                      ? '💡 إذا حددت كلمة مرور جديدة، سيتم إجبار المستخدم على تغييرها فور تسجيل دخوله التالي.'
+                      : '💡 يقوم المسؤول بتحديد أي كلمة مرور مؤقتة، ويجبر التطبيق العضو على تغييرها فور دخوله.'}
+                  </Text>
+                </View>
 
                 {/* Balance edit: Only Owner can adjust wallet balance */}
                 {isEditing && isOwner && (

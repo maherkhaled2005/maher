@@ -269,6 +269,7 @@ export default function AppNavigator() {
   const { isAuthenticated, user, checkAuth } = useAuthStore();
   const isBanned = !!(user && (user.status === 'banned' || user.status === 'suspended'));
   const isPendingApproval = !!(user && (user.status === 'pending_approval' || ((user.role === 'technician' || user.role === 'merchant') && !user.isPro && user.status !== 'active')));
+  const mustChangePassword = !!(user && (user.mustChangePassword === true || (user as any).mustChangePassword === 1));
 
   React.useEffect(() => {
     checkAuth?.();
@@ -291,6 +292,8 @@ export default function AppNavigator() {
           <Stack.Screen name="Banned" component={BannedScreen} />
         ) : isPendingApproval ? (
           <Stack.Screen name="PendingApproval" component={PendingApprovalScreen} />
+        ) : mustChangePassword ? (
+          <Stack.Screen name="ForcedChangePassword" component={ChangePasswordScreen} />
         ) : (
           <>
             {/* Main Tab Navigator */}
