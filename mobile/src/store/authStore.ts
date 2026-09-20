@@ -58,13 +58,13 @@ interface AuthState {
 }
 
 const MOCK_USERS: Record<string, User> = {
-  owner: { id: 'mock-owner', name: 'المهندس المالك خالد محمد', email: 'owner@tecnorexa.com', phone: '01000000001', role: 'owner', status: 'active', balance: 50000, createdAt: new Date().toISOString() },
-  manager: { id: 'mock-manager', name: 'المدير التنفيذي', email: 'manager@tecnorexa.com', phone: '01000000003', role: 'manager', status: 'active', balance: 25000, createdAt: new Date().toISOString() },
-  programmer: { id: 'mock-programmer', name: 'المبرمج الرئيسي ماهر', email: 'maher@tecnorexa.com', phone: '01000000002', role: 'programmer', status: 'active', balance: 35000, createdAt: new Date().toISOString() },
-  customer_support: { id: 'mock-support', name: 'خدمة العملاء', email: 'support@tecnorexa.com', phone: '01000000004', role: 'customer_support', status: 'active', balance: 15000, createdAt: new Date().toISOString() },
-  technician: { id: 'mock-tech', name: 'الفني المعتمد', email: 'tech@tecnorexa.com', phone: '01000000005', role: 'technician', status: 'active', balance: 12000, createdAt: new Date().toISOString() },
-  merchant: { id: 'mock-merchant', name: 'التاجر المعتمد', email: 'merchant@tecnorexa.com', phone: '01000000006', role: 'merchant', status: 'active', balance: 40000, createdAt: new Date().toISOString() },
-  customer: { id: 'mock-customer', name: 'العميل المعتمد', email: 'customer@tecnorexa.com', phone: '01000000007', role: 'customer', status: 'active', balance: 5000, createdAt: new Date().toISOString() },
+  owner: { id: 'mock-owner', name: 'المهندس خالد محمد', email: 'owner@tecnorexa.com', phone: '01000000001', role: 'owner', status: 'active', balance: 0, createdAt: new Date().toISOString() },
+  manager: { id: 'mock-manager', name: 'المدير التنفيذي', email: 'manager@tecnorexa.com', phone: '01000000003', role: 'manager', status: 'active', balance: 0, createdAt: new Date().toISOString() },
+  programmer: { id: 'mock-programmer', name: 'المهندس ماهر خالد', email: 'maher@tecnorexa.com', phone: '01064739664', role: 'programmer', status: 'active', balance: 0, createdAt: new Date().toISOString() },
+  customer_support: { id: 'mock-support', name: 'فريق خدمة العملاء', email: 'support@tecnorexa.com', phone: '01000000004', role: 'customer_support', status: 'active', balance: 0, createdAt: new Date().toISOString() },
+  technician: { id: 'mock-tech', name: 'فني صيانة معتمد', email: 'tech@tecnorexa.com', phone: '01000000005', role: 'technician', status: 'active', balance: 0, createdAt: new Date().toISOString() },
+  merchant: { id: 'mock-merchant', name: 'تاجر قطع الغيار المعتمد', email: 'merchant@tecnorexa.com', phone: '01000000006', role: 'merchant', status: 'active', balance: 0, createdAt: new Date().toISOString() },
+  customer: { id: 'mock-customer', name: 'عميل المنصة المعتمد', email: 'customer@tecnorexa.com', phone: '01000000007', role: 'customer', status: 'active', balance: 0, createdAt: new Date().toISOString() },
 };
 
 const resolveMockUser = (cleanId: string): User => {
@@ -81,7 +81,7 @@ const resolveMockUser = (cleanId: string): User => {
     email: cleanId.includes('@') ? cleanId : 'user@tecnorexa.com',
     role: 'customer',
     status: 'active',
-    balance: 1000,
+    balance: 0,
     createdAt: new Date().toISOString(),
   };
 };
