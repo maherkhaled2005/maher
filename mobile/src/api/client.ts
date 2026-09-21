@@ -3,12 +3,17 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
+const PRODUCTION_API_URL = 'https://api.tecnorexa.com/api';
+
+// Do not ship a trycloudflare.com URL here. Quick Tunnels get a new hostname
+// whenever they restart, which makes an installed APK lose its backend later.
 export const CANDIDATE_BASE_URLS = [
-  'https://neighbors-pure-governor-commissioner.trycloudflare.com/api',
+  'https://function-moment-integer-pendant.trycloudflare.com/api',
+  PRODUCTION_API_URL,
+  'http://10.193.120.99:5000/api',
   'http://192.168.1.17:5000/api',
   'http://localhost:5000/api',
   'http://10.0.2.2:5000/api',
-  'https://api.tecnorexa.com/api',
 ];
 
 const getInitialBaseURL = () => {
@@ -17,14 +22,22 @@ const getInitialBaseURL = () => {
   }
   return (
     process.env.EXPO_PUBLIC_API_URL ||
-    'https://neighbors-pure-governor-commissioner.trycloudflare.com/api'
+    CANDIDATE_BASE_URLS[0]
   );
 };
 
 let activeBaseURL = getInitialBaseURL();
 
 AsyncStorage.getItem('custom_api_url').then((saved) => {
-  if (saved && Platform.OS !== 'web') activeBaseURL = saved;
+  if (!saved || Platform.OS === 'web') return;
+
+  if (saved.includes('.trycloudflare.com') && saved !== CANDIDATE_BASE_URLS[0]) {
+    AsyncStorage.removeItem('custom_api_url').catch(() => {});
+    return;
+  }
+
+  activeBaseURL = saved;
+  api.defaults.baseURL = saved;
 });
 
 export const api = axios.create({
@@ -33,6 +46,7 @@ export const api = axios.create({
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
+    'Bypass-Tunnel-Reminder': 'true',
   },
 });
 
@@ -57,6 +71,9 @@ export const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL ||
   activeBaseURL.replace(/\/api$/, '');
 
+export const getActiveSocketURL = () =>
+  (process.env.EXPO_PUBLIC_SOCKET_URL || activeBaseURL.replace(/\/api$/, ''));
+
 const GITHUB_API_URL_ENDPOINT =
   'https://raw.githubusercontent.com/maherkhaled2005/maher/main/api_url.txt';
 
@@ -72,17 +89,22 @@ export const findFastestServer = async (): Promise<string | null> => {
       timeout: 3500,
     });
     if (ghRes.data && typeof ghRes.data === 'string') {
-      let remoteUrl = ghRes.data.trim().replace(/\/+$/, '');
-      if (remoteUrl.startsWith('http')) {
-        if (!remoteUrl.endsWith('/api')) remoteUrl += '/api';
-        urlsToProbe.add(remoteUrl);
+      const lines = ghRes.data.split(/\r?\n/);
+      for (const rawLine of lines) {
+        const remoteUrl = rawLine.trim().replace(/\/+$/, '');
+        if (remoteUrl.startsWith('http')) {
+          urlsToProbe.add(remoteUrl.endsWith('/api') ? remoteUrl : `${remoteUrl}/api`);
+        }
       }
     }
   } catch {}
 
   const probePromises = Array.from(urlsToProbe).map(async (url) => {
     try {
-      const res = await axios.get(`${url}/health`, { timeout: 3500 });
+      const res = await axios.get(`${url}/health`, {
+        headers: { 'Bypass-Tunnel-Reminder': 'true' },
+        timeout: 3500,
+      });
       if (res.data?.status === 'ok') {
         return url;
       }
@@ -124,6 +146,10 @@ api.interceptors.request.use(
       if (token) {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
+        // Keep the token used by this individual request. A late 401 from a
+        // previous account must never clear the session of an account that
+        // logged in after that request was sent.
+        (config as any)._sessionToken = token;
       }
     } catch (error) {
       if (__DEV__) {
@@ -142,8 +168,11 @@ api.interceptors.response.use(
     const config = error.config;
     const status = error?.response?.status;
 
-    if (status === 401) {
-      await AsyncStorage.multiRemove(['tr_token', 'tr_user']);
+    if (status === 401 && (config as any)?._sessionToken) {
+      const currentToken = await AsyncStorage.getItem('tr_token');
+      if (currentToken === (config as any)._sessionToken) {
+        await AsyncStorage.multiRemove(['tr_token', 'tr_user']);
+      }
     }
 
     if (status === 403) {

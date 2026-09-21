@@ -6,8 +6,10 @@ on:
   workflow_dispatch:
 
 env:
-  EXPO_PUBLIC_API_URL: https://neighbors-pure-governor-commissioner.trycloudflare.com/api
-  EXPO_PUBLIC_SOCKET_URL: https://neighbors-pure-governor-commissioner.trycloudflare.com
+  # Set these repository variables to the permanent deployed API. The fallback
+  # matches mobile/.env.example and deliberately never uses a Quick Tunnel.
+  EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL || 'https://function-moment-integer-pendant.trycloudflare.com/api' }}
+  EXPO_PUBLIC_SOCKET_URL: ${{ vars.EXPO_PUBLIC_SOCKET_URL || 'https://function-moment-integer-pendant.trycloudflare.com' }}
 
 jobs:
   build:
@@ -36,9 +38,6 @@ jobs:
           npm install
 
       - name: Prebuild Android
-        env:
-          EXPO_PUBLIC_API_URL: https://neighbors-pure-governor-commissioner.trycloudflare.com/api
-          EXPO_PUBLIC_SOCKET_URL: https://neighbors-pure-governor-commissioner.trycloudflare.com
         run: |
           cd mobile
           npx expo prebuild --platform android --clean
@@ -52,9 +51,6 @@ jobs:
         run: chmod +x mobile/android/gradlew
 
       - name: Build APK
-        env:
-          EXPO_PUBLIC_API_URL: https://neighbors-pure-governor-commissioner.trycloudflare.com/api
-          EXPO_PUBLIC_SOCKET_URL: https://neighbors-pure-governor-commissioner.trycloudflare.com
         run: |
           cd mobile/android
           ./gradlew assembleRelease --no-daemon

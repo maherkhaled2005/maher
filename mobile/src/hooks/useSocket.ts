@@ -1,6 +1,6 @@
 // src/hooks/useSocket.ts
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { SOCKET_URL } from '../api/client';
+import { getActiveSocketURL } from '../api/client';
 
 export const useSocket = (userId: string | null) => {
   const socketRef = useRef<any>(null);
@@ -14,7 +14,7 @@ export const useSocket = (userId: string | null) => {
     const setup = async () => {
       try {
         const { io } = await import('socket.io-client');
-        s = io(SOCKET_URL, {
+        s = io(getActiveSocketURL(), {
           transports: ['websocket'],
           reconnection: true,
           reconnectionAttempts: 5,
