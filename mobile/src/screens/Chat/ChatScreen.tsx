@@ -10,6 +10,7 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   ChevronRight,
@@ -43,7 +44,7 @@ export default function ChatScreen({ route, navigation }: any) {
     chatId: 'default',
     userName: 'محادثة',
     isOnline: true,
-    phone: '01000000000',
+    phone: '',
   };
 
   const [message, setMessage] = useState('');
@@ -132,8 +133,14 @@ export default function ChatScreen({ route, navigation }: any) {
   };
 
   const handleCall = () => {
-    const tel = phone || '01000000000';
-    Linking.openURL(`tel:${tel}`).catch(() => {});
+    const clean = phone && phone !== '01000000000' ? String(phone).trim() : '';
+    if (!clean) {
+      Alert.alert('تنبيه', 'رقم الهاتف غير متوفر');
+      return;
+    }
+    Linking.openURL(`tel:${clean}`).catch(() => {
+      Alert.alert('تنبيه', 'تعذر إجراء المكالمة');
+    });
   };
 
   return (

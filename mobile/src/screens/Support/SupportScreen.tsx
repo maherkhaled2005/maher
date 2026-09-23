@@ -36,23 +36,38 @@ export default function SupportScreen({ navigation }: any) {
     }
     setSubmitting(true);
     try {
-      await fetchApi('/support/tickets', {
-        method: 'POST',
-        data: {
-          title: `طلب صيانة: ${device}`,
-          subject: `صيانة ${device} - ${gov}`,
-          category: device,
-          description: `${desc.trim()}\n\n📍 العنوان: ${address.trim()} (${gov})`,
-          customerPhone: phone.trim(),
-          priority: 'medium',
-        },
-      });
+      if (!user) {
+        // Guest Support Flow (No login required)
+        await fetchApi('/support/guest-ticket', {
+          method: 'POST',
+          data: {
+            name: 'عميل TecnoRexa',
+            phone: phone.trim(),
+            subject: `صيانة ${device} - ${gov}`,
+            description: `${desc.trim()}\n\n📍 العنوان: ${address.trim()} (${gov})`,
+            category: device,
+            priority: 'medium',
+          },
+        });
+      } else {
+        await fetchApi('/support/tickets', {
+          method: 'POST',
+          data: {
+            title: `طلب صيانة: ${device}`,
+            subject: `صيانة ${device} - ${gov}`,
+            category: device,
+            description: `${desc.trim()}\n\n📍 العنوان: ${address.trim()} (${gov})`,
+            customerPhone: phone.trim(),
+            priority: 'medium',
+          },
+        });
+      }
       setSuccess(true);
       setTimeout(() => {
         if (navigation?.canGoBack && navigation.canGoBack()) {
           navigation.goBack();
         } else if (navigation?.navigate) {
-          navigation.navigate('Tickets');
+          navigation.navigate(user ? 'Tickets' : 'Login');
         }
       }, 2000);
     } catch (err: any) {

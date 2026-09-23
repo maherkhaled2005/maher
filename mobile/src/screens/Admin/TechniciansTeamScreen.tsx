@@ -273,12 +273,13 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
 
   // Direct Call
   const handleCall = (phone: string) => {
-    if (!phone) {
+    const clean = phone && !phone.startsWith('01000000') ? String(phone).trim() : '';
+    if (!clean) {
       Alert.alert('تنبيه', 'رقم الهاتف غير متوفر');
       return;
     }
-    Linking.openURL(`tel:${phone}`).catch(() => {
-      Alert.alert('تنبيه', `رقم الفني: ${phone}`);
+    Linking.openURL(`tel:${clean}`).catch(() => {
+      Alert.alert('تنبيه', `رقم الفني: ${clean}`);
     });
   };
 

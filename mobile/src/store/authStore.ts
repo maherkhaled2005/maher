@@ -26,6 +26,9 @@ interface User {
   city?: string;
   area?: string;
   address?: string;
+  mustChangePassword?: boolean;
+  isAvailable?: boolean;
+  specialties?: string;
   createdAt: string;
 }
 
@@ -77,8 +80,8 @@ const resolveMockUser = (cleanId: string): User => {
   return {
     id: `user-${Date.now()}`,
     name: 'مستخدم تكنوريكسا',
-    phone: cleanId.match(/^\d+$/) ? cleanId : '01000000000',
-    email: cleanId.includes('@') ? cleanId : 'user@tecnorexa.com',
+    phone: cleanId.match(/^\d+$/) ? cleanId : '',
+    email: cleanId.includes('@') ? cleanId : '',
     role: 'customer',
     status: 'active',
     balance: 0,

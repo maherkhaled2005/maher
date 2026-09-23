@@ -43,23 +43,17 @@ export default function SystemOpsScreen({ navigation }: any) {
   const role = normalizeRole(user?.role || 'customer');
   const isLead = user?.developerRank === 'lead' || role === 'owner';
 
-  const [services, setServices] = useState<Service[]>([
-    { id: 'api', name: 'خادم التطبيق (Node.js Engine)', status: 'online', uptime: '99.98%', ping: '12ms', memory: '142 MB' },
-    { id: 'db', name: 'قاعدة البيانات المركزية (Core DB)', status: 'online', uptime: '100%', ping: '2ms', memory: '48 MB' },
-    { id: 'redis', name: 'خادم التخزين المؤقت (Fast Cache)', status: 'online', uptime: '99.9%', ping: '5ms', memory: '64 MB' },
-    { id: 'storage', name: 'خادم الوسائط والمستندات (Cloud Storage)', status: 'online', uptime: '99.85%', ping: '18ms', memory: '310 MB' },
-  ]);
-  const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [restarting, setRestarting] = useState(false);
 
   const fetchServices = async () => {
-    setLoading(true);
     try {
       const data = await fetchApi('/system/services');
-      if (data) setServices(data);
+      if (Array.isArray(data)) setServices(data);
     } catch (error) {
-      // data already exists
+      // fallback if offline
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -68,23 +62,30 @@ export default function SystemOpsScreen({ navigation }: any) {
 
   useEffect(() => {
     fetchServices();
+    const interval = setInterval(fetchServices, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleRestartService = (serviceId: string) => {
     if (!isLead) {
-      Alert.alert('غير مسموح', 'هذه الصلاحية للقائد فقط');
+      Alert.alert('غير مسموح', 'هذه الصلاحية للمبرمج الرئيسي أو المالك فقط');
       return;
     }
-    Alert.alert('إعادة تشغيل الخدمة', `هل أنت متأكد من إعادة تشغيل هذه الخدمة؟`, [
+    Alert.alert('إعادة فحص الخدمة', `هل أنت متأكد من إعادة فحص وتهيئة هذه الخدمة؟`, [
       { text: 'إلغاء', style: 'cancel' },
       {
-        text: 'إعادة تشغيل',
-        onPress: () => {
-          setServices(prev => prev.map(s => s.id === serviceId ? { ...s, status: 'degraded' } : s));
-          setTimeout(() => {
-            setServices(prev => prev.map(s => s.id === serviceId ? { ...s, status: 'online' } : s));
-            Alert.alert('تم', 'تم إعادة تشغيل الخدمة');
-          }, 2000);
+        text: 'تهيئة الخدمة',
+        onPress: async () => {
+          try {
+            await fetchApi('/system/restart-service', {
+              method: 'POST',
+              body: JSON.stringify({ serviceId }),
+            });
+            await fetchServices();
+            Alert.alert('تم بنجاح', 'تمت إعادة فحص وتهيئة الخدمة وتحديث حالتها التشغيلية.');
+          } catch (err: any) {
+            Alert.alert('خطأ', err.message || 'تعذر تهيئة الخدمة');
+          }
         },
       },
     ]);
@@ -92,15 +93,21 @@ export default function SystemOpsScreen({ navigation }: any) {
 
   const handleClearCache = () => {
     if (!isLead) {
-      Alert.alert('غير مسموح', 'هذه الصلاحية للقائد فقط');
+      Alert.alert('غير مسموح', 'هذه الصلاحية للمبرمج الرئيسي أو المالك فقط');
       return;
     }
-    Alert.alert('مسح الكاش', 'هل أنت متأكد من مسح كاش Redis؟', [
+    Alert.alert('مسح الذاكرة المؤقتة', 'هل أنت متأكد من تفريغ كاش النظام والذاكرة المؤقتة؟', [
       { text: 'إلغاء', style: 'cancel' },
       {
-        text: 'مسح',
-        onPress: () => {
-          Alert.alert('تم', 'تم مسح الكاش بنجاح');
+        text: 'مسح الكاش',
+        onPress: async () => {
+          try {
+            await fetchApi('/system/clear-cache', { method: 'POST' });
+            await fetchServices();
+            Alert.alert('تم', 'تم تفريغ الذاكرة المؤقتة بنجاح ✅');
+          } catch (err: any) {
+            Alert.alert('خطأ', err.message || 'تعذر تفريغ الكاش');
+          }
         },
       },
     ]);
@@ -108,23 +115,28 @@ export default function SystemOpsScreen({ navigation }: any) {
 
   const handleFullRestart = () => {
     if (!isLead) {
-      Alert.alert('غير مسموح', 'هذه الصلاحية للقائد فقط');
+      Alert.alert('غير مسموح', 'هذه الصلاحية للمبرمج الرئيسي أو المالك فقط');
       return;
     }
     Alert.alert(
       'تحذير أمني ⚠️',
-      'إعادة تشغيل السيرفر بالكامل ستفصل جميع الاتصالات. هل أنت متأكد؟',
+      'إعادة إشارة تشغيل الخادم ستتحقق من كافة العمليات وتحديث نبض النظام. هل أنت متأكد؟',
       [
         { text: 'تراجع', style: 'cancel' },
         {
-          text: 'إعادة تشغيل',
+          text: 'إعادة تهيئة الخادم',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             setRestarting(true);
-            setTimeout(() => {
+            try {
+              await fetchApi('/system/restart-server', { method: 'POST' });
+              await fetchServices();
+              Alert.alert('تم بنجاح', 'تم إرسال إشارة إعادة التهيئة للخادم بنجاح ✅');
+            } catch (err: any) {
+              Alert.alert('خطأ', err.message || 'تعذر إرسال الإشارة');
+            } finally {
               setRestarting(false);
-              Alert.alert('تم', 'تم إعادة تشغيل السيرفر بنجاح');
-            }, 3000);
+            }
           },
         },
       ]

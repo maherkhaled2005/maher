@@ -28,6 +28,14 @@ import {
   Globe,
   Moon,
   MapPin,
+  Trash2,
+  Store,
+  Wrench,
+  Code2,
+  Headphones,
+  Briefcase,
+  Package,
+  CheckCircle2,
 } from 'lucide-react-native';
 import { colors, spacing, borderRadius } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
@@ -78,7 +86,7 @@ const SettingsScreen = ({ navigation }: any) => {
     // General Settings
     platform_name: 'TecnoRexa',
     support_email: 'support@tecnorexa.com',
-    support_phone: '+201000000000',
+    support_phone: '+201064739664',
     maintenance_mode: false,
     allow_registrations: true,
     marketplace_enabled: true,
@@ -182,6 +190,26 @@ const SettingsScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'حذف الحساب نهائياً ⚠️',
+      'هل أنت متأكد من رغبتك في حذف حسابك نهائياً من منصة TecnoRexa؟ سيتم إزالة جميع بياناتك الشخصية ولا يمكن التراجع عن هذه الخطوة.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'نعم، حذف الحساب',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.post('/auth/delete-account').catch(() => {});
+            } catch {}
+            logout();
+          },
+        },
+      ]
+    );
+  };
+
   if (!isOwner) {
     return (
       <View style={[styles.container, { height: Platform.OS === 'web' ? ('100vh' as any) : '100%' }]}>
@@ -212,6 +240,117 @@ const SettingsScreen = ({ navigation }: any) => {
               </View>
             </View>
           </View>
+
+          {/* Role-Specific Operational Settings */}
+          {user?.role === 'technician' && (
+            <View style={[styles.card, { borderColor: '#F59E0B55', marginBottom: spacing.md }]}>
+              <View style={styles.sectionHeader}>
+                <Wrench size={18} color="#F59E0B" />
+                <Text style={styles.sectionTitle}>إعدادات الفني وطلبات الصيانة المنزلية</Text>
+              </View>
+              <View style={styles.toggleRow}>
+                <Switch
+                  value={user?.isAvailable !== false}
+                  onValueChange={async (val) => {
+                    try {
+                      await api.post('/technician/availability', { isAvailable: val }).catch(() => {});
+                    } catch {}
+                  }}
+                  trackColor={{ false: '#333', true: '#10B981' }}
+                  thumbColor={colors.white}
+                />
+                <View style={{ alignItems: 'flex-end', flex: 1, marginRight: 10 }}>
+                  <Text style={styles.toggleLabel}>حالة استقبال الطلبات (متاح للعمل)</Text>
+                  <Text style={{ color: colors.gray, fontSize: 11, marginTop: 2 }}>
+                    تفعيل استقبال إشعارات طلبات الصيانة القريبة منك في محافظتك
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.divider, { marginVertical: 10 }]} />
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.toggleLabel}>التخصصات المعتمدة (أجهزة منزلية حصراً):</Text>
+                <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '700', marginTop: 4 }}>
+                  {user?.specialties || 'ثلاجات، غسالات، بوتاجازات، تكييفات، سخانات، ميكروويف'}
+                </Text>
+                <Text style={{ color: colors.gray, fontSize: 10, marginTop: 2 }}>
+                  * نطاق صيانة الأجهزة المنزلية حصراً وفق ميثاق TecnoRexa المعتمد
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {user?.role === 'merchant' && (
+            <View style={[styles.card, { borderColor: '#10B98155', marginBottom: spacing.md }]}>
+              <View style={styles.sectionHeader}>
+                <Store size={18} color="#10B981" />
+                <Text style={styles.sectionTitle}>إعدادات المتجر والتوريد</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end', marginBottom: 8 }}>
+                <Text style={styles.toggleLabel}>اسم المتجر المعتمد:</Text>
+                <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', marginTop: 2 }}>
+                  {user?.storeName || user?.name || 'متجر قطع الغيار المعتمد'}
+                </Text>
+              </View>
+              <View style={[styles.divider, { marginVertical: 8 }]} />
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.toggleLabel}>سياسة الاستبدال والضمان:</Text>
+                <Text style={{ color: colors.gray, fontSize: 11, marginTop: 2 }}>
+                  ضمان أصالة قطع الغيار وسياسة استرجاع واستبدال خلال 14 يوماً للعيوب المصنعية
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {user?.role === 'programmer' && (
+            <View style={[styles.card, { borderColor: '#3B82F655', marginBottom: spacing.md }]}>
+              <View style={styles.sectionHeader}>
+                <Code2 size={18} color="#3B82F6" />
+                <Text style={styles.sectionTitle}>تفضيلات بيئة التطوير والأنظمة</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.toggleLabel}>الرتبة البرمجية الحالية:</Text>
+                <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+                  {user?.developerRank === 'lead' ? 'المبرمج الرئيسي (Lead Architect) 👑' : 'مهندس برمجيات وتطوير (Software Engineer) 💻'}
+                </Text>
+                <Text style={{ color: colors.gray, fontSize: 11, marginTop: 4 }}>
+                  ربط تلقائي مع سجلات تدقيق النظام وخادم العمليات وتذاكر الاقتراحات المعتمدة
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {user?.role === 'customer_support' && (
+            <View style={[styles.card, { borderColor: '#0D948855', marginBottom: spacing.md }]}>
+              <View style={styles.sectionHeader}>
+                <Headphones size={18} color="#0D9488" />
+                <Text style={styles.sectionTitle}>إعدادات ممثل خدمة العملاء</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.toggleLabel}>حالة المناوبة التشغيلية:</Text>
+                <Text style={{ color: '#0D9488', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+                  متصل ومتاح للرد على التذاكر واستفسارات المستخدمين 🎧
+                </Text>
+                <Text style={{ color: colors.gray, fontSize: 11, marginTop: 4 }}>
+                  إشعارات فورية لكل تذكرة جديدة واستفسار وارد من العملاء أو الفنيين
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {user?.role === 'manager' && (
+            <View style={[styles.card, { borderColor: '#8B5CF655', marginBottom: spacing.md }]}>
+              <View style={styles.sectionHeader}>
+                <Briefcase size={18} color="#8B5CF6" />
+                <Text style={styles.sectionTitle}>تفضيلات المدير العام والعمليات</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.toggleLabel}>صلاحيات الإشراف والاعتماد:</Text>
+                <Text style={{ color: '#8B5CF6', fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+                  مراجعة طلبات الانضمام للفنيين والتجار والرقابة التشغيلية اليومية 👔
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Section: Appearance & Language */}
           <View style={[styles.card, { marginBottom: spacing.md }]}>
@@ -419,9 +558,27 @@ const SettingsScreen = ({ navigation }: any) => {
           </View>
 
           {/* Logout */}
-          <TouchableOpacity style={[styles.logoutBtn, { marginBottom: spacing.xl }]} onPress={handleLogout}>
+          <TouchableOpacity style={[styles.logoutBtn, { marginBottom: spacing.sm }]} onPress={handleLogout}>
             <LogOut size={16} color="#EF4444" />
             <Text style={styles.logoutBtnText}>تسجيل الخروج من الحساب</Text>
+          </TouchableOpacity>
+
+          {/* Delete Account */}
+          <TouchableOpacity
+            style={[
+              styles.logoutBtn,
+              {
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                borderColor: 'rgba(239, 68, 68, 0.25)',
+                marginBottom: spacing.xl,
+              },
+            ]}
+            onPress={handleDeleteAccount}
+          >
+            <Trash2 size={16} color="#EF4444" />
+            <Text style={[styles.logoutBtnText, { color: '#EF4444' }]}>
+              حذف الحساب نهائياً (Delete Account)
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </View>

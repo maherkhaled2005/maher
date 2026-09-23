@@ -180,8 +180,14 @@ export default function TrackingScreen() {
         <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
           <TouchableOpacity 
             onPress={() => {
-              const tel = route.params?.phone || (isCustomer ? '01000000005' : '01000000007');
-              Linking.openURL(`tel:${tel}`).catch(() => {});
+              const tel = route.params?.phone && !route.params.phone.startsWith('01000000') ? String(route.params.phone).trim() : '';
+              if (!tel) {
+                Alert.alert('تنبيه', 'رقم الهاتف غير متوفر');
+                return;
+              }
+              Linking.openURL(`tel:${tel}`).catch(() => {
+                Alert.alert('تنبيه', 'تعذر إجراء المكالمة');
+              });
             }}
             style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 12, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8 }}
           >

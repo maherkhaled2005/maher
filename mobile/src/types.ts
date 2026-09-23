@@ -23,9 +23,12 @@ export interface User {
   governorate?: string;
   city?: string;
   area?: string;
-  createdAt?: string;
   signature?: string;
   isTechActive?: boolean;
+  mustChangePassword?: boolean;
+  isAvailable?: boolean;
+  specialties?: string;
+  storeName?: string;
 }
 
 export interface Product {

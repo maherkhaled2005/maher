@@ -111,8 +111,15 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
   }, [orderId]);
 
   const handleCall = (phoneNumber?: string) => {
-    const targetPhone = phoneNumber || order?.clientPhone || order?.phone || '01000000000';
-    Linking.openURL(`tel:${targetPhone}`).catch(() => {});
+    const raw = phoneNumber || order?.clientPhone || order?.phone;
+    const targetPhone = raw && raw !== '01000000000' ? String(raw).trim() : '';
+    if (!targetPhone) {
+      Alert.alert('تنبيه', 'رقم الهاتف غير متوفر');
+      return;
+    }
+    Linking.openURL(`tel:${targetPhone}`).catch(() => {
+      Alert.alert('تنبيه', 'تعذر إجراء المكالمة');
+    });
   };
 
   const handleStartChat = () => {
@@ -456,7 +463,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <Phone color={colors.primary} size={16} />
             <Text style={{ color: colors.white, fontSize: 13 }}>
-              {order?.clientPhone || order?.phone || '01000000000'}
+              {order?.clientPhone || order?.phone || 'غير مسجل'}
             </Text>
           </View>
 
@@ -494,7 +501,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
                     {order?.technicianName || 'فني معتمد من المنصة'}
                   </Text>
                   <Text style={{ color: colors.gray, fontSize: 12 }}>
-                    {order?.technicianPhone || '01000000000'}
+                    {order?.technicianPhone || 'غير متوفر'}
                   </Text>
                   {order?.technician?.rating && (
                     <Text style={{ color: colors.warning, fontSize: 12, marginTop: 2 }}>

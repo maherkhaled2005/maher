@@ -152,7 +152,7 @@ export default function OwnerHeader({
             {unreadNotifications > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
-                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  {unreadNotifications}
                 </Text>
               </View>
             )}
@@ -169,7 +169,7 @@ export default function OwnerHeader({
             {unreadMessages > 0 && (
               <View style={[styles.badge, { backgroundColor: colors.primary }]}>
                 <Text style={[styles.badgeText, { color: '#0A0A0A' }]}>
-                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                  {unreadMessages}
                 </Text>
               </View>
             )}
@@ -248,9 +248,10 @@ const styles = StyleSheet.create({
   },
   centerGroup: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     marginHorizontal: spacing.xs,
   },
   titleRow: {

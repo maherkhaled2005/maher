@@ -40,8 +40,8 @@ const TECHNICIAN_SPECIALTIES = [
 ];
 
 const PAYMENT_METHODS = [
-  { id: 'vodafone_cash', label: 'فودافون كاش', sub: '01000000000', icon: Smartphone, color: '#E60000' },
-  { id: 'instapay', label: 'إنستاباي (InstaPay)', sub: '01000000000 / tecnorexa@instapay', icon: Zap, color: '#7928CA' },
+  { id: 'vodafone_cash', label: 'فودافون كاش', sub: '01064739664', icon: Smartphone, color: '#E60000' },
+  { id: 'instapay', label: 'إنستاباي (InstaPay)', sub: '01064739664 / tecnorexa@instapay', icon: Zap, color: '#7928CA' },
   { id: 'card', label: 'بطاقة بنكية (Visa / Master)', sub: 'دفع إلكتروني فوري ومؤمن', icon: CreditCard, color: '#D4AF37' },
   { id: 'wallet', label: 'محفظة TecnoRexa', sub: 'الخصم المباشر من رصيد المحفظة', icon: DollarSign, color: '#10B981' },
 ];

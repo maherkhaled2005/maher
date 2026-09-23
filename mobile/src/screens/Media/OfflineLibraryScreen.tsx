@@ -98,11 +98,11 @@ export default function OfflineLibraryScreen({ navigation }: any) {
         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <Clock size={18} color="#F59E0B" />
           <Text style={{ color: colors.white, fontWeight: '900', fontSize: 13 }}>
-            سيتم مسح المحتوى تلقائياً بعد 48 ساعة ⏱️
+            سيتم مسح الفيديو من المكتبة خلال يومين (48 ساعة) ⏱️
           </Text>
         </View>
         <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right', lineHeight: 18 }}>
-          حفاظاً على مساحة جهازك وحماية المحتوى، تُتاح الفيديوهات للمشاهدة بدون إنترنت لمدة 48 ساعة فقط من لحظة التنزيل.
+          حفاظاً على مساحة جهازك وحماية المحتوى، سيتم مسح الفيديو من المكتبة خلال يومين تلقائياً.
         </Text>
       </View>
 

@@ -81,8 +81,8 @@ export default function App() {
   }, []);
 
   // 1. Splash Screen Animation State
-  const splashLogoScale = React.useRef(new Animated.Value(5)).current; // Start very large
-  const splashContentOpacity = React.useRef(new Animated.Value(0)).current;
+  const splashOpacity = React.useRef(new Animated.Value(0)).current;
+  const splashScale = React.useRef(new Animated.Value(0.92)).current;
 
   useEffect(() => {
     if (notification) {
@@ -91,106 +91,82 @@ export default function App() {
   }, [notification]);
 
   useEffect(() => {
-    // Safety fallback: guaranteed entry after short timeout
-    const fallbackTimer = setTimeout(() => {
-      setAppReady(true);
-    }, Platform.OS === 'web' ? 600 : 2500);
+    // Elegant, short branding animation then directly into the app
+    Animated.parallel([
+      Animated.timing(splashOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(splashScale, {
+        toValue: 1,
+        friction: 7,
+        tension: 90,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
 
-    // Run animation
-    try {
-      Animated.sequence([
-        Animated.spring(splashLogoScale, {
-          toValue: 1,
-          friction: 5,
-          tension: 80,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.timing(splashContentOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.delay(Platform.OS === 'web' ? 400 : 1500),
-      ]).start(() => {
+    const transitionTimer = setTimeout(() => {
+      Animated.timing(splashOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start(() => {
         setAppReady(true);
       });
-    } catch {
-      setAppReady(true);
-    }
+    }, Platform.OS === 'web' ? 400 : 900);
 
-    return () => clearTimeout(fallbackTimer);
+    return () => clearTimeout(transitionTimer);
   }, []);
 
   if (!appReady) {
     return (
-      <TouchableOpacity 
-        activeOpacity={1} 
-        onPress={() => setAppReady(true)}
-        style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' }}
-      >
+      <View style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' }}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
-        
-        {/* Animated Circular Image Logo */}
-        <Animated.View style={{ transform: [{ scale: splashLogoScale }], alignItems: 'center' }}>
-          <View style={{
-            width: 250,
-            height: 250,
-            borderRadius: 125,
-            backgroundColor: '#000',
-            borderWidth: 4,
-            borderColor: '#D4AF37',
-            overflow: 'hidden',
-            justifyContent: 'center',
+
+        <Animated.View
+          style={{
+            opacity: splashOpacity,
+            transform: [{ scale: splashScale }],
             alignItems: 'center',
-            shadowColor: '#D4AF37',
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.5,
-            shadowRadius: 20,
-            elevation: 15,
-          }}>
+          }}
+        >
+          {/* Official TecnoRexa Brand Logo Card */}
+          <View
+            style={{
+              width: 130,
+              height: 130,
+              borderRadius: 30,
+              backgroundColor: '#111111',
+              borderWidth: 2,
+              borderColor: '#D4AF37',
+              overflow: 'hidden',
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: '#D4AF37',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.35,
+              shadowRadius: 16,
+              elevation: 10,
+              marginBottom: 24,
+            }}
+          >
             <Image
-              source={require('./assets/splash_poster.jpg')}
+              source={require('./assets/tecnorexa_official_logo.jpg')}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
           </View>
-        </Animated.View>
 
-        <Animated.View style={{ opacity: splashContentOpacity, alignItems: 'center', marginTop: 32 }}>
-          {/* Main English Name */}
-          <Text style={{ color: '#FFFFFF', fontSize: 36, fontWeight: '900', letterSpacing: 1, marginBottom: 12 }}>
+          {/* Brand Typography */}
+          <Text style={{ color: '#FFFFFF', fontSize: 32, fontWeight: '900', letterSpacing: 1, marginBottom: 8 }}>
             Tecno<Text style={{ color: '#D4AF37' }}>Rexa</Text>
           </Text>
-          <Text style={{ color: '#94A3B8', fontSize: 18, fontWeight: '700', letterSpacing: 1 }}>
-            كل شيء في تطبيق واحد
+          <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center' }}>
+            منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
           </Text>
-
-          {/* Gold Loading Button */}
-          <TouchableOpacity 
-            onPress={() => setAppReady(true)}
-            activeOpacity={0.8}
-            style={{ 
-              marginTop: 50,
-              backgroundColor: '#D4AF37', // Gold color
-              borderRadius: 30, 
-              paddingVertical: 14, 
-              paddingHorizontal: 40,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-              shadowColor: '#D4AF37',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.4,
-              shadowRadius: 15,
-              elevation: 10,
-            }}
-          >
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800', letterSpacing: 1 }}>دخول التطبيق</Text>
-          </TouchableOpacity>
         </Animated.View>
-      </TouchableOpacity>
+      </View>
     );
   }
 

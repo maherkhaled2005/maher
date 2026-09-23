@@ -14,36 +14,9 @@ import { MapPin, ChevronRight, Save, Plus, Check } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { fetchApi } from '../../api/client';
 import { colors, spacing, borderRadius } from '../../theme';
+import { EGYPTIAN_GOVERNORATES } from '../../constants/egypt';
 
-const EGYPT_GOVERNORATES = [
-  'القاهرة',
-  'الجيزة',
-  'الإسكندرية',
-  'القليوبية',
-  'الشرقية',
-  'الدقهلية',
-  'البحيرة',
-  'المنوفية',
-  'الغربية',
-  'كفر الشيخ',
-  'الفيوم',
-  'بني سويف',
-  'المنيا',
-  'أسيوط',
-  'سوهاج',
-  'قنا',
-  'الأقصر',
-  'أسوان',
-  'بورسعيد',
-  'الإسماعيلية',
-  'السويس',
-  'دمياط',
-  'شمال سيناء',
-  'جنوب سيناء',
-  'البحر الأحمر',
-  'الوادي الجديد',
-  'مطروح',
-];
+const EGYPT_GOVERNORATES = EGYPTIAN_GOVERNORATES;
 
 export default function AddressesScreen({ navigation }: any) {
   const { user, updateUser } = useAuthStore();

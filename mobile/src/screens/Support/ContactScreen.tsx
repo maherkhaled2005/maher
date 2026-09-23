@@ -271,7 +271,7 @@ export default function ContactScreen({ navigation }: any) {
                 اتصال هاتفي
               </Text>
               <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700', marginTop: 2 }}>
-                01000000000
+                01064739664
               </Text>
             </TouchableOpacity>
 
@@ -311,9 +311,6 @@ export default function ContactScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
 
-
-
-
             <View
               style={{
                 flex: 1,
@@ -345,7 +342,7 @@ export default function ContactScreen({ navigation }: any) {
                 ساعات العمل
               </Text>
               <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700', marginTop: 2 }}>
-                24/7 على مدار الساعة
+                يومياً 9 ص - 10 م
               </Text>
             </View>
           </View>

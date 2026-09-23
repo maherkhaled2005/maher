@@ -278,14 +278,14 @@ export default function TechnicianDashboard({ navigation }: any) {
                 alignItems: 'flex-end',
               }}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: spacing.xs }}>
+              <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: spacing.xs }}>
                 <View style={{ backgroundColor: k.color + '22', padding: 6, borderRadius: borderRadius.sm }}>
                   <k.icon size={18} color={k.color} />
                 </View>
-                <Text style={{ fontSize: 10, color: k.color, fontWeight: '700' }}>{k.note}</Text>
               </View>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.white, marginBottom: 2 }}>{k.value}</Text>
-              <Text style={{ fontSize: 11, color: colors.gray, fontWeight: '600' }}>{k.label}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.white, marginBottom: 2, textAlign: 'right' }}>{k.value}</Text>
+              <Text style={{ fontSize: 11, color: colors.gray, fontWeight: '600', textAlign: 'right', marginBottom: 2 }}>{k.label}</Text>
+              <Text style={{ fontSize: 10, color: k.color, fontWeight: '700', textAlign: 'right' }} numberOfLines={2}>{k.note}</Text>
             </View>
           ))}
         </View>

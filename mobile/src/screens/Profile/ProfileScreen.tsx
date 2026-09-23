@@ -551,13 +551,13 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={{ color: colors.gray, fontSize: 12 }}>
-                  {user?.phone || '01000000000'}
+                  {user?.phone || 'غير محدد'}
                 </Text>
                 <Phone size={13} color={colors.gray} />
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={{ color: colors.gray, fontSize: 12 }}>
-                  {user?.email || 'user@tecnorexa.com'}
+                  {user?.email || 'غير محدد'}
                 </Text>
                 <Mail size={13} color={colors.gray} />
               </View>

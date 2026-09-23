@@ -26,9 +26,9 @@ export default function BannedScreen() {
   };
 
   const handleContactSupport = () => {
-    Linking.openURL('tel:01000000004').catch(() => {
+    Linking.openURL('tel:01064739664').catch(() => {
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.open('https://wa.me/20100000004', '_blank');
+        window.open('https://wa.me/201064739664', '_blank');
       }
     });
   };

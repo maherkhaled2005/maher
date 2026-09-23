@@ -72,7 +72,7 @@ export default function AIChatScreen({ navigation }: any) {
     {
       id: 'welcome',
       role: 'ai',
-      text: 'مرحباً بك في المساعد الذكي لمنصة TecnoRexa 🤖✨\n\nأنا هنا لمساعدتك في تشخيص أعطال الأجهزة المنزلية (تكييف، غسالة، ثلاجة، شاشة، سخان، بوتاجاز...)، تقديم خطوات فحص الأمان الأولية، وتوجيهك لأفضل فني معتمد.',
+      text: 'مرحباً بك في المساعد الذكي لمنصة TecnoRexa 🤖✨\n\nأنا هنا لمساعدتك في تشخيص أعطال الأجهزة المنزلية (تكييف، غسالة، ثلاجة، شاشة، سخان، بوتاجاز...)، تقديم خطوات فحص الأمان الأولية، واستكشاف وحل الأعطال الفنية بدقة.',
       timestamp: new Date(),
     },
   ]);
@@ -217,7 +217,7 @@ export default function AIChatScreen({ navigation }: any) {
         {
           id: `ai-${Date.now()}`,
           role: 'ai',
-          text: err.message || 'تعذر الاتصال بخادم الذكاء الاصطناعي. يرجى التحقق من اتصال الإنترنت، أو حجز فني صيانة معتمد للسلامة.',
+          text: err.message || 'تعذر الاتصال بخادم الذكاء الاصطناعي. يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.',
           specialty: fallbackSpecialty,
           timestamp: new Date(),
         },
@@ -239,9 +239,6 @@ export default function AIChatScreen({ navigation }: any) {
     return 'all';
   };
 
-  const handleBookTechnician = (specialty?: string) => {
-    navigation.navigate('TechniciansTeam', { specialty: specialty || 'all' });
-  };
 
   return (
     <SafeAreaView
@@ -356,23 +353,7 @@ export default function AIChatScreen({ navigation }: any) {
                   </Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity
-                onPress={() => handleBookTechnician('all')}
-                style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  borderRadius: borderRadius.md,
-                  backgroundColor: 'rgba(212, 175, 55, 0.15)',
-                  borderWidth: 1,
-                  borderColor: colors.primary,
-                  flexDirection: 'row-reverse',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <Wrench size={13} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>اطلب فني</Text>
-              </TouchableOpacity>
+
             </View>
           )}
         </View>
@@ -560,37 +541,7 @@ export default function AIChatScreen({ navigation }: any) {
                       {item.text}
                     </Text>
 
-                    {/* Book Maintenance CTA directly on AI diagnosis (Non-technicians only) */}
-                    {isAi && item.id !== 'welcome' && currentRole !== 'technician' && (
-                      <View
-                        style={{
-                          marginTop: spacing.sm,
-                          paddingTop: spacing.xs,
-                          borderTopWidth: 1,
-                          borderColor: '#222',
-                        }}
-                      >
-                        <TouchableOpacity
-                          onPress={() => handleBookTechnician(item.specialty)}
-                          style={{
-                            backgroundColor: colors.primary,
-                            paddingVertical: 8,
-                            paddingHorizontal: 12,
-                            borderRadius: borderRadius.md,
-                            flexDirection: 'row-reverse',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 6,
-                            marginTop: 4,
-                          }}
-                        >
-                          <Wrench size={13} color="#0A0A0A" />
-                          <Text style={{ color: '#0A0A0A', fontSize: 12, fontWeight: '900' }}>
-                            طلب فني صيانة متخصص ({item.specialty || 'صيانة منزلية'})
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
+
 
                     {/* Technician view: search spare parts or contact customer support (NEVER request technician) */}
                     {isAi && item.id !== 'welcome' && currentRole === 'technician' && (
@@ -911,7 +862,7 @@ export default function AIChatScreen({ navigation }: any) {
                     تحويل فودافون كاش أو إنستاباي
                   </Text>
                   <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 2 }}>
-                    تحويل إلى محفظة المنصة 01000000000 وتأكيد الطلب
+                    تحويل إلى محفظة المنصة 01064739664 وتأكيد الطلب
                   </Text>
                 </View>
                 <View style={{ backgroundColor: 'rgba(230,0,0,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#E60000' }}>
@@ -926,7 +877,7 @@ export default function AIChatScreen({ navigation }: any) {
                 بيانات التحويل الرسمي:
               </Text>
               <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '900', textAlign: 'right' }}>
-                رقم المحفظة / إنستاباي: 01000000000
+                رقم المحفظة / إنستاباي: 01064739664
               </Text>
               <Text style={{ color: '#71717A', fontSize: 10, textAlign: 'right', marginTop: 2 }}>
                 * الذكاء الاصطناعي خدمة سحابية متصلة بالإنترنت حصراً وغير متوفرة أوفلاين
