@@ -1104,33 +1104,22 @@ async function runMigrations() {
   } catch {}
   console.log("✅ [SEED] Home appliance specialties enforced (strictly home appliances only)");
 
-  // Seed default 7 official role accounts if not present
+  // Seed essential administrative accounts if not present
   const coreUsers = [
-    { id: 'owner_master', name: 'المهندس خالد محمد', phone: '01000000001', role: 'owner', email: 'owner@tecnorexa.com', pass: 'Owner@123456', specialty: 'المالك والمشرف العام', developerRank: 'none' },
+    { id: 'owner_master', name: 'المهندس خالد محمد (المالك)', phone: '01011112222', role: 'owner', email: 'owner@tecnorexa.com', pass: 'Owner@123456', specialty: 'المالك والمشرف العام', developerRank: 'none' },
     { id: 'programmer_lead', name: 'المهندس ماهر خالد', phone: '01064739664', role: 'programmer', email: 'maher@tecnorexa.com', pass: 'Maher@123456', specialty: 'المسؤول التقني وقائد التطوير', developerRank: 'lead' },
-    { id: 'programmer_assistant', name: 'المبرمج المساعد', phone: '01000000008', role: 'programmer', email: 'assistant@tecnorexa.com', pass: 'Assistant@123456', specialty: 'مشرف المطورين والإصلاح السريع', developerRank: 'assistant' },
-    { id: 'programmer_junior', name: 'المبرمج العادي', phone: '01000000009', role: 'programmer', email: 'dev@tecnorexa.com', pass: 'Dev@123456', specialty: 'مطور تنفيذ المهام البرمجية', developerRank: 'junior' },
-    { id: 'manager_lead', name: 'المدير التنفيذي', phone: '01000000003', role: 'manager', email: 'manager@tecnorexa.com', pass: 'Manager@123456', specialty: 'الإدارة والتشغيل', developerRank: 'none' },
-    { id: 'support_lead', name: 'فريق خدمة العملاء', phone: '01000000004', role: 'customer_support', email: 'support@tecnorexa.com', pass: 'Support@123456', specialty: 'الدعم الفني وخدمة العملاء', developerRank: 'none' },
-    { id: 'tech_lead', name: 'فني صيانة معتمد', phone: '01000000005', role: 'technician', email: 'tech@tecnorexa.com', pass: 'Tech@123456', specialty: 'تكييف وتبريد ❄️', isPro: 1, developerRank: 'none' },
-    { id: 'merchant_lead', name: 'تاجر قطع الغيار المعتمد', phone: '01000000006', role: 'merchant', email: 'merchant@tecnorexa.com', pass: 'Merchant@123456', specialty: 'متجر ريكسا الهندسي', developerRank: 'none' },
-    { id: 'customer_lead', name: 'عميل المنصة المعتمد', phone: '01000000007', role: 'customer', email: 'customer@tecnorexa.com', pass: 'Customer@123456', specialty: 'عميل مميز', developerRank: 'none' },
   ];
 
   for (const cu of coreUsers) {
-    const existing = await db.prepare("SELECT * FROM users WHERE id = ?").get(cu.id) as any;
+    const existing = await db.prepare("SELECT * FROM users WHERE id = ? OR phone = ?").get(cu.id, cu.phone) as any;
     if (!existing) {
       const hash = bcrypt.hashSync(cu.pass, 10);
       db.prepare(`
         INSERT INTO users (id, name, phone, email, role, developerRank, password, status, verified, balance, specialty, isPro, createdAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, 0, ?, ?, datetime('now'))
       `).run(cu.id, cu.name, cu.phone, cu.email, cu.role, cu.developerRank || 'none', hash, cu.specialty || '', cu.isPro ? 1 : 0);
-    } else if (cu.id === 'programmer_lead') {
-      await db.prepare("UPDATE users SET phone = ?, developerRank = 'lead', programmerLevel = 'lead' WHERE id = ?").run('01064739664', cu.id);
-    } else if (cu.id === 'programmer_assistant') {
-      await db.prepare("UPDATE users SET developerRank = 'assistant' WHERE id = ?").run(cu.id);
-    } else if (cu.id === 'programmer_junior') {
-      await db.prepare("UPDATE users SET developerRank = 'junior' WHERE id = ?").run(cu.id);
+    } else if (cu.role === 'programmer') {
+      await db.prepare("UPDATE users SET phone = ?, developerRank = 'lead', programmerLevel = 'lead', role = 'programmer', name = ? WHERE id = ?").run('01064739664', cu.name, existing.id);
     }
   }
 }
