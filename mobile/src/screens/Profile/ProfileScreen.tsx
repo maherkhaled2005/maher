@@ -563,6 +563,38 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
             </View>
 
+            {/* Technician Specialties Badges */}
+            {user?.specialty ? (
+              <View style={{ marginTop: spacing.sm, alignItems: 'center', paddingHorizontal: spacing.md }}>
+                <Text style={{ color: colors.gray, fontSize: 11, marginBottom: 6, fontWeight: '700' }}>
+                  التخصصات المعتمدة (3 تخصصات):
+                </Text>
+                <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                  {String(user.specialty)
+                    .split(/[,،]/)
+                    .map((s: string) => s.trim())
+                    .filter(Boolean)
+                    .map((spec: string, idx: number) => (
+                      <View
+                        key={idx}
+                        style={{
+                          backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                          borderColor: colors.primary,
+                          borderWidth: 1,
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          borderRadius: 12,
+                        }}
+                      >
+                        <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '800' }}>
+                          🔧 {spec}
+                        </Text>
+                      </View>
+                    ))}
+                </View>
+              </View>
+            ) : null}
+
             {/* Quick Action Buttons */}
             <View
               style={{

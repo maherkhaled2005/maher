@@ -147,8 +147,8 @@ export default function LoginScreen({ navigation }: any) {
                   borderRadius: borderRadius.lg,
                   paddingHorizontal: spacing.md,
                   height: 54,
-                  ...(Platform.OS === 'web' ? { cursor: 'text' } : {}),
-                }}
+                  ...(Platform.OS === 'web' ? ({ cursor: 'text' } as any) : {}),
+                } as any}
               >
                 <TextInput
                   ref={phoneInputRef}
@@ -191,8 +191,8 @@ export default function LoginScreen({ navigation }: any) {
                   borderRadius: borderRadius.lg,
                   paddingHorizontal: spacing.md,
                   height: 54,
-                  ...(Platform.OS === 'web' ? { cursor: 'text' } : {}),
-                }}
+                  ...(Platform.OS === 'web' ? ({ cursor: 'text' } as any) : {}),
+                } as any}
               >
                 <TouchableOpacity
                   onPress={() => setShowPass(!showPass)}

@@ -355,9 +355,34 @@ export default function ManagerDashboard({ navigation }: any) {
                       📞 هاتف: {upg.userPhone || upg.senderPhone || upg.phone || 'مسجل'} | الرسوم: {upg.fee || 300} ج.م
                     </Text>
                     {upg.specialty && (
-                      <Text style={[styles.pendingItemSub, { color: colors.gray }]}>
-                        التخصص: {upg.specialty}
-                      </Text>
+                      <View style={{ marginTop: 4 }}>
+                        <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right', marginBottom: 2 }}>
+                          التخصصات الـ 3 المعتمدة:
+                        </Text>
+                        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 4 }}>
+                          {String(upg.specialty)
+                            .split(/[,،]/)
+                            .map((s: string) => s.trim())
+                            .filter(Boolean)
+                            .map((spec: string, idx: number) => (
+                              <View
+                                key={idx}
+                                style={{
+                                  backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                                  borderColor: colors.primary,
+                                  borderWidth: 1,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  borderRadius: 8,
+                                }}
+                              >
+                                <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
+                                  🔧 {spec}
+                                </Text>
+                              </View>
+                            ))}
+                        </View>
+                      </View>
                     )}
                   </View>
                   <View style={{ flexDirection: 'row-reverse', gap: 6, alignItems: 'center' }}>

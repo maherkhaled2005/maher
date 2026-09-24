@@ -538,8 +538,33 @@ export default function OwnerDashboard({ navigation }: any) {
                   </View>
 
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13 }}>#{t.rank} {t.name}</Text>
-                    <Text style={{ color: colors.gray, fontSize: 11 }}>{t.specialty}</Text>
+                    {t.specialty ? (
+                      <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                        {String(t.specialty)
+                          .split(/[,،]/)
+                          .map((s: string) => s.trim())
+                          .filter(Boolean)
+                          .map((spec: string, sIdx: number) => (
+                            <View
+                              key={sIdx}
+                              style={{
+                                backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                                borderColor: colors.primary,
+                                borderWidth: 0.5,
+                                paddingHorizontal: 6,
+                                paddingVertical: 1,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
+                                🔧 {spec}
+                              </Text>
+                            </View>
+                          ))}
+                      </View>
+                    ) : (
+                      <Text style={{ color: colors.gray, fontSize: 11 }}>صيانة منزلية</Text>
+                    )}
                   </View>
                 </View>
               ))

@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Linking,
+  Image,
 } from 'react-native';
 import {
   Search,
@@ -657,12 +658,33 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
                 }}
               >
                 <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ color: colors.white, fontSize: 16, fontWeight: 'bold' }}>{item.name}</Text>
-                    <Text style={{ color: colors.primary, fontSize: 12 }}>
-                      التخصص المطلوب: {item.specialty || 'صيانة عامة'}
-                    </Text>
-                  </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: colors.white, fontSize: 16, fontWeight: 'bold' }}>{item.name}</Text>
+                      <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                        <Text style={{ color: colors.gray, fontSize: 11 }}>التخصصات الـ 3:</Text>
+                        {String(item.specialty || 'صيانة أجهزة منزلية')
+                          .split(/[,،]/)
+                          .map((s: string) => s.trim())
+                          .filter(Boolean)
+                          .map((spec: string, sIdx: number) => (
+                            <View
+                              key={sIdx}
+                              style={{
+                                backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                                borderColor: colors.primary,
+                                borderWidth: 0.5,
+                                paddingHorizontal: 6,
+                                paddingVertical: 1,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
+                                🔧 {spec}
+                              </Text>
+                            </View>
+                          ))}
+                      </View>
+                    </View>
                   <View
                     style={{
                       backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -788,27 +810,36 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
                           overflow: 'hidden',
                         }}
                       >
-                        {tech.avatar && (tech.avatar.startsWith('http') || tech.avatar.startsWith('data:') || tech.avatar.startsWith('/')) ? (
-                          <Image source={{ uri: tech.avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                        {(item as any).avatar && ((item as any).avatar.startsWith('http') || (item as any).avatar.startsWith('data:') || (item as any).avatar.startsWith('/')) ? (
+                          <Image source={{ uri: (item as any).avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                         ) : (
                           <Text style={{ fontSize: 20 }}>🔧</Text>
                         )}
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ color: colors.white, fontSize: 15, fontWeight: 'bold' }}>{item.name}</Text>
-                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                          <View
-                            style={{
-                              backgroundColor: 'rgba(212, 175, 55, 0.15)',
-                              paddingHorizontal: 8,
-                              paddingVertical: 2,
-                              borderRadius: 8,
-                            }}
-                          >
-                            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>
-                              {item.specialty || 'صيانة عامة'}
-                            </Text>
-                          </View>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                          {String(item.specialty || 'صيانة عامة')
+                            .split(/[,،]/)
+                            .map((s: string) => s.trim())
+                            .filter(Boolean)
+                            .map((spec: string, sIdx: number) => (
+                              <View
+                                key={sIdx}
+                                style={{
+                                  backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                                  borderColor: colors.primary,
+                                  borderWidth: 0.5,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 1,
+                                  borderRadius: 8,
+                                }}
+                              >
+                                <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
+                                  🔧 {spec}
+                                </Text>
+                              </View>
+                            ))}
                           {item.city && (
                             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 2 }}>
                               <MapPin size={10} color={colors.gray} />
@@ -1215,9 +1246,30 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
                   <Text style={{ color: colors.white, fontSize: 14, fontWeight: 'bold' }}>
                     الفني: {bookingTech?.name}
                   </Text>
-                  <Text style={{ color: colors.primary, fontSize: 12 }}>
-                    التخصص: {bookingTech?.specialty || 'صيانة عامة'}
-                  </Text>
+                  <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                    <Text style={{ color: colors.gray, fontSize: 11 }}>التخصصات الـ 3:</Text>
+                    {String(bookingTech?.specialty || 'صيانة منزلية')
+                      .split(/[,،]/)
+                      .map((s: string) => s.trim())
+                      .filter(Boolean)
+                      .map((spec: string, sIdx: number) => (
+                        <View
+                          key={sIdx}
+                          style={{
+                            backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                            borderColor: colors.primary,
+                            borderWidth: 0.5,
+                            paddingHorizontal: 6,
+                            paddingVertical: 1,
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
+                            🔧 {spec}
+                          </Text>
+                        </View>
+                      ))}
+                  </View>
                 </View>
                 <View
                   style={{

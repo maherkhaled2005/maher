@@ -21,11 +21,45 @@ import {
   FileText,
   Camera,
   CheckCircle2,
+  Wrench,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
+
+const TECH_SPECIALTIES_30 = [
+  'ثلاجة',
+  'ديب فريزر',
+  'غسالة ملابس',
+  'غسالة أطباق',
+  'ميكروويف',
+  'بوتجاز',
+  'فرن كهربائي',
+  'فرن غاز',
+  'تكييف منزلي',
+  'شفاط مطبخ',
+  'سخان مياه',
+  'خلاط',
+  'عجان',
+  'كبة',
+  'محضرة طعام',
+  'عصارة',
+  'خلاط يدوي',
+  'مكنسة كهربائية',
+  'مكواة',
+  'مروحة',
+  'مروحة سقف',
+  'غلاية مياه',
+  'ماكينة قهوة',
+  'ماكينة تحضير الشاي',
+  'مقلاة هوائية',
+  'محضرة قهوة',
+  'مكنسة روبوت',
+  'مجفف ملابس',
+  'شفاط حمام',
+  'صانعة ساندوتشات',
+];
 
 export default function EditProfileScreen({ navigation }: any) {
   const { user, updateUser } = useAuthStore();
@@ -37,6 +71,29 @@ export default function EditProfileScreen({ navigation }: any) {
     bio: user?.bio || '',
     avatar: user?.avatar || '',
   });
+
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>(() => {
+    if (user?.specialty) {
+      return user.specialty.split(/[,،]/).map((s: string) => s.trim()).filter(Boolean).slice(0, 3);
+    }
+    return ['ثلاجة', 'غسالة ملابس', 'تكييف منزلي'];
+  });
+
+  const toggleSpecialty = (spec: string) => {
+    if (selectedSpecialties.includes(spec)) {
+      if (selectedSpecialties.length === 1) {
+        Alert.alert('تنبيه', 'يجب اختيار 3 تخصصات صيانة.');
+        return;
+      }
+      setSelectedSpecialties(selectedSpecialties.filter((s) => s !== spec));
+    } else {
+      if (selectedSpecialties.length >= 3) {
+        Alert.alert('الحد الأقصى', 'يرجى اختيار 3 تخصصات صيانة فقط. قم بإلغاء تحديد أحدها لاختيار تخصص بديل.');
+        return;
+      }
+      setSelectedSpecialties([...selectedSpecialties, spec]);
+    }
+  };
 
   const [loading, setLoading] = useState(false);
 
@@ -101,6 +158,13 @@ export default function EditProfileScreen({ navigation }: any) {
       return;
     }
 
+    if (user?.role === 'technician') {
+      if (selectedSpecialties.length !== 3) {
+        Alert.alert('تنبيه', `يرجى اختيار 3 تخصصات صيانة بالضبط (تم اختيار ${selectedSpecialties.length} من 3) ⚠️`);
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       await api.put('/user/profile', {
@@ -111,6 +175,12 @@ export default function EditProfileScreen({ navigation }: any) {
         avatar: form.avatar.trim(),
       });
 
+      if (user?.role === 'technician') {
+        await api.put('/technician/specialties', {
+          specialties: selectedSpecialties,
+        }).catch(() => {});
+      }
+
       if (user) {
         updateUser({
           ...user,
@@ -119,6 +189,7 @@ export default function EditProfileScreen({ navigation }: any) {
           email: form.email.trim(),
           bio: form.bio.trim(),
           avatar: form.avatar.trim() || user.avatar,
+          specialty: user?.role === 'technician' ? selectedSpecialties.join('، ') : user.specialty,
         });
       }
 
@@ -465,6 +536,77 @@ export default function EditProfileScreen({ navigation }: any) {
                 placeholderTextColor="#666"
               />
             </View>
+
+            {/* Technician 3 Specialties (For Technicians) */}
+            {user?.role === 'technician' && (
+              <View style={{ marginTop: 6, marginBottom: 8 }}>
+                <View
+                  style={{
+                    flexDirection: 'row-reverse',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 8,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                    <Wrench size={16} color={colors.primary} />
+                    <Text style={{ color: colors.white, fontWeight: '800', fontSize: 14 }}>
+                      تخصصات الصيانة المعتمدة (3 تخصصات)
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: selectedSpecialties.length === 3 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(212, 175, 55, 0.2)',
+                      borderColor: selectedSpecialties.length === 3 ? '#10B981' : '#D4AF37',
+                      borderWidth: 1,
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: selectedSpecialties.length === 3 ? '#10B981' : '#D4AF37',
+                        fontSize: 11,
+                        fontWeight: '800',
+                      }}
+                    >
+                      تم اختيار {selectedSpecialties.length} من 3
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
+                  {TECH_SPECIALTIES_30.map((spec) => {
+                    const isChecked = selectedSpecialties.includes(spec);
+                    return (
+                      <TouchableOpacity
+                        key={spec}
+                        onPress={() => toggleSpecialty(spec)}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: borderRadius.md,
+                          backgroundColor: isChecked ? colors.primary : '#1A1A1A',
+                          borderWidth: 1,
+                          borderColor: isChecked ? colors.primary : '#333',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: isChecked ? '#0A0A0A' : colors.white,
+                            fontSize: 12,
+                            fontWeight: isChecked ? '900' : '600',
+                          }}
+                        >
+                          {isChecked ? `✓ ${spec}` : spec}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             {/* Bio */}
             <View>

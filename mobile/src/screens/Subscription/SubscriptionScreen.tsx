@@ -77,9 +77,31 @@ export default function SubscriptionScreen({ route, navigation }: any) {
   const initialTab = route?.params?.plan === 'merchant' ? 'merchant' : 'technician';
   const [activeTab, setActiveTab] = useState<'technician' | 'merchant'>(initialTab);
 
-  // Technician state
-  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ثلاجة');
-  const [customSpecialty, setCustomSpecialty] = useState('');
+  // Technician state - exactly 3 specialties
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([
+    'ثلاجة',
+    'غسالة ملابس',
+    'تكييف منزلي',
+  ]);
+
+  const toggleSpecialty = (spec: string) => {
+    if (selectedSpecialties.includes(spec)) {
+      if (selectedSpecialties.length === 1) {
+        Alert.alert('تنبيه', 'يجب تحديد 3 تخصصات صيانة.');
+        return;
+      }
+      setSelectedSpecialties(selectedSpecialties.filter((s) => s !== spec));
+    } else {
+      if (selectedSpecialties.length >= 3) {
+        Alert.alert(
+          'الحد الأقصى للتخصصات',
+          'يمكنك اختيار 3 تخصصات صيانة فقط. قم بإلغاء تحديد أحد التخصصات لتتمكن من اختيار تخصص بديل.'
+        );
+        return;
+      }
+      setSelectedSpecialties([...selectedSpecialties, spec]);
+    }
+  };
 
   // Merchant state
   const [storeName, setStoreName] = useState('');
@@ -111,18 +133,13 @@ export default function SubscriptionScreen({ route, navigation }: any) {
   const price = isTech ? 300 : 100;
   const planTitle = isTech ? 'ترقية فني معتمد' : 'ترقية تاجر معتمد';
 
-  const effectiveSpecialty =
-    selectedSpecialty === '💡 أخرى' && customSpecialty.trim()
-      ? customSpecialty.trim()
-      : selectedSpecialty;
-
   const handleContinueAsCustomer = () => {
     navigation.navigate('Main', { screen: 'Home' });
   };
 
   const handleOpenPaymentConfirm = () => {
-    if (isTech && selectedSpecialty === '💡 أخرى' && !customSpecialty.trim()) {
-      Alert.alert('تنبيه', 'يرجى كتابة التخصص في الحقل المخصص.');
+    if (isTech && selectedSpecialties.length !== 3) {
+      Alert.alert('تنبيه', `يرجى اختيار 3 تخصصات صيانة بالضبط (تم اختيار ${selectedSpecialties.length} من 3).`);
       return;
     }
     if (!isTech && !storeName.trim()) {
@@ -144,7 +161,7 @@ export default function SubscriptionScreen({ route, navigation }: any) {
         planId: isTech ? 'technician' : 'merchant',
         amount: price,
         paymentMethod: selectedPayment,
-        specialty: isTech ? effectiveSpecialty : undefined,
+        specialty: isTech ? selectedSpecialties.join('، ') : undefined,
         storeName: !isTech ? storeName.trim() : undefined,
         senderPhone: senderPhone.trim() || undefined,
         receiptImage: receiptImage || undefined,
@@ -370,17 +387,39 @@ export default function SubscriptionScreen({ route, navigation }: any) {
         {/* 1. If Technician: Specialties Grid */}
         {isTech && (
           <View style={{ marginBottom: spacing.md }}>
-            <Text style={{ color: colors.white, fontSize: 14, fontWeight: 'bold', marginBottom: 8, textAlign: 'right' }}>
-              اختر تخصصك الأساسي في الصيانة: *
-            </Text>
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: colors.white, fontSize: 14, fontWeight: 'bold', textAlign: 'right' }}>
+                تخصصات الصيانة التي تتقنها: *
+              </Text>
+              <View
+                style={{
+                  backgroundColor: selectedSpecialties.length === 3 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(212, 175, 55, 0.2)',
+                  borderColor: selectedSpecialties.length === 3 ? '#10B981' : '#D4AF37',
+                  borderWidth: 1,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 12,
+                }}
+              >
+                <Text
+                  style={{
+                    color: selectedSpecialties.length === 3 ? '#10B981' : '#D4AF37',
+                    fontSize: 11,
+                    fontWeight: '800',
+                  }}
+                >
+                  تم اختيار {selectedSpecialties.length} من 3
+                </Text>
+              </View>
+            </View>
 
             <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
               {TECHNICIAN_SPECIALTIES.map((spec) => {
-                const isSelected = selectedSpecialty === spec;
+                const isSelected = selectedSpecialties.includes(spec);
                 return (
                   <TouchableOpacity
                     key={spec}
-                    onPress={() => setSelectedSpecialty(spec)}
+                    onPress={() => toggleSpecialty(spec)}
                     style={{
                       paddingHorizontal: 12,
                       paddingVertical: 8,
@@ -397,31 +436,12 @@ export default function SubscriptionScreen({ route, navigation }: any) {
                         fontWeight: isSelected ? '900' : '600',
                       }}
                     >
-                      {spec}
+                      {isSelected ? `✓ ${spec}` : spec}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-
-            {selectedSpecialty === '💡 أخرى' && (
-              <TextInput
-                style={{
-                  backgroundColor: '#1E1E1E',
-                  borderWidth: 1,
-                  borderColor: colors.primary,
-                  borderRadius: borderRadius.md,
-                  padding: 10,
-                  color: colors.white,
-                  textAlign: 'right',
-                  marginTop: 8,
-                }}
-                placeholder="اكتب تخصصك الفني بالتفصيل..."
-                placeholderTextColor={colors.gray}
-                value={customSpecialty}
-                onChangeText={setCustomSpecialty}
-              />
-            )}
           </View>
         )}
 
@@ -702,10 +722,10 @@ export default function SubscriptionScreen({ route, navigation }: any) {
               </View>
 
               {isTech ? (
-                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
-                  <Text style={{ color: colors.gray, fontSize: 12 }}>التخصص المختار:</Text>
-                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: 'bold' }}>
-                    {effectiveSpecialty}
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: colors.gray, fontSize: 12 }}>التخصصات الـ 3:</Text>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: 'bold', maxWidth: '70%', textAlign: 'left' }}>
+                    {selectedSpecialties.join('، ')}
                   </Text>
                 </View>
               ) : (

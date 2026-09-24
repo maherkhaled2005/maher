@@ -42,7 +42,7 @@ const CATEGORIES = [
 
 export default function MyProductsScreen({ navigation }: any) {
   const { user } = useAuthStore();
-  const isMerchant = user?.role === 'merchant' || (user as any)?.canSell || user?.isPro;
+  const isMerchant = user?.role === 'merchant' || Boolean((user as any)?.canSell);
   const [isSubscribed, setIsSubscribed] = useState(isMerchant);
   const [activating, setActivating] = useState(false);
   const [search, setSearch] = useState('');

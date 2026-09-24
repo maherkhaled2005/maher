@@ -14,6 +14,7 @@ import {
   RefreshControl,
   Linking,
   Share,
+  Image,
 } from 'react-native';
 import {
   Search,

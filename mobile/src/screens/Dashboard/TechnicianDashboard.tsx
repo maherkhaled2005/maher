@@ -11,6 +11,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   AppState,
+  Modal,
 } from 'react-native';
 import {
   Wrench,
@@ -34,12 +35,37 @@ import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
 import OwnerHeader from '../../components/OwnerHeader';
 
-const SPECIALTIES = [
-  { id: 'washer', label: 'غسالات ملابس وأطباق', icon: '🧺' },
-  { id: 'fridge', label: 'ثلاجات وديب فريزر', icon: '🧊' },
-  { id: 'cooker', label: 'بوتاجازات وأفران', icon: '🔥' },
-  { id: 'microwave', label: 'ميكروويف وأجهزة طهي', icon: '♨️' },
-  { id: 'ac', label: 'تكييفات وتبريد', icon: '❄️' },
+const ALL_TECH_SPECIALTIES = [
+  'ثلاجة',
+  'ديب فريزر',
+  'غسالة ملابس',
+  'غسالة أطباق',
+  'ميكروويف',
+  'بوتجاز',
+  'فرن كهربائي',
+  'فرن غاز',
+  'تكييف منزلي',
+  'شفاط مطبخ',
+  'سخان مياه',
+  'خلاط',
+  'عجان',
+  'كبة',
+  'محضرة طعام',
+  'عصارة',
+  'خلاط يدوي',
+  'مكنسة كهربائية',
+  'مكواة',
+  'مروحة',
+  'مروحة سقف',
+  'غلاية مياه',
+  'ماكينة قهوة',
+  'ماكينة تحضير الشاي',
+  'مقلاة هوائية',
+  'محضرة قهوة',
+  'مكنسة روبوت',
+  'مجفف ملابس',
+  'شفاط حمام',
+  'صانعة ساندوتشات',
 ];
 
 export default function TechnicianDashboard({ navigation }: any) {
@@ -48,6 +74,62 @@ export default function TechnicianDashboard({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [overview, setOverview] = useState<any>(null);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [specialtyModalVisible, setSpecialtyModalVisible] = useState(false);
+  const [editingSpecialties, setEditingSpecialties] = useState<string[]>([]);
+  const [isSavingSpecs, setIsSavingSpecs] = useState(false);
+
+  const handleOpenSpecialtiesModal = () => {
+    const current = user?.specialty
+      ? user.specialty.split(/[,،]/).map((s: string) => s.trim()).filter(Boolean)
+      : [];
+    setEditingSpecialties(current.slice(0, 3));
+    setSpecialtyModalVisible(true);
+  };
+
+  const handleToggleEditSpecialty = (spec: string) => {
+    if (editingSpecialties.includes(spec)) {
+      setEditingSpecialties(editingSpecialties.filter((s) => s !== spec));
+    } else {
+      if (editingSpecialties.length >= 3) {
+        Alert.alert(
+          'الحد الأقصى 3 تخصصات',
+          'قم بإلغاء تحديد أحد التخصصات لتتمكن من اختيار تخصص بديل.'
+        );
+        return;
+      }
+      setEditingSpecialties([...editingSpecialties, spec]);
+    }
+  };
+
+  const handleSaveSpecialties = async () => {
+    if (editingSpecialties.length !== 3) {
+      Alert.alert(
+        'تنبيه',
+        `يجب اختيار 3 تخصصات صيانة بالضبط (تم اختيار ${editingSpecialties.length} من 3).`
+      );
+      return;
+    }
+    setIsSavingSpecs(true);
+    try {
+      const res = await api.put('/technician/specialties', {
+        specialties: editingSpecialties,
+      });
+      if (res?.data?.user) {
+        updateUser(res.data.user);
+      } else if (user) {
+        updateUser({ ...user, specialty: editingSpecialties.join('، ') });
+      }
+      setSpecialtyModalVisible(false);
+      Alert.alert('تم الحفظ بنجاح ✅', 'تم تحديث واعتماد تخصصات الصيانة الـ 3 الخاصة بك.');
+    } catch (err: any) {
+      Alert.alert(
+        'خطأ في الحفظ',
+        err?.response?.data?.error || err.message || 'تعذر حفظ التخصصات، حاول ثانية.'
+      );
+    } finally {
+      setIsSavingSpecs(false);
+    }
+  };
 
   const handleToggleAvailability = async (val: boolean) => {
     setIsAvailable(val);
@@ -289,6 +371,241 @@ export default function TechnicianDashboard({ navigation }: any) {
             </View>
           ))}
         </View>
+
+        {/* Certified 3 Specialties Card */}
+        <View
+          style={{
+            backgroundColor: colors.darkCard,
+            borderRadius: borderRadius.lg,
+            padding: spacing.md,
+            borderWidth: 1,
+            borderColor: 'rgba(212, 175, 55, 0.4)',
+            marginTop: spacing.md,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row-reverse',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: spacing.xs,
+            }}
+          >
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+              <Wrench size={18} color={colors.primary} />
+              <Text style={{ color: colors.white, fontSize: 14, fontWeight: '900' }}>
+                تخصصات الصيانة المعتمدة (3 تخصصات)
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleOpenSpecialtiesModal}
+              style={{
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: borderRadius.md,
+                borderWidth: 1,
+                borderColor: colors.primary,
+              }}
+            >
+              <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '800' }}>
+                تعديل ✏️
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right', marginBottom: spacing.sm }}>
+            التخصصات الرسمية المسجلة في حسابك والتي تظهر للمدير والمالك والعملاء:
+          </Text>
+
+          <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
+            {(user?.specialty
+              ? user.specialty.split(/[,،]/).map((s: string) => s.trim()).filter(Boolean)
+              : ['ثلاجة', 'غسالة ملابس', 'تكييف منزلي']
+            ).map((spec: string, idx: number) => (
+              <View
+                key={idx}
+                style={{
+                  flexDirection: 'row-reverse',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: 'rgba(212, 175, 55, 0.12)',
+                  borderColor: colors.primary,
+                  borderWidth: 1,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: borderRadius.md,
+                }}
+              >
+                <CheckCircle2 size={13} color={colors.primary} />
+                <Text style={{ color: colors.white, fontSize: 12, fontWeight: '800' }}>
+                  {spec}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Modal for Editing 3 Specialties */}
+        <Modal
+          visible={specialtyModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setSpecialtyModalVisible(false)}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.85)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: spacing.md,
+            }}
+          >
+            <View
+              style={{
+                width: '100%',
+                maxWidth: 480,
+                maxHeight: '85%',
+                backgroundColor: '#141414',
+                borderRadius: borderRadius.lg,
+                borderWidth: 1,
+                borderColor: colors.primary,
+                padding: spacing.lg,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row-reverse',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: spacing.xs,
+                }}
+              >
+                <Text style={{ color: colors.white, fontSize: 16, fontWeight: '900' }}>
+                  تعديل تخصصات الصيانة 🔧
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setSpecialtyModalVisible(false)}
+                  style={{ padding: 4 }}
+                >
+                  <Text style={{ color: colors.gray, fontSize: 18, fontWeight: 'bold' }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: spacing.sm }}>
+                اختر 3 تخصصات صيانة للأجهزة المنزلية بالضبط:
+              </Text>
+
+              <View
+                style={{
+                  alignSelf: 'flex-end',
+                  backgroundColor:
+                    editingSpecialties.length === 3
+                      ? 'rgba(16, 185, 129, 0.2)'
+                      : 'rgba(212, 175, 55, 0.2)',
+                  borderColor:
+                    editingSpecialties.length === 3 ? '#10B981' : '#D4AF37',
+                  borderWidth: 1,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  marginBottom: spacing.md,
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      editingSpecialties.length === 3 ? '#10B981' : '#D4AF37',
+                    fontSize: 12,
+                    fontWeight: '800',
+                  }}
+                >
+                  تم اختيار {editingSpecialties.length} من 3
+                </Text>
+              </View>
+
+              <ScrollView
+                style={{ maxHeight: 340 }}
+                contentContainerStyle={{
+                  flexDirection: 'row-reverse',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  paddingBottom: spacing.md,
+                }}
+              >
+                {ALL_TECH_SPECIALTIES.map((spec) => {
+                  const isChecked = editingSpecialties.includes(spec);
+                  return (
+                    <TouchableOpacity
+                      key={spec}
+                      onPress={() => handleToggleEditSpecialty(spec)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: borderRadius.md,
+                        backgroundColor: isChecked ? colors.primary : '#1E1E1E',
+                        borderWidth: 1,
+                        borderColor: isChecked ? colors.primary : '#333',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: isChecked ? '#0A0A0A' : colors.white,
+                          fontSize: 12,
+                          fontWeight: isChecked ? '900' : '600',
+                        }}
+                      >
+                        {isChecked ? `✓ ${spec}` : spec}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={{ flexDirection: 'row-reverse', gap: spacing.sm, marginTop: spacing.md }}>
+                <TouchableOpacity
+                  onPress={handleSaveSpecialties}
+                  disabled={isSavingSpecs}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.primary,
+                    paddingVertical: 12,
+                    borderRadius: borderRadius.md,
+                    alignItems: 'center',
+                    opacity: isSavingSpecs ? 0.7 : 1,
+                  }}
+                >
+                  {isSavingSpecs ? (
+                    <ActivityIndicator color="#0A0A0A" size="small" />
+                  ) : (
+                    <Text style={{ color: '#0A0A0A', fontSize: 13, fontWeight: '900' }}>
+                      حفظ واعتماد التخصصات الـ 3 ✅
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setSpecialtyModalVisible(false)}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderRadius: borderRadius.md,
+                    backgroundColor: '#262626',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700' }}>
+                    إلغاء
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Technician Sections */}
         <View style={{ marginTop: spacing.xl, marginBottom: spacing.md }}>

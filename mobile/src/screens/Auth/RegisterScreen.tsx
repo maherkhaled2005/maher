@@ -123,6 +123,13 @@ export default function RegisterScreen({ navigation }: any) {
     if (selectedSpecialties.includes(item)) {
       setSelectedSpecialties(selectedSpecialties.filter((s) => s !== item));
     } else {
+      if (selectedSpecialties.length >= 3) {
+        Alert.alert(
+          'الحد الأقصى للتخصصات',
+          'يجب اختيار 3 تخصصات صيانة بالضبط. قم بإلغاء تحديد أحد التخصصات لتتمكن من اختيار تخصص بديل.'
+        );
+        return;
+      }
       setSelectedSpecialties([...selectedSpecialties, item]);
     }
   };
@@ -165,8 +172,8 @@ export default function RegisterScreen({ navigation }: any) {
     }
 
     if (role === 'technician') {
-      if (selectedSpecialties.length === 0) {
-        newErrors.specialties = 'يرجى تحديد تخصص صيانة أجهزة منزلية واحد على الأقل';
+      if (selectedSpecialties.length !== 3) {
+        newErrors.specialties = `يرجى اختيار 3 تخصصات صيانة بالضبط (تم اختيار ${selectedSpecialties.length} من 3)`;
       }
       if (!senderPhone.trim()) {
         newErrors.senderPhone = 'يرجى إدخال رقم المحفظة المحول منها رسوم الاشتراك (300 ج.م)';
@@ -459,9 +466,31 @@ export default function RegisterScreen({ navigation }: any) {
           {/* Technician Specialties Selection */}
           {role === 'technician' && (
             <View style={{ width: '100%', maxWidth: 440, alignSelf: 'center', marginBottom: spacing.lg }}>
-              <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 8 }}>
-                تخصصات الصيانة التي تتقنها <Text style={{ color: '#EF4444' }}>*</Text>
-              </Text>
+              <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right' }}>
+                  تخصصات الصيانة التي تتقنها <Text style={{ color: '#EF4444' }}>*</Text>
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: selectedSpecialties.length === 3 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(212, 175, 55, 0.2)',
+                    borderColor: selectedSpecialties.length === 3 ? '#10B981' : '#D4AF37',
+                    borderWidth: 1,
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: selectedSpecialties.length === 3 ? '#10B981' : '#D4AF37',
+                      fontSize: 11,
+                      fontWeight: '800',
+                    }}
+                  >
+                    تم اختيار {selectedSpecialties.length} من 3
+                  </Text>
+                </View>
+              </View>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
                 {TECH_SPECIALTIES.map((spec) => {
                   const isChecked = selectedSpecialties.includes(spec);
@@ -713,7 +742,7 @@ const styles = {
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
     height: 54,
-    ...(Platform.OS === 'web' ? { cursor: 'text' } : {}),
+    ...(Platform.OS === 'web' ? ({ cursor: 'text' } as any) : {}),
   },
   input: {
     flex: 1,
@@ -723,6 +752,6 @@ const styles = {
     fontSize: 14,
     fontWeight: '600' as const,
     paddingVertical: 0,
-    ...(Platform.OS === 'web' ? { outline: 'none' } : {}),
+    ...(Platform.OS === 'web' ? ({ outline: 'none' } as any) : {}),
   },
 };

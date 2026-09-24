@@ -738,6 +738,9 @@ async function runMigrations() {
   await ensureColumns("technician_reviews", {
     orderId: "TEXT",
   });
+  await ensureColumns("upgrade_requests", {
+    specialty: "TEXT",
+  });
   await ensureColumns("courses", {
     instructorId: "TEXT",
     instructorName: "TEXT",
@@ -1857,9 +1860,9 @@ app.post("/api/auth/register", async (req, res) => {
     const initialStatus = isProfessionalRole ? 'pending_approval' : 'active';
 
     if (reqRole === 'technician') {
-      const specsList = Array.isArray(specialties) ? specialties : (specialties ? String(specialties).split(',').map(s => s.trim()) : []);
-      if (specsList.length === 0) {
-        return res.status(400).json({ error: "يرجى تحديد تخصص صيانة أجهزة منزلية واحد على الأقل" });
+      const specsList = Array.isArray(specialties) ? specialties : (specialties ? String(specialties).split(/[,،]/).map(s => s.trim()).filter(Boolean) : []);
+      if (specsList.length !== 3) {
+        return res.status(400).json({ error: "يجب اختيار 3 تخصصات صيانة للأجهزة المنزلية بالضبط" });
       }
       const hasInvalid = specsList.some((s: string) => !HOME_APPLIANCE_SPECIALTY_NAMES.has(s));
       if (hasInvalid) {
@@ -1886,11 +1889,32 @@ app.post("/api/auth/register", async (req, res) => {
       otp,
       otpExpires,
       new Date().toISOString(),
-      specialties ? (Array.isArray(specialties) ? specialties.join(', ') : String(specialties)) : null,
+      specialties ? (Array.isArray(specialties) ? specialties.join('، ') : String(specialties)) : null,
       new Date().toISOString()
     );
 
     if (isProfessionalRole && transferReceipt) {
+      const formattedSpecialty = specialties
+        ? (Array.isArray(specialties) ? specialties.join('، ') : String(specialties))
+        : null;
+      try {
+        db.prepare(`
+          INSERT INTO upgrade_requests (id, userId, userName, userPhone, requestedRole, feePaid, receiptImage, senderPhone, status, specialty, createdAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+        `).run(
+          `upg_${Date.now()}`,
+          userId,
+          name.trim(),
+          cleanPhone,
+          reqRole,
+          reqRole === 'technician' ? 300 : 100,
+          transferReceipt,
+          senderPhone || cleanPhone,
+          formattedSpecialty,
+          new Date().toISOString()
+        );
+      } catch (e) {}
+
       try {
         db.prepare(`
           INSERT INTO approval_requests (id, userId, type, details, status, createdAt)
@@ -1904,6 +1928,7 @@ app.post("/api/auth/register", async (req, res) => {
             senderPhone: senderPhone || cleanPhone,
             transferReceipt,
             specialties,
+            specialty: formattedSpecialty,
           }),
           new Date().toISOString()
         );
@@ -3301,23 +3326,32 @@ app.post("/api/trade-requests/:id/reject", authenticateToken, requireAdmin, asyn
 });
 
 // ─── UPGRADE & WITHDRAW REQUESTS APIS (SECTION 15 & 16) ─────────────────────────
-app.get("/api/upgrade-requests", authenticateToken,requireAdmin,async (req, res) => {
+app.get("/api/upgrade-requests", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const rows = await db.prepare("SELECT * FROM upgrade_requests ORDER BY createdAt DESC").all();
+    const rows = await db.prepare(`
+      SELECT ur.*, COALESCE(ur.specialty, u.specialty) as specialty, u.name as userName, u.phone as userPhone
+      FROM upgrade_requests ur
+      LEFT JOIN users u ON ur.userId = u.id
+      ORDER BY ur.createdAt DESC
+    `).all();
     res.json(rows || []);
   } catch {
     res.json([]);
   }
 });
 
-app.post("/api/upgrade-requests/:id/approve", authenticateToken,requireAdmin,async (req: any, res) => {
+app.post("/api/upgrade-requests/:id/approve", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
     const row = await db.prepare("SELECT * FROM upgrade_requests WHERE id = ?").get(id) as any;
     if (!row) return res.status(404).json({ error: "طلب الترقية غير موجود" });
 
     const newRole = row.requestedRole === 'merchant' ? 'merchant' : 'technician';
-    await db.prepare("UPDATE users SET role = ?, status = 'active', isPro = 1, verified = 1 WHERE id = ? OR phone = ?").run(newRole, row.userId, row.userPhone);
+    if (row.specialty) {
+      await db.prepare("UPDATE users SET role = ?, status = 'active', isPro = 1, verified = 1, specialty = ? WHERE id = ? OR phone = ?").run(newRole, row.specialty, row.userId, row.userPhone);
+    } else {
+      await db.prepare("UPDATE users SET role = ?, status = 'active', isPro = 1, verified = 1 WHERE id = ? OR phone = ?").run(newRole, row.userId, row.userPhone);
+    }
     db.prepare("UPDATE upgrade_requests SET status = 'approved', reviewedBy = ?, reviewedAt = datetime('now') WHERE id = ?").run(req.user?.name || 'الإدارة', id);
     try {
       await db.prepare("UPDATE approval_requests SET status = 'approved', approvedBy = ? WHERE id = ?").run(req.user?.name || 'الإدارة', id);
@@ -4231,6 +4265,42 @@ app.post("/api/technician/availability", authenticateToken, requireActiveTechnic
       availabilityStatus: availStatus,
       user: updated, 
       message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴" 
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/technician/specialties — Update technician's 3 certified home appliance specialties
+app.put("/api/technician/specialties", authenticateToken, async (req: any, res) => {
+  try {
+    const { specialties, technicianId } = req.body;
+    const isStaff = ['owner', 'manager', 'programmer'].includes(normalizeRoleServer(req.user.role));
+    const targetId = (isStaff && technicianId) ? technicianId : req.user.id;
+
+    const specsList = Array.isArray(specialties) 
+      ? specialties 
+      : String(specialties || '').split(/[,،]/).map((s: string) => s.trim()).filter(Boolean);
+
+    if (specsList.length !== 3) {
+      return res.status(400).json({ error: "يجب اختيار 3 تخصصات صيانة للأجهزة المنزلية بالضبط" });
+    }
+
+    const hasInvalid = specsList.some((s: string) => !HOME_APPLIANCE_SPECIALTY_NAMES.has(s));
+    if (hasInvalid) {
+      return res.status(400).json({ error: "التخصصات محصورة في قائمة الأجهزة المنزلية الـ 30 المعتمدة" });
+    }
+
+    const joined = specsList.join('، ');
+    db.prepare("UPDATE users SET specialty = ? WHERE id = ?").run(joined, targetId);
+    const updatedUser = db.prepare("SELECT * FROM users WHERE id = ?").get(targetId) as any;
+
+    res.json({
+      success: true,
+      message: "تم حفظ وتحديث التخصصات الـ 3 بنجاح ✓",
+      specialty: joined,
+      specialties: specsList,
+      user: updatedUser,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -10183,15 +10253,20 @@ app.post("/api/subscriptions/subscribe", authenticateToken,async (req: any, res)
     } catch {}
 
     // Mirror to upgrade_requests for admin audit
+    const specStr = specialty ? (Array.isArray(specialty) ? specialty.join('، ') : String(specialty)) : null;
     try {
       db.prepare(`
-        INSERT INTO upgrade_requests (id, userId, userName, userPhone, requestedRole, feePaid, receiptImage, senderPhone, status, adminNotes, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'تم الدفع؛ بانتظار اعتماد المالك', datetime('now'))
-      `).run(`upg_${id}`, req.user.id, req.user.name, req.user.phone, effectiveRole, numAmount, receiptImage || null, senderPhone || req.user.phone);
+        INSERT INTO upgrade_requests (id, userId, userName, userPhone, requestedRole, feePaid, receiptImage, senderPhone, status, adminNotes, specialty, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'تم الدفع؛ بانتظار اعتماد الإدارة', ?, datetime('now'))
+      `).run(`upg_${id}`, req.user.id, req.user.name, req.user.phone, effectiveRole, numAmount, receiptImage || null, senderPhone || req.user.phone, specStr);
     } catch {}
 
     // Payment is not activation: protect every professional screen until the owner approves.
-    await db.prepare("UPDATE users SET status = 'pending_approval', isPro = 0 WHERE id = ?").run(req.user.id);
+    if (specStr) {
+      await db.prepare("UPDATE users SET status = 'pending_approval', isPro = 0, specialty = ? WHERE id = ?").run(specStr, req.user.id);
+    } else {
+      await db.prepare("UPDATE users SET status = 'pending_approval', isPro = 0 WHERE id = ?").run(req.user.id);
+    }
     try {
       const owners = db.prepare("SELECT id FROM users WHERE role = 'owner' AND status = 'active'").all() as any[];
       const insertNotification = db.prepare(
