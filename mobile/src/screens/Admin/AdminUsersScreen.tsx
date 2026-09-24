@@ -801,17 +801,22 @@ export default function AdminUsersScreen({ navigation }: any) {
 
                   <View
                     style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
                       backgroundColor: '#1E1E1E',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      borderWidth: 1,
+                      borderWidth: 1.5,
                       borderColor: colors.border,
+                      overflow: 'hidden',
                     }}
                   >
-                    <Text style={{ fontSize: 18 }}>{item.avatar || '👤'}</Text>
+                    {item.avatar && (item.avatar.startsWith('http') || item.avatar.startsWith('data:') || item.avatar.startsWith('/')) ? (
+                      <Image source={{ uri: item.avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    ) : (
+                      <Text style={{ fontSize: 18 }}>{item.avatar || '👤'}</Text>
+                    )}
                   </View>
                 </View>
 

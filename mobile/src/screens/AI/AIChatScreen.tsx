@@ -877,10 +877,10 @@ export default function AIChatScreen({ navigation }: any) {
                 بيانات التحويل الرسمي:
               </Text>
               <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '900', textAlign: 'right' }}>
-                رقم المحفظة / إنستاباي: 01064739664
+                فودافون كاش: 01064739664 | إنستاباي: adelelgohry412@instapay
               </Text>
               <Text style={{ color: '#71717A', fontSize: 10, textAlign: 'right', marginTop: 2 }}>
-                * الذكاء الاصطناعي خدمة سحابية متصلة بالإنترنت حصراً وغير متوفرة أوفلاين
+                * الذكاء الاصطناعي خدمة سحابية متصلة بالإنترنت حصراً لضمان أعلى دقة فنية
               </Text>
             </View>
 

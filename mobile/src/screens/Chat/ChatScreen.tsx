@@ -268,125 +268,131 @@ export default function ChatScreen({ route, navigation }: any) {
         </View>
       </View>
 
-      {/* Messages Scroll Area */}
-      <ScrollView
-        ref={scrollViewRef}
+      {/* Chat Area & Input wrapped in KeyboardAvoidingView */}
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
-        contentContainerStyle={{
-          padding: spacing.md,
-          paddingBottom: spacing.xl,
-          flexGrow: 1,
-        }}
-        showsVerticalScrollIndicator={false}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
-        {/* Security Encryption Badge */}
-        <View
-          style={{
-            flexDirection: 'row-reverse',
-            alignItems: 'center',
-            justifyContent: 'center',
-            alignSelf: 'center',
-            backgroundColor: 'rgba(212, 175, 55, 0.08)',
-            paddingHorizontal: spacing.md,
-            paddingVertical: 4,
-            borderRadius: borderRadius.full,
-            borderWidth: 1,
-            borderColor: 'rgba(212, 175, 55, 0.2)',
-            marginBottom: spacing.md,
-            gap: 6,
+        {/* Messages Scroll Area */}
+        <ScrollView
+          ref={scrollViewRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: spacing.md,
+            paddingBottom: spacing.md,
+            flexGrow: 1,
           }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Lock color={colors.primary} size={12} />
-          <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>
-            محادثة آمنة ومشفرة عبر خوادم TecnoRexa
-          </Text>
-        </View>
-
-        {loading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={{ color: colors.gray, fontSize: 13, marginTop: 8 }}>
-              جاري مزامنة الرسائل...
+          {/* Security Encryption Badge */}
+          <View
+            style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              justifyContent: 'center',
+              alignSelf: 'center',
+              backgroundColor: 'rgba(212, 175, 55, 0.08)',
+              paddingHorizontal: spacing.md,
+              paddingVertical: 4,
+              borderRadius: borderRadius.full,
+              borderWidth: 1,
+              borderColor: 'rgba(212, 175, 55, 0.2)',
+              marginBottom: spacing.md,
+              gap: 6,
+            }}
+          >
+            <Lock color={colors.primary} size={12} />
+            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>
+              محادثة آمنة ومشفرة عبر خوادم TecnoRexa
             </Text>
           </View>
-        ) : messages.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, paddingHorizontal: spacing.lg }}>
-            <Text style={{ fontSize: 36, marginBottom: 8 }}>💬</Text>
-            <Text style={{ color: colors.white, fontSize: 16, fontWeight: 'bold' }}>
-              لا توجد رسائل سابقة
-            </Text>
-            <Text style={{ color: colors.gray, fontSize: 13, textAlign: 'center', marginTop: 4 }}>
-              ابدأ المحادثة الآن، رسائلك مشفرة ومحفوظة بأمان تام في سجل حسابك.
-            </Text>
-          </View>
-        ) : (
-          messages.map((msg) => {
-            const timeStr = msg.createdAt
-              ? new Date(msg.createdAt).toLocaleTimeString('ar-EG', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '';
 
-            return (
-              <View
-                key={msg.id}
-                style={{
-                  alignSelf: msg.isMe ? 'flex-start' : 'flex-end',
-                  backgroundColor: msg.isMe ? colors.primary : '#181818',
-                  maxWidth: '82%',
-                  paddingHorizontal: 14,
-                  paddingVertical: 10,
-                  borderRadius: borderRadius.lg,
-                  borderBottomLeftRadius: msg.isMe ? 2 : borderRadius.lg,
-                  borderBottomRightRadius: !msg.isMe ? 2 : borderRadius.lg,
-                  marginBottom: spacing.sm,
-                  borderWidth: msg.isMe ? 0 : 1,
-                  borderColor: '#2A2A2A',
-                }}
-              >
-                <Text
-                  style={{
-                    color: msg.isMe ? '#000000' : colors.white,
-                    fontSize: 14,
-                    lineHeight: 20,
-                    textAlign: 'right',
-                    fontWeight: msg.isMe ? '700' : '500',
-                  }}
-                >
-                  {msg.content}
-                </Text>
+          {loading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 }}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={{ color: colors.gray, fontSize: 13, marginTop: 8 }}>
+                جاري مزامنة الرسائل...
+              </Text>
+            </View>
+          ) : messages.length === 0 ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, paddingHorizontal: spacing.lg }}>
+              <Text style={{ fontSize: 36, marginBottom: 8 }}>💬</Text>
+              <Text style={{ color: colors.white, fontSize: 16, fontWeight: 'bold' }}>
+                لا توجد رسائل سابقة
+              </Text>
+              <Text style={{ color: colors.gray, fontSize: 13, textAlign: 'center', marginTop: 4 }}>
+                ابدأ المحادثة الآن، رسائلك مشفرة ومحفوظة بأمان تام في سجل حسابك.
+              </Text>
+            </View>
+          ) : (
+            messages.map((msg) => {
+              const timeStr = msg.createdAt
+                ? new Date(msg.createdAt).toLocaleTimeString('ar-EG', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : '';
 
+              return (
                 <View
+                  key={msg.id}
                   style={{
-                    flexDirection: 'row-reverse',
-                    justifyContent: 'flex-start',
-                    alignItems: 'center',
-                    marginTop: 4,
-                    gap: 4,
+                    alignSelf: msg.isMe ? 'flex-start' : 'flex-end',
+                    backgroundColor: msg.isMe ? colors.primary : '#181818',
+                    maxWidth: '82%',
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: borderRadius.lg,
+                    borderBottomLeftRadius: msg.isMe ? 2 : borderRadius.lg,
+                    borderBottomRightRadius: !msg.isMe ? 2 : borderRadius.lg,
+                    marginBottom: spacing.sm,
+                    borderWidth: msg.isMe ? 0 : 1,
+                    borderColor: '#2A2A2A',
                   }}
                 >
                   <Text
                     style={{
-                      color: msg.isMe ? 'rgba(0,0,0,0.6)' : colors.gray,
-                      fontSize: 10,
-                      fontWeight: '600',
+                      color: msg.isMe ? '#000000' : colors.white,
+                      fontSize: 14,
+                      lineHeight: 20,
+                      textAlign: 'right',
+                      fontWeight: msg.isMe ? '700' : '500',
                     }}
                   >
-                    {timeStr}
+                    {msg.content}
                   </Text>
-                  {msg.isMe && (
-                    <CheckCheck color={msg.read ? '#059669' : 'rgba(0,0,0,0.6)'} size={13} />
-                  )}
-                </View>
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
 
-      {/* Input Bar */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                  <View
+                    style={{
+                      flexDirection: 'row-reverse',
+                      justifyContent: 'flex-start',
+                      alignItems: 'center',
+                      marginTop: 4,
+                      gap: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: msg.isMe ? 'rgba(0,0,0,0.6)' : colors.gray,
+                        fontSize: 10,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {timeStr}
+                    </Text>
+                    {msg.isMe && (
+                      <CheckCheck color={msg.read ? '#059669' : 'rgba(0,0,0,0.6)'} size={13} />
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+
+        {/* Input Bar */}
         <View
           style={{
             flexDirection: 'row-reverse',

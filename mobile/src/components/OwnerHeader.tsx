@@ -139,64 +139,70 @@ export default function OwnerHeader({
           ) : null}
         </View>
 
-        {/* Left side: Back Button, Refresh, Badges, or Custom Right Action */}
+        {/* Left side: Back Button or Main Action Badges (responsive & uncrowded) */}
         <View style={[styles.sideGroup, { flexDirection: 'row', gap: 6, alignItems: 'center' }]}>
-          {/* Notifications Button */}
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => navigation?.navigate && navigation.navigate('Notifications')}
-            activeOpacity={0.8}
-            accessibilityLabel="الإشعارات"
-          >
-            <Bell size={18} color={colors.gray} />
-            {unreadNotifications > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unreadNotifications}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Chat Button */}
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => navigation?.navigate && navigation.navigate('ChatList')}
-            activeOpacity={0.8}
-            accessibilityLabel="المحادثات"
-          >
-            <MessageCircle size={18} color={colors.gray} />
-            {unreadMessages > 0 && (
-              <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                <Text style={[styles.badgeText, { color: '#0A0A0A' }]}>
-                  {unreadMessages}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {onRefresh && (
-            <TouchableOpacity style={styles.iconBtn} onPress={onRefresh} activeOpacity={0.8} accessibilityLabel="تحديث">
-              <RefreshCw size={18} color={colors.gray} />
-            </TouchableOpacity>
-          )}
-          {rightAction}
           {showBack ? (
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => {
-                if (navigation?.canGoBack && navigation.canGoBack()) {
-                  navigation.goBack();
-                } else if (navigation?.navigate) {
-                  navigation.navigate('Home');
-                }
-              }}
-              activeOpacity={0.8}
-              accessibilityLabel="العوده للخلف"
-            >
-              <ChevronRight size={22} color={colors.white} />
-            </TouchableOpacity>
-          ) : !rightAction && !onRefresh ? null : null}
+            <>
+              {onRefresh && (
+                <TouchableOpacity style={styles.iconBtn} onPress={onRefresh} activeOpacity={0.8} accessibilityLabel="تحديث">
+                  <RefreshCw size={17} color={colors.gray} />
+                </TouchableOpacity>
+              )}
+              {rightAction}
+              <TouchableOpacity
+                style={[styles.iconBtn, { borderColor: activeColor + '55', backgroundColor: '#1A1A1A' }]}
+                onPress={() => {
+                  if (navigation?.canGoBack && navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else if (navigation?.navigate) {
+                    navigation.navigate('Home');
+                  }
+                }}
+                activeOpacity={0.8}
+                accessibilityLabel="العوده للخلف"
+              >
+                <ChevronRight size={22} color={activeColor} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* Notifications Button */}
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => navigation?.navigate && navigation.navigate('Notifications')}
+                activeOpacity={0.8}
+                accessibilityLabel="الإشعارات"
+              >
+                <Bell size={18} color={colors.gray} />
+                {unreadNotifications > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Chat Button */}
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => navigation?.navigate && navigation.navigate('ChatList')}
+                activeOpacity={0.8}
+                accessibilityLabel="المحادثات"
+              >
+                <MessageCircle size={18} color={colors.gray} />
+                {unreadMessages > 0 && (
+                  <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                    <Text style={[styles.badgeText, { color: '#0A0A0A' }]}>
+                      {unreadMessages > 99 ? '99+' : unreadMessages}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {rightAction}
+            </>
+          )}
         </View>
       </View>
 

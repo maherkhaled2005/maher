@@ -37,6 +37,8 @@ import { colors, spacing, borderRadius } from '../../theme';
 import { api } from '../../api/client';
 import OwnerHeader from '../../components/OwnerHeader';
 import { generateExecutiveReportHTML, exportExecutiveCSV } from '../../utils/executiveReport';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 export default function ManagerDashboard({ navigation }: any) {
   const { user } = useAuthStore();
@@ -150,6 +152,7 @@ export default function ManagerDashboard({ navigation }: any) {
   };
 
   const managerSections = [
+    { label: 'طلبات الترقية وإيصالات الدفع 🧾', desc: 'مراجعة صور إيصالات التحويل وأرقام الهواتف واعتماد الفنيين والتجار', icon: FileCheck, screen: 'TradeRequests', color: colors.primary },
     { label: 'إدارة وتوجيه الطلبات', desc: 'متابعة الطلبات وتعيين الفنيين', icon: ShoppingBag, screen: 'Orders', color: '#3B82F6' },
     { label: 'فحص واعتماد المنتجات', desc: 'مراجعة المنتجات والموافقة أو الحظر', icon: ShoppingBag, screen: 'Marketplace', color: '#8B5CF6' },
     { label: 'تذاكر الدعم والشكاوى', desc: 'حل الشكاوى وتوزيع التذاكر', icon: Ticket, screen: 'Tickets', color: '#EF4444' },
@@ -162,7 +165,7 @@ export default function ManagerDashboard({ navigation }: any) {
     { label: 'التقارير التشغيلية', desc: 'معدلات الإنجاز وأداء فرق العمل', icon: BarChart2, screen: 'AuditLogs', color: colors.primary },
   ];
 
-  const handleExport = (type: 'pdf' | 'excel' | 'csv') => {
+  const handleExport = async (type: 'pdf' | 'excel' | 'csv') => {
     setExportModalVisible(false);
     const reportData = {
       period: '30d',
@@ -196,13 +199,29 @@ export default function ManagerDashboard({ navigation }: any) {
       Alert.alert('✅ تم بنجاح', `تم تجهيز وتصدير التقرير التشغيلي بصيغة ${type.toUpperCase()}`);
     } else {
       try {
-        const textSummary = `📑 تقرير غرفة العمليات والرقابة - TecnoRexa\n\n👔 المسؤول: المدير العام\n📦 الطلبات قيد المتابعة: ${reportData.todayOrders}\n🔧 الفنيين النشطين: ${reportData.availableTechnicians}\n🎧 تذاكر الدعم المفتوحة: ${reportData.pendingTickets}`;
-        Share.share({
-          title: 'تقرير غرفة العمليات التشغيلي',
-          message: type === 'csv' ? exportExecutiveCSV(reportData) : textSummary,
-        });
+        if (type === 'pdf') {
+          const { uri } = await Print.printToFileAsync({
+            html: generateExecutiveReportHTML(reportData),
+          });
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            await Sharing.shareAsync(uri, {
+              UTI: '.pdf',
+              mimeType: 'application/pdf',
+              dialogTitle: 'تقرير غرفة العمليات التشغيلي',
+            });
+          } else {
+            Alert.alert('✅ تم إنشاء التقرير', `تم حفظ ملف PDF بنجاح في:\n${uri}`);
+          }
+        } else {
+          const textSummary = `📑 تقرير غرفة العمليات والرقابة - TecnoRexa\n\n👔 المسؤول: المدير العام\n📦 الطلبات قيد المتابعة: ${reportData.todayOrders}\n🔧 الفنيين النشطين: ${reportData.availableTechnicians}\n🎧 تذاكر الدعم المفتوحة: ${reportData.pendingTickets}`;
+          await Share.share({
+            title: 'تقرير غرفة العمليات التشغيلي',
+            message: type === 'csv' ? exportExecutiveCSV(reportData) : textSummary,
+          });
+        }
       } catch (err: any) {
-        Alert.alert('✅ تم التصدير', `تم إعداد وتصدير تقرير المنظومة التشغيلي بصيغة ${type.toUpperCase()}`);
+        Alert.alert('تنبيه', `حدث خطأ أثناء تصدير التقرير: ${err?.message || 'يرجى المحاولة مجدداً'}`);
       }
     }
   };
@@ -326,23 +345,36 @@ export default function ManagerDashboard({ navigation }: any) {
             <View style={styles.actionBlock}>
               <View style={styles.blockHeader}>
                 <FileCheck size={18} color={colors.primary} />
-                <Text style={styles.blockTitle}>طلبات ترقية فنيين (سداد 300 ج.م)</Text>
+                <Text style={styles.blockTitle}>طلبات ترقية بانتظار التحقق والمراجعة</Text>
               </View>
               {pendingUpgradesList.map(upg => (
                 <View key={upg.id} style={styles.pendingItem}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.pendingItemTitle}>{upg.technicianName || upg.userName || 'فني متخصص'}</Text>
+                    <Text style={styles.pendingItemTitle}>{upg.technicianName || upg.userName || 'طلب ترقية معتمد'}</Text>
                     <Text style={styles.pendingItemSub}>
-                      التخصص: {upg.specialty || 'صيانة عامة'} | الرسوم: {upg.fee || 300} ج.م
+                      📞 هاتف: {upg.userPhone || upg.senderPhone || upg.phone || 'مسجل'} | الرسوم: {upg.fee || 300} ج.م
                     </Text>
+                    {upg.specialty && (
+                      <Text style={[styles.pendingItemSub, { color: colors.gray }]}>
+                        التخصص: {upg.specialty}
+                      </Text>
+                    )}
                   </View>
-                  <TouchableOpacity
-                    style={[styles.approveBtn, { backgroundColor: colors.primary }]}
-                    onPress={() => handleApproveUpgrade(upg.id)}
-                  >
-                    <Check size={14} color="#0A0A0A" />
-                    <Text style={[styles.btnText, { color: '#0A0A0A' }]}>ترقية</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row-reverse', gap: 6, alignItems: 'center' }}>
+                    <TouchableOpacity
+                      style={[styles.approveBtn, { backgroundColor: '#1E40AF', paddingHorizontal: 10 }]}
+                      onPress={() => navigation.navigate('TradeRequests')}
+                    >
+                      <Text style={[styles.btnText, { color: '#FFF' }]}>فحص الإيصال 🧾</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.approveBtn, { backgroundColor: colors.primary, paddingHorizontal: 10 }]}
+                      onPress={() => handleApproveUpgrade(upg.id)}
+                    >
+                      <Check size={14} color="#0A0A0A" />
+                      <Text style={[styles.btnText, { color: '#0A0A0A' }]}>اعتماد</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </View>

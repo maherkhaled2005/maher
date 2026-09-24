@@ -1106,20 +1106,22 @@ async function runMigrations() {
 
   // Seed essential administrative accounts if not present
   const coreUsers = [
-    { id: 'owner_master', name: 'المهندس خالد محمد (المالك)', phone: '01011112222', role: 'owner', email: 'owner@tecnorexa.com', pass: 'Owner@123456', specialty: 'المالك والمشرف العام', developerRank: 'none' },
-    { id: 'programmer_lead', name: 'المهندس ماهر خالد', phone: '01064739664', role: 'programmer', email: 'maher@tecnorexa.com', pass: 'Maher@123456', specialty: 'المسؤول التقني وقائد التطوير', developerRank: 'lead' },
+    { id: 'owner_master', name: 'المهندس خالد محمد (المالك)', phone: '01011112222', role: 'owner', email: 'owner@tecnorexa.com', pass: '123456', specialty: 'المالك والمشرف العام', developerRank: 'none' },
+    { id: 'manager_adel', name: 'عادل الجوهري (المدير العام)', phone: '01286585187', role: 'manager', email: 'adelelgohry412@gmail.com', pass: '123456', specialty: 'المدير التنفيذي والتشغيلي', developerRank: 'none' },
+    { id: 'programmer_maher', name: 'المهندس ماهر خالد (رئيس المبرمجين ومصمم التطبيق)', phone: '01064739664', role: 'programmer', email: 'maherkhaled880@gmail.com', pass: '123456', specialty: 'المسؤول التقني وقائد التطوير ومصمم التطبيق', developerRank: 'lead' },
+    { id: 'support_official', name: 'فريق خدمة العملاء والدعم الفني', phone: '01557470554', role: 'customer_support', email: 'tecnorexa@gmail.com', pass: '123456', specialty: 'خدمة العملاء والدعم الفني', developerRank: 'none' },
   ];
 
   for (const cu of coreUsers) {
-    const existing = await db.prepare("SELECT * FROM users WHERE id = ? OR phone = ?").get(cu.id, cu.phone) as any;
+    const existing = await db.prepare("SELECT * FROM users WHERE id = ? OR phone = ? OR email = ?").get(cu.id, cu.phone, cu.email) as any;
+    const hash = bcrypt.hashSync(cu.pass, 10);
     if (!existing) {
-      const hash = bcrypt.hashSync(cu.pass, 10);
       db.prepare(`
-        INSERT INTO users (id, name, phone, email, role, developerRank, password, status, verified, balance, specialty, isPro, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, 0, ?, ?, datetime('now'))
+        INSERT INTO users (id, name, phone, email, role, developerRank, password, status, verified, phoneVerified, balance, specialty, isPro, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, 1, 0, ?, ?, datetime('now'))
       `).run(cu.id, cu.name, cu.phone, cu.email, cu.role, cu.developerRank || 'none', hash, cu.specialty || '', cu.isPro ? 1 : 0);
-    } else if (cu.role === 'programmer') {
-      await db.prepare("UPDATE users SET phone = ?, developerRank = 'lead', programmerLevel = 'lead', role = 'programmer', name = ? WHERE id = ?").run('01064739664', cu.name, existing.id);
+    } else {
+      await db.prepare("UPDATE users SET phone = ?, email = ?, developerRank = ?, role = ?, name = ? WHERE id = ?").run(cu.phone, cu.email, cu.developerRank || 'none', cu.role, cu.name, existing.id);
     }
   }
 }
@@ -1188,8 +1190,8 @@ function parseUtcDate(dateStr: string | null | undefined): Date | null {
 }
 
 app.post("/api/auth/login", async (req, res) => {
-  const { email, phone, password } = req.body;
-  const loginIdentifier = (phone || email || "").trim();
+  const { email, phone, identifier, username, password } = req.body;
+  const loginIdentifier = (identifier || phone || email || username || "").trim();
   if (!loginIdentifier || !password)
     return res.status(400).json({ error: "رقم الهاتف/البريد وكلمة المرور مطلوبان" });
 
@@ -2722,7 +2724,15 @@ app.post("/api/owner/wallet/adjust", authenticateToken, requireOwner, async (req
   }
 });
 
-app.get("/api/owner/system/settings", authenticateToken, requireOwner, async (req: any, res) => {
+const requireOwnerOrLeadDev = (req: any, res: any, next: any) => {
+  const r = normalizeRoleServer(req.user?.role);
+  if (r === 'owner' || (r === 'programmer' && (req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead' || req.user?.phone === '01064739664'))) {
+    return next();
+  }
+  return res.status(403).json({ error: "هذا الإجراء مخصص لمالك المنصة والمسؤول التقني فقط." });
+};
+
+app.get("/api/owner/system/settings", authenticateToken, requireOwnerOrLeadDev, async (req: any, res) => {
   try {
     const rows = await db.prepare("SELECT key, value FROM system_settings").all() as any[];
     const settings: Record<string, string> = {};
@@ -2741,7 +2751,7 @@ app.get("/api/owner/system/settings", authenticateToken, requireOwner, async (re
   }
 });
 
-app.put("/api/owner/system/settings", authenticateToken, requireOwner, async (req: any, res) => {
+app.put("/api/owner/system/settings", authenticateToken, requireOwnerOrLeadDev, async (req: any, res) => {
   try {
     const settings = req.body;
     // Block direct updates to sensitive keys through this endpoint
@@ -5560,13 +5570,13 @@ app.post(
     const isOwner = role === 'owner';
     const isLeadProgrammer = (role === 'programmer' || role === 'lead_developer') && 
       (req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead' || req.user?.phone === '01064739664');
-    const isManager = role === 'manager';
 
-    if (!isOwner && !isLeadProgrammer && !isManager) {
-      return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة على الإدارة وقائد المبرمجين." });
+    // Strict rule: Manager is NOT allowed to add users. Only Lead Programmer and Owner can add users.
+    if (!isOwner && !isLeadProgrammer) {
+      return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة حصرياً على المسؤول التقني (رئيس المبرمجين) والمالك." });
     }
 
-    const { name, phone, email, role: userRole, password, developerRank } = req.body;
+    const { name, phone, email, role: userRole, password } = req.body;
     if (!name || !phone) {
       return res.status(400).json({ error: "الاسم ورقم الهاتف مطلوبان" });
     }
@@ -5583,16 +5593,14 @@ app.post(
 
     const normalizedRole = normalizeRoleServer(userRole || "customer");
 
-    // Restrictions: Only Owner can create Owner or Manager
-    if (['owner', 'manager'].includes(normalizedRole) && !isOwner) {
-      return res.status(403).json({ error: "فقط المالك يمكنه إنشاء حسابات المالك أو المدير." });
+    // Restrictions: Owner and Programmer roles cannot be created from general form
+    if (['owner', 'programmer'].includes(normalizedRole)) {
+      return res.status(403).json({ error: "لا يمكن إضافة حساب مالك أو مبرمج من هذا النموذج؛ هذه الحسابات حصرية وإدارية عليا." });
     }
 
-    // Assign developerRank for programmers
-    let devRank = 'none';
-    if (normalizedRole === 'programmer') {
-      devRank = 'junior'; // مبرمج عادي
-    }
+    // Professional roles (technician / merchant) require payment before activation!
+    const isProfessionalRole = normalizedRole === 'technician' || normalizedRole === 'merchant';
+    const initialStatus = isProfessionalRole ? 'pending_approval' : 'active';
 
     try {
       const cleanEmail = email && String(email).trim() ? String(email).trim() : null;
@@ -5612,7 +5620,7 @@ app.post(
         INSERT INTO users (
           id, name, phone, email, password, role, developerRank, programmerLevel,
           status, verified, phoneVerified, balance, mustChangePassword, createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, 1, 0, 1, datetime('now'))
+        ) VALUES (?, ?, ?, ?, ?, ?, 'none', 'none', ?, 1, 1, 0, 1, datetime('now'))
       `).run(
         userId,
         name.trim(),
@@ -5620,8 +5628,7 @@ app.post(
         cleanEmail,
         hashedPassword,
         normalizedRole,
-        devRank,
-        devRank,
+        initialStatus,
       );
 
       const logId = `audit_${Date.now()}`;
@@ -6627,9 +6634,58 @@ app.post("/api/orders", async (req: any, res) => {
             new Date().toISOString()
           );
         }
+
+        // Notify all Owners and Managers of the new maintenance request
+        try {
+          const admins = db.prepare("SELECT id FROM users WHERE role IN ('owner', 'manager') AND status = 'active'").all() as any[];
+          for (const admin of admins) {
+            db.prepare(`
+              INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+              VALUES (?, ?, 'order_created', 'طلب صيانة جديد من عميل 🔧', ?, ?, ?)
+            `).run(
+              `notif_adm_${Date.now()}_${admin.id}`,
+              admin.id,
+              `قام العميل (${custName}) بطلب صيانة: ${sType} في ${gov}`,
+              JSON.stringify({ orderId, sType, customerName: custName }),
+              new Date().toISOString()
+            );
+          }
+        } catch (eAdm) {}
+
+        // Log in audit_logs so it appears in Owner Dashboard Live Feed
+        try {
+          db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+            .run(`audit_${Date.now()}`, 'طلب صيانة جديد', technicianId || null, userId, `طلب صيانة من ${custName}: ${sType} بقيمة ${orderTotal} ج.م`);
+        } catch (eAudit) {}
+
+        try {
+          io.emit('new_order', { orderId, sType, customerName: custName, total: orderTotal });
+        } catch (eIo) {}
       } catch (err: any) {
         console.warn("Could not mirror to support_requests:", err.message);
       }
+    } else {
+      // General Purchase Order - notify Owner and Manager
+      try {
+        const admins = db.prepare("SELECT id FROM users WHERE role IN ('owner', 'manager') AND status = 'active'").all() as any[];
+        for (const admin of admins) {
+          db.prepare(`
+            INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+            VALUES (?, ?, 'order_created', 'طلب شراء جديد من السوق 🛒', ?, ?, ?)
+          `).run(
+            `notif_adm_${Date.now()}_${admin.id}`,
+            admin.id,
+            `طلب شراء جديد من العميل (${custName}) بقيمة ${orderTotal} ج.م`,
+            JSON.stringify({ orderId, total: orderTotal }),
+            new Date().toISOString()
+          );
+        }
+      } catch (eAdm) {}
+
+      try {
+        db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+          .run(`audit_${Date.now()}`, 'طلب شراء من المتجر', sellerId || null, userId, `شراء من العميل ${custName} بقيمة ${orderTotal} ج.م`);
+      } catch (eAudit) {}
     }
 
     res.json({
@@ -8729,18 +8785,18 @@ app.get("/api/ai/credits", authenticateToken,async (req: any, res) => {
 app.get("/api/ai/subscription/status", authenticateToken, async (req: any, res) => {
   try {
     const userId = req.user.id;
-    const isOwner = req.user.role === "owner";
+    const isExempt = req.user.role === "owner" || req.user.role === "programmer";
 
-    // Get total tokens used today
-    const todayUsage = db.prepare(`
-      SELECT SUM(tokensUsed) as total FROM ai_usage
-      WHERE userId = ? AND date(createdAt) = date('now')
+    // Get total messages sent today
+    const todayQuery = db.prepare(`
+      SELECT COUNT(*) as total FROM ai_chat_history
+      WHERE userId = ? AND role = 'user' AND date(createdAt) = date('now')
     `).get(userId) as any;
 
-    // Get total tokens used this month
-    const monthUsage = db.prepare(`
-      SELECT SUM(tokensUsed) as total FROM ai_usage
-      WHERE userId = ? AND strftime('%Y-%m', createdAt) = strftime('%Y-%m', 'now')
+    // Get total messages sent this month
+    const monthQuery = db.prepare(`
+      SELECT COUNT(*) as total FROM ai_chat_history
+      WHERE userId = ? AND role = 'user' AND strftime('%Y-%m', createdAt) = strftime('%Y-%m', 'now')
     `).get(userId) as any;
 
     // Check active subscription
@@ -8751,22 +8807,79 @@ app.get("/api/ai/subscription/status", authenticateToken, async (req: any, res) 
       ORDER BY createdAt DESC LIMIT 1
     `).get(userId) as any;
 
-    // Determine daily/monthly limits
-    const dailyLimit = isOwner ? 1000 : (sub ? 50 : 3);
-    const monthlyLimit = isOwner ? 30000 : (sub ? 1500 : 10);
-    const todayUsed = Number(todayUsage?.total) || 0;
-    const monthUsed = Number(monthUsage?.total) || 0;
+    const isSubscribed = isExempt || !!sub;
+    const price = 100; // Official 100 EGP/month
+    const dailyLimit = isExempt ? 1000 : (sub ? 50 : 3);
+    const monthlyLimit = isExempt ? 30000 : (sub ? 1500 : 10);
+    const todayUsed = Number(todayQuery?.total) || 0;
+    const monthUsed = Number(monthQuery?.total) || 0;
 
-    const freePreviewsLeft = sub ? 0 : Math.max(0, 3 - todayUsed);
+    const freePreviewsLeft = isSubscribed ? 0 : Math.max(0, 3 - todayUsed);
 
     res.json({
-      isSubscribed: isOwner || !!sub,
+      isSubscribed,
       startedAt: sub?.createdAt || null,
       expiresAt: sub?.expiresAt || null,
       dailyRemaining: Math.max(0, dailyLimit - todayUsed),
       monthlyRemaining: Math.max(0, monthlyLimit - monthUsed),
-      price: 20,
+      price,
       freePreviewsLeft,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/ai/subscription/subscribe — Subscribe to AI Assistant
+app.post("/api/ai/subscription/subscribe", authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const { paymentMethod, senderPhone } = req.body;
+    const price = 100;
+
+    const user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+    if (!user) return res.status(404).json({ error: "المستخدم غير موجود" });
+
+    if (paymentMethod === "wallet") {
+      const balance = Number(user.balance || 0);
+      if (balance < price) {
+        return res.status(400).json({
+          error: `رصيد المحفظة الحالي (${balance} ج.م) غير كافٍ. قيمة الاشتراك ${price} ج.م. يرجى شحن المحفظة أولاً.`,
+        });
+      }
+
+      // Deduct from wallet
+      db.prepare("UPDATE users SET balance = balance - ? WHERE id = ?").run(price, userId);
+
+      const txId = `tx_${Date.now()}`;
+      db.prepare(`
+        INSERT INTO transactions (id, userId, type, amount, description, status, createdAt)
+        VALUES (?, ?, 'debit', ?, 'اشتراك شهري في المساعد الذكي TecnoRexa AI', 'completed', datetime('now'))
+      `).run(txId, userId, price);
+    }
+
+    const subId = `sub_${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    const expiresDate = new Date();
+    expiresDate.setDate(expiresDate.getDate() + 30);
+    const expiresIso = expiresDate.toISOString();
+
+    db.prepare(`
+      INSERT INTO subscriptions (id, userId, planId, targetRole, amount, paymentMethod, status, createdAt, expiresAt)
+      VALUES (?, ?, 'ai_monthly', 'customer', ?, ?, 'active', ?, ?)
+    `).run(subId, userId, price, paymentMethod || 'wallet', nowIso, expiresIso);
+
+    const notifId = `notif_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO notifications (id, userId, title, message, type, read, createdAt)
+      VALUES (?, ?, 'تفعيل المساعد الذكي 🤖', 'تم تفعيل باقة الذكاء الاصطناعي الشهرية (30 يوماً) بنجاح. يمكنك الآن تشخيص كافة الأعطال والاستفادة من الدعم الفني الذكي.', 'system', 0, datetime('now'))
+    `).run(notifId, userId);
+
+    res.json({
+      success: true,
+      message: "تم تفعيل اشتراك الذكاء الاصطناعي بنجاح لمدة 30 يوماً.",
+      subscriptionId: subId,
+      expiresAt: expiresIso,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -8850,6 +8963,31 @@ app.post(
     const message = (req.body.message || req.body.query || req.body.text || "").trim();
     const imageFile = req.file;
     const userRole = req.user.role || "customer";
+
+    // Quota Enforcement: Customers get 3 free previews daily before requiring AI subscription (100 EGP/mo)
+    const isExempt = userRole === "owner" || userRole === "programmer";
+    if (!isExempt) {
+      const activeSub = db.prepare(`
+        SELECT id FROM subscriptions
+        WHERE userId = ? AND planId LIKE 'ai%' AND status = 'active'
+        AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
+      `).get(req.user.id);
+
+      if (!activeSub) {
+        const todayCount = (db.prepare(`
+          SELECT COUNT(*) as c FROM ai_chat_history
+          WHERE userId = ? AND role = 'user' AND date(createdAt) = date('now')
+        `).get(req.user.id) as any)?.c || 0;
+
+        if (todayCount >= 3) {
+          return res.status(403).json({
+            error: "AI_SUBSCRIPTION_REQUIRED",
+            message: "عفواً، لقد استهلكت المعاينات الـ 3 المجانية المتاحة لليوم. يتطلب الاستمرار تفعيل الاشتراك الشهري (100 ج.م).",
+            freePreviewsLeft: 0,
+          });
+        }
+      }
+    }
 
     try {
       let aiResponse = "";

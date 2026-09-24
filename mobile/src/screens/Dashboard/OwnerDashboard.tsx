@@ -42,6 +42,8 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { fetchApi } from '../../api/client';
 import OwnerSideDrawer, { OWNER_SECTIONS } from '../../components/OwnerSideDrawer';
 import { generateExecutiveReportHTML, exportExecutiveCSV } from '../../utils/executiveReport';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 const PERIODS = [
   { label: 'اليوم', value: 'today' },
@@ -114,7 +116,7 @@ export default function OwnerDashboard({ navigation }: any) {
     setRefreshing(false);
   }, [selectedPeriod]);
 
-  const handleExport = (type: 'pdf' | 'excel' | 'csv') => {
+  const handleExport = async (type: 'pdf' | 'excel' | 'csv') => {
     setExportModalVisible(false);
     const reportData = {
       period: selectedPeriod,
@@ -156,13 +158,29 @@ export default function OwnerDashboard({ navigation }: any) {
       Alert.alert('✅ تم بنجاح', `تم تجهيز وتصدير التقرير التنفيذي الشامل بصيغة ${type.toUpperCase()}`);
     } else {
       try {
-        const textSummary = `📑 تقرير TecnoRexa التنفيذي (${reportData.period})\n\n👑 المالك: ${reportData.ownerName}\n💰 إجمالي الإيرادات: ${reportData.totalRevenue} ج.م\n👥 المستخدمين النشطين: ${reportData.activeUsers}\n📦 الطلبات اليومية: ${reportData.todayOrders}\n🔧 الفنيين المتاحين: ${reportData.availableTechnicians}\n💳 المسحوبات المعلقة: ${reportData.pendingWithdrawalsAmount} ج.م`;
-        Share.share({
-          title: 'تقرير منصة TecnoRexa التنفيذي',
-          message: type === 'csv' ? exportExecutiveCSV(reportData) : textSummary,
-        });
+        if (type === 'pdf') {
+          const { uri } = await Print.printToFileAsync({
+            html: generateExecutiveReportHTML(reportData),
+          });
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            await Sharing.shareAsync(uri, {
+              UTI: '.pdf',
+              mimeType: 'application/pdf',
+              dialogTitle: 'تقرير منصة TecnoRexa التنفيذي',
+            });
+          } else {
+            Alert.alert('✅ تم إنشاء التقرير', `تم حفظ ملف PDF بنجاح في:\n${uri}`);
+          }
+        } else {
+          const textSummary = `📑 تقرير TecnoRexa التنفيذي (${reportData.period})\n\n👑 المالك: ${reportData.ownerName}\n💰 إجمالي الإيرادات: ${reportData.totalRevenue} ج.م\n👥 المستخدمين النشطين: ${reportData.activeUsers}\n📦 الطلبات اليومية: ${reportData.todayOrders}\n🔧 الفنيين المتاحين: ${reportData.availableTechnicians}\n💳 المسحوبات المعلقة: ${reportData.pendingWithdrawalsAmount} ج.م`;
+          await Share.share({
+            title: 'تقرير منصة TecnoRexa التنفيذي',
+            message: type === 'csv' ? exportExecutiveCSV(reportData) : textSummary,
+          });
+        }
       } catch (err: any) {
-        Alert.alert('✅ تم التصدير', `تم إعداد وتصدير تقرير المنصة المالي والتشغيلي بصيغة ${type.toUpperCase()}`);
+        Alert.alert('تنبيه', `حدث خطأ أثناء تصدير التقرير: ${err?.message || 'يرجى المحاولة مجدداً'}`);
       }
     }
   };

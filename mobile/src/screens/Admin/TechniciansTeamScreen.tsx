@@ -785,9 +785,14 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
                           justifyContent: 'center',
                           borderWidth: 1.5,
                           borderColor: colors.primary,
+                          overflow: 'hidden',
                         }}
                       >
-                        <Text style={{ fontSize: 20 }}>🔧</Text>
+                        {tech.avatar && (tech.avatar.startsWith('http') || tech.avatar.startsWith('data:') || tech.avatar.startsWith('/')) ? (
+                          <Image source={{ uri: tech.avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                        ) : (
+                          <Text style={{ fontSize: 20 }}>🔧</Text>
+                        )}
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ color: colors.white, fontSize: 15, fontWeight: 'bold' }}>{item.name}</Text>

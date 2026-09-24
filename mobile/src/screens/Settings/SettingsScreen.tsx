@@ -46,7 +46,7 @@ type SettingsTab = 'payment' | 'commissions' | 'general' | 'security' | 'terms';
 
 const SettingsScreen = ({ navigation }: any) => {
   const { user, logout } = useAuthStore();
-  const isOwner = user?.role === 'owner';
+  const isOwner = user?.role === 'owner' || (user?.role === 'programmer' && (user?.developerRank === 'lead' || user?.phone === '01064739664'));
   const [activeTab, setActiveTab] = useState<SettingsTab>('payment');
   const [loading, setLoading] = useState(isOwner);
   const [saving, setSaving] = useState(false);

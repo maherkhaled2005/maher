@@ -100,7 +100,8 @@ export default function WalletScreen({ navigation }: any) {
   // Customer Top-up Modal
   const [topupModalVisible, setTopupModalVisible] = useState(false);
   const [topupAmount, setTopupAmount] = useState('100');
-  const [topupMethod, setTopupMethod] = useState('بطاقة ائتمان / بنكية');
+  const [topupMethod, setTopupMethod] = useState('إنستاباي');
+  const [topupSenderAccount, setTopupSenderAccount] = useState('');
   const [submittingTopup, setSubmittingTopup] = useState(false);
 
   const loadWalletData = async () => {
@@ -309,11 +310,14 @@ export default function WalletScreen({ navigation }: any) {
         method: 'POST',
         data: {
           amount: amt,
+          paymentMethod: topupMethod,
+          senderAccount: topupSenderAccount.trim() || undefined,
         },
       });
 
       setTopupModalVisible(false);
-      const msg = res.message || `تم شحن المحفظة بمبلغ ${amt} ج.م بنجاح!`;
+      setTopupSenderAccount('');
+      const msg = res.message || `تم تقديم طلب شحن المحفظة بمبلغ ${amt} ج.م بنجاح!`;
       Alert.alert('✅ تم الشحن بنجاح', msg);
       await loadWalletData();
     } catch (err: any) {
@@ -1149,7 +1153,7 @@ export default function WalletScreen({ navigation }: any) {
             {/* Payment Method */}
             <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: 4 }}>طريقة الدفع الآمن:</Text>
             <View style={{ flexDirection: 'row-reverse', gap: 6, marginBottom: spacing.md }}>
-              {['بطاقة بنكية', 'فودافون كاش', 'فوري'].map((pm) => (
+              {['إنستاباي', 'فودافون كاش', 'بطاقة بنكية'].map((pm) => (
                 <TouchableOpacity
                   key={pm}
                   onPress={() => setTopupMethod(pm)}
@@ -1169,6 +1173,45 @@ export default function WalletScreen({ navigation }: any) {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Official payment instructions banner */}
+            {(topupMethod === 'إنستاباي' || topupMethod === 'فودافون كاش') && (
+              <View style={{ backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: colors.primary + '55', borderRadius: borderRadius.md, padding: spacing.sm, marginBottom: spacing.md }}>
+                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: 'bold', textAlign: 'right', marginBottom: 4 }}>
+                  {topupMethod === 'إنستاباي' ? 'بيانات التحويل عبر تطبيق InstaPay ⚡' : 'بيانات التحويل عبر فودافون كاش 📱'}
+                </Text>
+                {topupMethod === 'إنستاباي' && (
+                  <Text style={{ color: colors.white, fontSize: 12, textAlign: 'right', marginBottom: 2 }}>
+                    معرّف إنستاباي: <Text style={{ color: colors.primary, fontWeight: 'bold' }}>adelelgohry412@instapay</Text>
+                  </Text>
+                )}
+                <Text style={{ color: colors.white, fontSize: 12, textAlign: 'right', marginBottom: 2 }}>
+                  رقم الهاتف: <Text style={{ color: colors.primary, fontWeight: 'bold' }}>01064739664</Text>
+                </Text>
+                <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right', marginTop: 4 }}>
+                  يرجى تحويل المبلغ ثم إدخال رقم هاتفك أو حسابك المحول منه لتأكيد إضافة الرصيد.
+                </Text>
+
+                <TextInput
+                  style={{
+                    backgroundColor: '#111',
+                    borderRadius: borderRadius.sm,
+                    borderWidth: 1,
+                    borderColor: '#333',
+                    padding: spacing.xs + 4,
+                    color: colors.white,
+                    textAlign: 'right',
+                    fontSize: 12,
+                    marginTop: 8,
+                  }}
+                  placeholder="رقم المحفظة / الحساب المحول منه..."
+                  placeholderTextColor={colors.gray}
+                  value={topupSenderAccount}
+                  onChangeText={setTopupSenderAccount}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            )}
 
             <TouchableOpacity
               onPress={handleSubmitTopup}

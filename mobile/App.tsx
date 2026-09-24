@@ -82,7 +82,7 @@ export default function App() {
 
   // 1. Splash Screen Animation State
   const splashOpacity = React.useRef(new Animated.Value(0)).current;
-  const splashScale = React.useRef(new Animated.Value(0.92)).current;
+  const splashScale = React.useRef(new Animated.Value(1.35)).current;
 
   useEffect(() => {
     if (notification) {
@@ -91,17 +91,17 @@ export default function App() {
   }, [notification]);
 
   useEffect(() => {
-    // Elegant, short branding animation then directly into the app
+    // Professional circular logo scale-down entrance animation
     Animated.parallel([
       Animated.timing(splashOpacity, {
         toValue: 1,
-        duration: 400,
+        duration: 500,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(splashScale, {
         toValue: 1,
-        friction: 7,
-        tension: 90,
+        friction: 6,
+        tension: 50,
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
@@ -109,12 +109,12 @@ export default function App() {
     const transitionTimer = setTimeout(() => {
       Animated.timing(splashOpacity, {
         toValue: 0,
-        duration: 250,
+        duration: 350,
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setAppReady(true);
       });
-    }, Platform.OS === 'web' ? 400 : 900);
+    }, Platform.OS === 'web' ? 1200 : 1800);
 
     return () => clearTimeout(transitionTimer);
   }, []);
@@ -131,40 +131,48 @@ export default function App() {
             alignItems: 'center',
           }}
         >
-          {/* Official TecnoRexa Brand Logo Card */}
+          {/* Official TecnoRexa Circular Gold Brand Logo */}
           <View
             style={{
-              width: 130,
-              height: 130,
-              borderRadius: 30,
+              width: 140,
+              height: 140,
+              borderRadius: 70,
               backgroundColor: '#111111',
-              borderWidth: 2,
+              borderWidth: 2.5,
               borderColor: '#D4AF37',
               overflow: 'hidden',
               justifyContent: 'center',
               alignItems: 'center',
               shadowColor: '#D4AF37',
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.35,
-              shadowRadius: 16,
-              elevation: 10,
-              marginBottom: 24,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.45,
+              shadowRadius: 20,
+              elevation: 12,
+              marginBottom: 20,
             }}
           >
             <Image
-              source={require('./assets/tecnorexa_official_logo.jpg')}
+              source={require('./assets/tecnorexa_logo_gold.jpg')}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
           </View>
 
           {/* Brand Typography */}
-          <Text style={{ color: '#FFFFFF', fontSize: 32, fontWeight: '900', letterSpacing: 1, marginBottom: 8 }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 32, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }}>
             Tecno<Text style={{ color: '#D4AF37' }}>Rexa</Text>
           </Text>
-          <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center' }}>
+          <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 24 }}>
             منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
           </Text>
+
+          {/* Loading indicator with text */}
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+            <ActivityIndicator size="small" color="#D4AF37" />
+            <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: 'bold' }}>
+              جاري التحميل...
+            </Text>
+          </View>
         </Animated.View>
       </View>
     );

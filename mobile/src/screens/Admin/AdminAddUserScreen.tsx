@@ -19,11 +19,10 @@ import { colors, spacing, borderRadius } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
 
 const ALL_ROLES = [
-  { id: 'programmer', label: 'مبرمج عادي', icon: '💻', ownerOnly: false },
-  { id: 'manager', label: 'المدير', icon: '👔', ownerOnly: true },
-  { id: 'customer_support', label: 'خدمة العملاء', icon: '🎧', ownerOnly: false },
-  { id: 'technician', label: 'فني صيانة معتمد', icon: '🔧', ownerOnly: false },
-  { id: 'merchant', label: 'تاجر قطع غيار', icon: '🏪', ownerOnly: false },
+  { id: 'manager', label: 'المدير العام', icon: '👔', ownerOnly: false },
+  { id: 'customer_support', label: 'خدمة العملاء والدعم الفني', icon: '🎧', ownerOnly: false },
+  { id: 'technician', label: 'فني صيانة معتمد (يتطلب سداد اشتراك 300 ج.م)', icon: '🔧', ownerOnly: false },
+  { id: 'merchant', label: 'تاجر ومورد قطع غيار (يتطلب سداد اشتراك 100 ج.م)', icon: '🏪', ownerOnly: false },
   { id: 'customer', label: 'عميل', icon: '👤', ownerOnly: false },
 ];
 
@@ -38,11 +37,31 @@ export default function AdminAddUserScreen({ navigation }: any) {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('123456');
-  const [role, setRole] = useState('programmer');
+  const [role, setRole] = useState('customer_support');
   const [showRoles, setShowRoles] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const availableRoles = ALL_ROLES.filter((r) => !r.ownerOnly || isOwner);
+  // Strictly check authorization: Only Lead Programmer and Owner
+  if (!isOwner && !isLeadProgrammer) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ color: '#EF4444', fontSize: 20, fontWeight: '900', marginBottom: 12, textAlign: 'center' }}>
+          غير مصرح لك بإضافة مستخدمين ⛔
+        </Text>
+        <Text style={{ color: '#A1A1AA', fontSize: 14, textAlign: 'center', marginBottom: 20 }}>
+          صلاحية إضافة المستخدمين مقتصرة حصرياً على المسؤول التقني (رئيس المبرمجين) والمالك.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ backgroundColor: '#D4AF37', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+        >
+          <Text style={{ color: '#0A0A0A', fontWeight: 'bold' }}>رجوع</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const availableRoles = ALL_ROLES;
   const selectedRoleObj = ALL_ROLES.find((r) => r.id === role) || availableRoles[0];
 
   const handleSave = async () => {
@@ -74,13 +93,17 @@ export default function AdminAddUserScreen({ navigation }: any) {
           email: cleanEmail || undefined,
           role,
           password: cleanPassword,
-          developerRank: role === 'programmer' ? 'junior' : undefined,
         },
       });
 
+      const isProRole = role === 'technician' || role === 'merchant';
+      const extraNotice = isProRole 
+        ? '\n\n⚠️ تنبيه مهم: الحساب سيبقى قيد الانتظار ولن يتم تفعيل صلاحياته إلا بعد قيام العضو بسداد رسوم الاشتراك وتأكيد الإيصال.' 
+        : '';
+
       Alert.alert(
-        '✅ تم إضافة العضو',
-        `تم تسجيل الحساب بنجاح برتبة "${selectedRoleObj.label}". كلمة المرور الأولية المحددة هي (${cleanPassword}). سيتوجب على العضو تغيير كلمة المرور عند تسجيل الدخول لأول مرة لضمان الأمان.`,
+        '✅ تم إضافة العضو بنجاح',
+        `تم تسجيل الحساب برتبة "${selectedRoleObj.label}". كلمة المرور الأولية المحددة هي (${cleanPassword}). سيتوجب على العضو تغيير كلمة المرور عند تسجيل الدخول لأول مرة.${extraNotice}`,
         [{ text: 'تم', onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {

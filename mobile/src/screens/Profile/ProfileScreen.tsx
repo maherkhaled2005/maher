@@ -629,9 +629,9 @@ export default function ProfileScreen({ navigation }: any) {
                   gap: 6,
                 }}
               >
-                <Lock size={16} color={colors.gray} />
-                <Text style={{ color: colors.white, fontWeight: '700', fontSize: 12 }}>
-                  كلمة المرور
+                <Lock size={16} color={colors.primary} />
+                <Text style={{ color: colors.white, fontWeight: '800', fontSize: 13 }}>
+                  تغيير كلمة المرور
                 </Text>
               </TouchableOpacity>
 
