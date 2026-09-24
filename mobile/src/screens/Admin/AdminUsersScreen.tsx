@@ -61,7 +61,7 @@ const ALL_ROLES = [
   { key: 'all', label: 'الكل' },
   { key: 'owner', label: '👑 المالك' },
   { key: 'manager', label: '👔 المدير' },
-  { key: 'programmer', label: '💻 مبرمج عادي' },
+  { key: 'programmer', label: '💻 رئيس التقني' },
   { key: 'customer_support', label: '🎧 الدعم' },
   { key: 'technician', label: '🔧 الفني' },
   { key: 'merchant', label: '🏪 التاجر' },
@@ -183,10 +183,7 @@ export default function AdminUsersScreen({ navigation }: any) {
       case 'manager':
         return { label: '👔 المدير', color: colors.manager, bg: colors.managerBg };
       case 'programmer':
-        if (phone === '01064739664' || developerRank === 'lead') {
-          return { label: '💻 المسؤول التقني (قائد المبرمجين)', color: '#8B5CF6', bg: 'rgba(139,92,246,0.15)' };
-        }
-        return { label: '💻 مبرمج عادي', color: colors.programmer, bg: colors.programmerBg };
+        return { label: '💻 رئيس التقني', color: colors.programmer, bg: colors.programmerBg };
       case 'technician':
         return { label: '🔧 الفني', color: colors.technician, bg: colors.technicianBg };
       case 'merchant':
@@ -207,9 +204,9 @@ export default function AdminUsersScreen({ navigation }: any) {
       return;
     }
 
-    // 🛡️ Cannot ban any owner account
-    if (targetNormRole === 'owner') {
-      Alert.alert('غير مسموح ⚠️', 'لا يمكن حظر حساب المالك بقرار إداري.');
+    // 🛡️ Cannot ban any owner or programmer account
+    if (targetNormRole === 'owner' || targetNormRole === 'programmer') {
+      Alert.alert('غير مسموح ⚠️', 'حسابات المالك ورئيس التقني محصنة بالكامل ولا يمكن حظرها إدارياً.');
       return;
     }
 
@@ -282,9 +279,10 @@ export default function AdminUsersScreen({ navigation }: any) {
       Alert.alert('غير مسموح ⚠️', 'لا يمكنك حذف حسابك الشخصي بصفتك مالك المنصة.');
       return;
     }
-    // 🛡️ Cannot delete another owner
-    if (normalizeRole(u.role) === 'owner') {
-      Alert.alert('غير مسموح ⚠️', 'لا يمكن حذف حساب مالك المنصة.');
+    // 🛡️ Cannot delete owner or programmer
+    const targetNorm = normalizeRole(u.role);
+    if (targetNorm === 'owner' || targetNorm === 'programmer') {
+      Alert.alert('غير مسموح ⚠️', 'لا يمكن حذف حساب المالك أو رئيس التقني.');
       return;
     }
     setDeleteTargetUser(u);
@@ -312,7 +310,7 @@ export default function AdminUsersScreen({ navigation }: any) {
 
   const openAddUserModal = () => {
     if (!canAddUser) {
-      Alert.alert('غير مصرح ⚠️', 'صلاحية إضافة المستخدمين محصورة بالمالك ورئيس المبرمجين فقط.');
+      Alert.alert('غير مصرح ⚠️', 'صلاحية إضافة المستخدمين محصورة بالمالك ورئيس التقني فقط.');
       return;
     }
     setIsEditing(false);
@@ -321,7 +319,7 @@ export default function AdminUsersScreen({ navigation }: any) {
     setFormPhone('');
     setFormEmail('');
     setFormPassword('123456');
-    setFormRole('programmer');
+    setFormRole('customer_support');
     setFormStatus('active');
     setFormBalance('0');
     setUserModalVisible(true);
@@ -874,8 +872,8 @@ export default function AdminUsersScreen({ navigation }: any) {
                     </TouchableOpacity>
                   )}
 
-                  {/* Delete Button (Owner ONLY) */}
-                  {isOwner && (
+                  {/* Delete Button (Owner ONLY, and strictly cannot delete owner or programmer) */}
+                  {isOwner && normalizeRole(item.role) !== 'owner' && normalizeRole(item.role) !== 'programmer' && (
                     <TouchableOpacity
                       onPress={() => openDeleteModal(item)}
                       style={{
@@ -895,8 +893,8 @@ export default function AdminUsersScreen({ navigation }: any) {
                     </TouchableOpacity>
                   )}
 
-                  {/* Ban / Unban Button (Owner and Manager) */}
-                  {!isReadOnly && (
+                  {/* Ban / Unban Button (Owner and Manager, strictly cannot ban owner or programmer) */}
+                  {!isReadOnly && normalizeRole(item.role) !== 'owner' && normalizeRole(item.role) !== 'programmer' && (
                     <TouchableOpacity
                       onPress={() => handleToggleBan(item)}
                       style={{
@@ -1117,6 +1115,9 @@ export default function AdminUsersScreen({ navigation }: any) {
                   <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
                     {ALL_ROLES.filter((r) => {
                       if (r.key === 'all') return false;
+                      // لا يمكن إضافة رتبة المالك أو رئيس التقني من خلال إضافة مستخدم
+                      if (!isEditing && (r.key === 'owner' || r.key === 'programmer')) return false;
+                      if (isEditing && (r.key === 'owner' || r.key === 'programmer') && formRole !== r.key) return false;
                       if (isManager && (r.key === 'owner' || r.key === 'manager')) return false;
                       return true;
                     }).map((r) => (

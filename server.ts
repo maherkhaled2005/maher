@@ -1131,7 +1131,7 @@ async function runMigrations() {
   const coreUsers = [
     { id: 'owner_master', name: 'المهندس خالد محمد (المالك)', phone: '01011112222', role: 'owner', email: 'owner@tecnorexa.com', pass: '123456', specialty: 'المالك والمشرف العام', developerRank: 'none' },
     { id: 'manager_adel', name: 'عادل الجوهري (المدير العام)', phone: '01286585187', role: 'manager', email: 'adelelgohry412@gmail.com', pass: '123456', specialty: 'المدير التنفيذي والتشغيلي', developerRank: 'none' },
-    { id: 'programmer_maher', name: 'المهندس ماهر خالد (رئيس المبرمجين ومصمم التطبيق)', phone: '01064739664', role: 'programmer', email: 'maherkhaled880@gmail.com', pass: '123456', specialty: 'المسؤول التقني وقائد التطوير ومصمم التطبيق', developerRank: 'lead' },
+    { id: 'programmer_maher', name: 'المهندس ماهر خالد', phone: '01064739664', role: 'programmer', email: 'maherkhaled880@gmail.com', pass: '123456', specialty: 'رئيس التقني وقائد التطوير', developerRank: 'lead' },
     { id: 'support_official', name: 'فريق خدمة العملاء والدعم الفني', phone: '01557470554', role: 'customer_support', email: 'tecnorexa@gmail.com', pass: '123456', specialty: 'خدمة العملاء والدعم الفني', developerRank: 'none' },
   ];
 
@@ -5764,7 +5764,7 @@ app.post(
 
     // Strict rule: Manager is NOT allowed to add users. Only Lead Programmer and Owner can add users.
     if (!isOwner && !isLeadProgrammer) {
-      return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة حصرياً على المسؤول التقني (رئيس المبرمجين) والمالك." });
+      return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة حصرياً على رئيس التقني والمالك." });
     }
 
     const { name, phone, email, role: userRole, password } = req.body;
@@ -5779,14 +5779,14 @@ app.post(
 
     // Lead Programmer phone is unique and exclusive
     if (cleanPhone === '01064739664') {
-      return res.status(400).json({ error: "رقم هاتف قائد المبرمجين مسجل بالفعل وحصري للمسؤول التقني." });
+      return res.status(400).json({ error: "رقم هاتف رئيس التقني مسجل بالفعل وحصري." });
     }
 
     const normalizedRole = normalizeRoleServer(userRole || "customer");
 
     // Restrictions: Owner and Programmer roles cannot be created from general form
     if (['owner', 'programmer'].includes(normalizedRole)) {
-      return res.status(403).json({ error: "لا يمكن إضافة حساب مالك أو مبرمج من هذا النموذج؛ هذه الحسابات حصرية وإدارية عليا." });
+      return res.status(403).json({ error: "لا يمكن إضافة حساب مالك أو رئيس التقني من هذا النموذج." });
     }
 
     // Professional roles (technician / merchant) require payment before activation!
@@ -5876,17 +5876,16 @@ app.put(
         return res.status(400).json({ error: "لا يمكن للمالك تخفيض رتبة حسابه الخاص" });
       }
 
-      // 🛡️ Lead Programmer Protection: Cannot be banned or demoted
-      if ((oldUser.id === 'programmer_lead' || oldUser.phone === '01064739664') && targetId !== currentUser.id) {
-        if (status === 'banned' || status === 'suspended' || (normalizedTargetRole !== 'programmer' && !isOwner)) {
-          return res.status(403).json({ error: "لا يمكن حظر أو تعديل رتبة قائد المبرمجين والمسؤول التقني 🛡️" });
-        }
+      // 🛡️ Owner & Programmer Protection: Neither can be banned or suspended
+      if ((oldUserRole === "owner" || oldUserRole === "programmer" || oldUser.id === 'programmer_maher' || oldUser.phone === '01064739664') && (status === "banned" || status === "suspended")) {
+        return res.status(403).json({ error: "لا يمكن حظر حساب المالك أو رئيس التقني 🛡️" });
       }
 
-      // 🛡️ Cannot ban any owner account
-      if (oldUserRole === "owner" && (status === "banned" || status === "suspended")) {
-        return res.status(403).json({ error: "لا يمكن حظر حساب المالك" });
+      // 🛡️ Cannot demote lead programmer
+      if ((oldUser.id === 'programmer_maher' || oldUser.phone === '01064739664' || oldUserRole === 'programmer') && targetId !== currentUser.id && normalizedTargetRole !== 'programmer') {
+        return res.status(403).json({ error: "لا يمكن تعديل رتبة رئيس التقني 🛡️" });
       }
+
       if (oldUserRole === "owner" && !isOwner) {
         return res.status(403).json({ error: "لا يمكنك تعديل صلاحيات المالك" });
       }
@@ -6014,9 +6013,10 @@ app.delete(
       if (!targetUser)
         return res.status(404).json({ error: "المستخدم غير موجود" });
       
-      // 🛡️ Cannot delete another owner account
-      if (normalizeRoleServer(targetUser.role) === 'owner')
-        return res.status(403).json({ error: "لا يمكن حذف حساب المالك" });
+      // 🛡️ Cannot delete owner or programmer account
+      const targetUserNormRole = normalizeRoleServer(targetUser.role);
+      if (targetUserNormRole === 'owner' || targetUserNormRole === 'programmer' || targetId === 'programmer_maher')
+        return res.status(403).json({ error: "لا يمكن حذف حساب المالك أو رئيس التقني 🛡️" });
 
       // Soft-delete financial records (anonymize but keep for accounting)
       const anonymizedName = `محذوف_${targetId.slice(-6)}`;
@@ -11504,8 +11504,9 @@ app.put("/api/owner/users/:id/ban", authenticateToken, requireOwner, async (req:
     const targetId = req.params.id;
     const targetUser = await db.prepare("SELECT id, role, name FROM users WHERE id = ?").get(targetId) as any;
     if (!targetUser) return res.status(404).json({ error: "المستخدم غير موجود" });
-    if (targetUser.role === 'owner' || targetId === req.user.id || targetId === 'owner_master') {
-      return res.status(400).json({ error: "لا يمكن حظر حساب المالك الرئيسي للمنظومة 🛡️" });
+    const targetNormRole = normalizeRoleServer(targetUser.role);
+    if (targetNormRole === 'owner' || targetNormRole === 'programmer' || targetId === req.user.id || targetId === 'owner_master' || targetId === 'programmer_maher') {
+      return res.status(400).json({ error: "لا يمكن حظر حساب المالك أو رئيس التقني للمنظومة 🛡️" });
     }
     await db.prepare("UPDATE users SET status = 'banned', banned = 1, banReason = 'حظر إداري' WHERE id = ?").run(targetId);
     res.json({ success: true, message: `تم حظر حساب (${targetUser.name}) بنجاح` });
@@ -11552,8 +11553,9 @@ app.delete("/api/owner/users/:id", authenticateToken, requireOwner, async (req: 
     const targetId = req.params.id;
     const targetUser = await db.prepare("SELECT id, role, name FROM users WHERE id = ?").get(targetId) as any;
     if (!targetUser) return res.status(404).json({ error: "المستخدم غير موجود" });
-    if (targetUser.role === 'owner' || targetId === req.user.id || targetId === 'owner_master') {
-      return res.status(403).json({ error: "لا يمكن حذف حساب المالك الرئيسي للمنظومة 🛡️" });
+    const targetNorm = normalizeRoleServer(targetUser.role);
+    if (targetNorm === 'owner' || targetNorm === 'programmer' || targetId === req.user.id || targetId === 'owner_master' || targetId === 'programmer_maher') {
+      return res.status(403).json({ error: "لا يمكن حذف حساب المالك أو رئيس التقني للمنظومة 🛡️" });
     }
 
     // Anonymize financial history before deletion to prevent constraint errors

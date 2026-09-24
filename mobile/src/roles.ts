@@ -211,15 +211,12 @@ export function normalizeRole(role: string): ValidRole {
 export function getRoleLabel(role: string, developerRank?: string, phone?: string): string {
   const norm = normalizeRole(role);
   if (norm === "programmer") {
-    if (phone === "01064739664" || developerRank === "lead") {
-      return "المسؤول التقني وقائد المبرمجين 💻";
-    }
-    return "مبرمج عادي 💻";
+    return "رئيس التقني 💻";
   }
   const labels: Record<string, string> = {
     owner: "المالك 👑",
     manager: "المدير 👔",
-    programmer: "مبرمج عادي 💻",
+    programmer: "رئيس التقني 💻",
     customer_support: "دعم العملاء 🎧",
     technician: "فني صيانة 🔧",
     merchant: "تاجر معتمد 🏪",

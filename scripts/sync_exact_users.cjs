@@ -28,7 +28,7 @@ const targetUsers = [
   },
   {
     id: 'programmer_maher',
-    name: 'المهندس ماهر خالد (رئيس المبرمجين ومصمم التطبيق)',
+    name: 'المهندس ماهر خالد',
     phone: '01064739664',
     email: 'maherkhaled880@gmail.com',
     role: 'programmer',

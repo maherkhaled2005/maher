@@ -49,7 +49,7 @@ export default function AdminAddUserScreen({ navigation }: any) {
           غير مصرح لك بإضافة مستخدمين ⛔
         </Text>
         <Text style={{ color: '#A1A1AA', fontSize: 14, textAlign: 'center', marginBottom: 20 }}>
-          صلاحية إضافة المستخدمين مقتصرة حصرياً على المسؤول التقني (رئيس المبرمجين) والمالك.
+          صلاحية إضافة المستخدمين مقتصرة حصرياً على رئيس التقني والمالك.
         </Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -79,7 +79,7 @@ export default function AdminAddUserScreen({ navigation }: any) {
       return;
     }
     if (cleanPhone === '01064739664') {
-      Alert.alert('تنبيه', 'رقم الهاتف 01064739664 مخصص حصرياً للمسؤول التقني وقائد المبرمجين ولا يمكن تكراره.');
+      Alert.alert('تنبيه', 'رقم الهاتف 01064739664 مخصص حصرياً لرئيس التقني ولا يمكن تكراره.');
       return;
     }
 
