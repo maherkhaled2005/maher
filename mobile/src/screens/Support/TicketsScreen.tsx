@@ -35,10 +35,12 @@ export default function TicketsScreen({ navigation }: any) {
 
   // New Ticket Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0].id);
   const [priority, setPriority] = useState('medium');
-  const [phone, setPhone] = useState(user?.phone || '');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -65,6 +67,14 @@ export default function TicketsScreen({ navigation }: any) {
   };
 
   const handleCreateTicket = async () => {
+    if (!name.trim()) {
+      Alert.alert('تنبيه', 'يرجى إدخال اسمك بالكامل');
+      return;
+    }
+    if (!phone.trim() || phone.trim().length < 11) {
+      Alert.alert('تنبيه', 'يرجى إدخال رقم هاتفك للتواصل معك (11 رقماً)');
+      return;
+    }
     if (!subject.trim() || !description.trim()) {
       Alert.alert('تنبيه', 'يرجى كتابة عنوان التذكرة وتفاصيل المشكلة');
       return;
@@ -75,16 +85,21 @@ export default function TicketsScreen({ navigation }: any) {
       const res = await fetchApi('/support/tickets', {
         method: 'POST',
         data: {
+          customerName: name.trim(),
+          customerPhone: phone.trim(),
+          email: email.trim() || undefined,
           subject: subject.trim(),
           title: subject.trim(),
           category,
           priority,
-          customerPhone: phone.trim() || user?.phone || '',
           description: description.trim(),
         },
       });
 
       Alert.alert('تم بنجاح', 'تم فتح التذكرة وإرسالها لفريق الدعم الفني بنجاح');
+      setName('');
+      setPhone('');
+      setEmail('');
       setSubject('');
       setDescription('');
       setIsModalOpen(false);
@@ -134,7 +149,6 @@ export default function TicketsScreen({ navigation }: any) {
         {user?.role !== 'customer_support' && user?.role !== 'support' && (
           <TouchableOpacity
             onPress={() => {
-              setPhone(user?.phone || '');
               setIsModalOpen(true);
             }}
             style={{
@@ -261,14 +275,14 @@ export default function TicketsScreen({ navigation }: any) {
                 ))}
               </View>
 
-              {/* العنوان */}
+              {/* الاسم بالكامل */}
               <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                عنوان المشكلة أو الاستفسار *:
+                الاسم بالكامل *:
               </Text>
               <TextInput
-                value={subject}
-                onChangeText={setSubject}
-                placeholder="مثال: مشكلة في موعد صيانة التكييف / عطل فني"
+                value={name}
+                onChangeText={setName}
+                placeholder="أدخل اسمك بالكامل هنا..."
                 placeholderTextColor={colors.gray}
                 style={{
                   backgroundColor: colors.dark,
@@ -285,14 +299,61 @@ export default function TicketsScreen({ navigation }: any) {
 
               {/* رقم الهاتف للتواصل */}
               <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                رقم الهاتف للتواصل:
+                رقم الهاتف للتواصل *:
               </Text>
               <TextInput
                 value={phone}
                 onChangeText={setPhone}
-                placeholder="010XXXXXXXX"
+                placeholder="010XXXXXXXX (11 رقماً)"
                 placeholderTextColor={colors.gray}
                 keyboardType="phone-pad"
+                maxLength={11}
+                style={{
+                  backgroundColor: colors.dark,
+                  color: colors.white,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: borderRadius.md,
+                  padding: spacing.md,
+                  textAlign: 'right',
+                  marginBottom: spacing.md,
+                  fontSize: 14,
+                }}
+              />
+
+              {/* البريد الإلكتروني للتواصل */}
+              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                البريد الإلكتروني للتواصل:
+              </Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="example@email.com (اختياري)"
+                placeholderTextColor={colors.gray}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={{
+                  backgroundColor: colors.dark,
+                  color: colors.white,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: borderRadius.md,
+                  padding: spacing.md,
+                  textAlign: 'right',
+                  marginBottom: spacing.md,
+                  fontSize: 14,
+                }}
+              />
+
+              {/* العنوان */}
+              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                عنوان المشكلة أو الاستفسار *:
+              </Text>
+              <TextInput
+                value={subject}
+                onChangeText={setSubject}
+                placeholder="مثال: مشكلة في موعد صيانة التكييف / عطل فني"
+                placeholderTextColor={colors.gray}
                 style={{
                   backgroundColor: colors.dark,
                   color: colors.white,
@@ -408,8 +469,13 @@ export default function TicketsScreen({ navigation }: any) {
             </Text>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                 <Text style={{ color: colors.gray, fontSize: typography.sizes.xs, fontWeight: '700' }}>{item.client || item.customerName || 'عميل'}</Text>
+                {(item.customerPhone || item.phone) ? (
+                  <Text style={{ color: colors.primary, fontSize: typography.sizes.xs, fontWeight: '800' }}>
+                    • {item.customerPhone || item.phone}
+                  </Text>
+                ) : null}
               </View>
               <Text style={{ color: colors.gray, fontSize: typography.sizes.xs }}>{item.date || item.createdAt || 'اليوم'}</Text>
             </View>

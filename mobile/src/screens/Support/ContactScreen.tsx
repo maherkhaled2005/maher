@@ -30,106 +30,90 @@ import { useAuthStore } from '../../store/authStore';
 
 export default function ContactScreen({ navigation }: any) {
   const { user } = useAuthStore();
-  const [name, setName] = useState(user?.name || '');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async () => {
-    const finalName = user ? (user.name || 'مستخدم مسجل') : name.trim();
-    const finalPhone = user ? (user.phone || '') : phone.trim();
-    const finalEmail = user ? (user.email || '') : email.trim();
+    const cleanName = name.trim();
+    const cleanPhone = phone.trim();
+    const cleanEmail = email.trim();
+    const cleanSubject = subject.trim() || 'رسالة استفسار لخدمة العملاء';
+    const cleanMessage = message.trim();
 
-    if (!user && !finalName) {
-      Alert.alert('تنبيه', 'يرجى إدخال الاسم بالكامل');
+    if (!cleanName) {
+      Alert.alert('تنبيه', 'يرجى إدخال اسمك بالكامل');
       return;
     }
-    if (!message.trim()) {
-      Alert.alert('تنبيه', 'يرجى كتابة نص الرسالة');
+    if (!cleanPhone || cleanPhone.length < 11) {
+      Alert.alert('تنبيه', 'يرجى إدخال رقم هاتف صحيح للتواصل معك (11 رقماً)');
       return;
     }
-    if (!user && (!finalPhone || finalPhone.length < 11)) {
-      Alert.alert('تنبيه', 'يرجى إدخال رقم هاتف صحيح للتواصل معك');
+    if (!cleanMessage) {
+      Alert.alert('تنبيه', 'يرجى كتابة نص الرسالة أو الاستفسار');
       return;
     }
 
     setLoading(true);
     try {
-      // Also send directly to tecnorexa@gmail.com
-      fetchApi('/contact', {
+      // 1. Send directly to official email (tecnorexa@gmail.com)
+      await fetchApi('/contact', {
         method: 'POST',
         data: {
-          name: finalName,
-          phone: finalPhone,
-          email: finalEmail || undefined,
-          subject: subject.trim() || 'رسالة استفسار لخدمة العملاء',
-          message: message.trim(),
+          name: cleanName,
+          phone: cleanPhone,
+          email: cleanEmail || undefined,
+          subject: cleanSubject,
+          message: cleanMessage,
         },
       }).catch(() => {});
 
-      if (!user) {
-        // Guest Support Flow (No login required)
-        const res = await fetchApi('/support/guest-ticket', {
-          method: 'POST',
-          data: {
-            name: finalName,
-            phone: finalPhone,
-            email: finalEmail || undefined,
-            subject: subject.trim() || 'طلب مساعدة من زائر المنصة',
-            description: message.trim(),
-          },
-        });
-        if (res?.success) {
-          setSuccess(true);
-        } else {
-          throw new Error(res?.error || 'تعذر إرسال التذكرة');
-        }
-      } else {
-        // Authenticated User Flow
-        const conv = await fetchApi('/conversations', {
-          method: 'POST',
-          data: {
-            name: 'تذكرة دعم: ' + (subject.trim() || 'رسالة تواصل'),
-            type: 'support',
-            participants: [],
-          },
-        });
-
-        if (conv && conv.id) {
-          await fetchApi('/messages', {
-            method: 'POST',
-            data: {
-              conversationId: conv.id,
-              content: `[تذكرة دعم من ${finalName}]\n\n${message.trim()}`,
-              type: 'text',
-            },
-          });
-
+      // 2. Also register support ticket so customer service sees it in the app
+      if (user) {
+        try {
           await fetchApi('/support/tickets', {
             method: 'POST',
             data: {
-              title: subject.trim() || 'رسالة تواصل من صفحة اتصل بنا',
-              subject: subject.trim() || 'رسالة تواصل',
-              customerName: finalName,
-              customerPhone: finalPhone,
-              email: finalEmail,
-              description: message.trim(),
+              title: cleanSubject,
+              subject: cleanSubject,
+              customerName: cleanName,
+              customerPhone: cleanPhone,
+              email: cleanEmail || undefined,
+              description: cleanMessage,
               type: 'inquiry',
               priority: 'medium',
             },
+          });
+        } catch {
+          await fetchApi('/support/guest-ticket', {
+            method: 'POST',
+            data: {
+              name: cleanName,
+              phone: cleanPhone,
+              email: cleanEmail || undefined,
+              subject: cleanSubject,
+              description: cleanMessage,
+            },
           }).catch(() => {});
-
-          setSuccess(true);
-          setTimeout(() => {
-            navigation.replace('Chat', { conversationId: conv.id });
-          }, 1500);
-        } else {
-          throw new Error('فشل إنشاء المحادثة مع الدعم');
         }
+      } else {
+        await fetchApi('/support/guest-ticket', {
+          method: 'POST',
+          data: {
+            name: cleanName,
+            phone: cleanPhone,
+            email: cleanEmail || undefined,
+            subject: cleanSubject,
+            description: cleanMessage,
+          },
+        });
       }
+
+      setSuccess(true);
     } catch (err: any) {
       Alert.alert('تنبيه', err.message || 'تعذر إرسال الرسالة حالياً، يرجى المحاولة لاحقاً');
     } finally {
@@ -399,103 +383,78 @@ export default function ContactScreen({ navigation }: any) {
             </View>
 
             <View style={{ gap: spacing.sm }}>
-              {user ? (
-                <View
+              {/* Full Name */}
+              <View>
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
+                  الاسم بالكامل <Text style={{ color: colors.danger }}>*</Text>
+                </Text>
+                <TextInput
                   style={{
-                    backgroundColor: '#111',
+                    backgroundColor: '#0A0A0A',
                     borderRadius: borderRadius.md,
                     padding: spacing.md,
+                    color: colors.white,
+                    textAlign: 'right',
                     borderWidth: 1,
-                    borderColor: 'rgba(212, 175, 55, 0.3)',
-                    flexDirection: 'row-reverse',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 6,
+                    borderColor: colors.border,
+                    fontSize: 13,
                   }}
-                >
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
-                    <Text style={{ color: colors.white, fontSize: 13, fontWeight: 'bold' }}>
-                      إرسال باسم: {user.name}
-                    </Text>
-                  </View>
-                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: 'bold' }}>
-                    {user.phone}
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <View>
-                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
-                      الاسم بالكامل *
-                    </Text>
-                    <TextInput
-                      style={{
-                        backgroundColor: '#0A0A0A',
-                        borderRadius: borderRadius.md,
-                        padding: spacing.md,
-                        color: colors.white,
-                        textAlign: 'right',
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        fontSize: 13,
-                      }}
-                      placeholder="أدخل اسمك الكامل"
-                      placeholderTextColor={colors.gray}
-                      value={name}
-                      onChangeText={setName}
-                    />
-                  </View>
+                  placeholder="أدخل اسمك بالكامل هنا..."
+                  placeholderTextColor={colors.gray}
+                  value={name}
+                  onChangeText={setName}
+                />
+              </View>
 
-                  <View>
-                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
-                      رقم الهاتف للتواصل <Text style={{ color: colors.danger }}>*</Text>
-                    </Text>
-                    <TextInput
-                      style={{
-                        backgroundColor: '#0A0A0A',
-                        borderRadius: borderRadius.md,
-                        padding: spacing.md,
-                        color: colors.white,
-                        textAlign: 'right',
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        fontSize: 13,
-                      }}
-                      placeholder="01xxxxxxxxx"
-                      placeholderTextColor={colors.gray}
-                      value={phone}
-                      onChangeText={setPhone}
-                      keyboardType="phone-pad"
-                      maxLength={11}
-                    />
-                  </View>
+              {/* Phone Number */}
+              <View>
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
+                  رقم الهاتف للتواصل <Text style={{ color: colors.danger }}>*</Text>
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: '#0A0A0A',
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    color: colors.white,
+                    textAlign: 'right',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    fontSize: 13,
+                  }}
+                  placeholder="01xxxxxxxxx (رقم الهاتف للتواصل معك)"
+                  placeholderTextColor={colors.gray}
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                />
+              </View>
 
-                  <View>
-                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
-                      البريد الإلكتروني
-                    </Text>
-                    <TextInput
-                      style={{
-                        backgroundColor: '#0A0A0A',
-                        borderRadius: borderRadius.md,
-                        padding: spacing.md,
-                        color: colors.white,
-                        textAlign: 'right',
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        fontSize: 13,
-                      }}
-                      placeholder="example@email.com"
-                      placeholderTextColor={colors.gray}
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
-                  </View>
-                </>
-              )}
+              {/* Email */}
+              <View>
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
+                  البريد الإلكتروني للتواصل
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: '#0A0A0A',
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    color: colors.white,
+                    textAlign: 'right',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    fontSize: 13,
+                  }}
+                  placeholder="example@gmail.com (للرد عليك عبر البريد)"
+                  placeholderTextColor={colors.gray}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
 
               <View>
                 <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>

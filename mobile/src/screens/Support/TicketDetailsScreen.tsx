@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, SafeAreaView, TouchableOpacity, TextInput,
-  FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, RefreshControl
+  FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, RefreshControl,
+  Linking,
 } from 'react-native';
 import { 
-  Send, User, ArrowLeft, ChevronRight, Shield, Wrench, Code
+  Send, User, ArrowLeft, ChevronRight, Shield, Wrench, Code, Phone, Mail
 } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -215,6 +216,52 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Customer Contact Details for Customer Support / Staff */}
+      {(ticketData.customerPhone || ticketData.phone || ticketData.email || ticketData.userEmail || ticketData.customerName || ticketData.client) ? (
+        <View
+          style={{
+            backgroundColor: '#18181B',
+            paddingHorizontal: spacing.md,
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderColor: '#27272A',
+            flexDirection: 'row-reverse',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <View style={{ alignItems: 'flex-end', flex: 1 }}>
+            <Text style={{ color: colors.white, fontSize: 13, fontWeight: '800' }}>
+              المرسل: {ticketData.customerName || ticketData.client || 'عميل'}
+            </Text>
+            <View style={{ flexDirection: 'row-reverse', gap: 14, marginTop: 4 }}>
+              {(ticketData.customerPhone || ticketData.phone) ? (
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`tel:${ticketData.customerPhone || ticketData.phone}`)}
+                  style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}
+                >
+                  <Phone size={13} color={colors.primary} />
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '800' }}>
+                    {ticketData.customerPhone || ticketData.phone}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {(ticketData.email || ticketData.userEmail) ? (
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`mailto:${ticketData.email || ticketData.userEmail}`)}
+                  style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}
+                >
+                  <Mail size={13} color="#3B82F6" />
+                  <Text style={{ color: '#3B82F6', fontSize: 11, fontWeight: '600' }}>
+                    {ticketData.email || ticketData.userEmail}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       <FlatList
         ref={flatListRef}

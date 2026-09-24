@@ -7416,8 +7416,9 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
   const description = req.body.description || '';
   const category = req.body.category || req.body.type || 'technical';
   const priority = req.body.priority || 'medium';
-  const customerPhone = req.body.customerPhone || req.user?.phone || '';
-  const email = req.body.email || req.user?.email || '';
+  const customerName = (req.body.customerName || req.body.name || '').trim() || req.user?.name || 'عميل';
+  const customerPhone = (req.body.customerPhone || req.body.phone || '').trim() || req.user?.phone || '';
+  const email = (req.body.email || '').trim() || req.user?.email || '';
   const ticketId = req.body.id || `ticket_${Date.now()}`;
   try {
     db.prepare(
@@ -7432,7 +7433,7 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
       description,
       category,
       priority,
-      req.user.name || 'عميل',
+      customerName,
       customerPhone,
       email,
       new Date().toISOString(),
@@ -7445,14 +7446,14 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
         `tmsg_${Date.now()}`,
         ticketId,
         req.user.id,
-        req.user.name || 'العميل',
+        customerName,
         description,
         description,
         new Date().toISOString(),
       );
     }
     try {
-      io.emit("new_ticket", { ticketId, subject, customerName: req.user.name || 'عميل', priority });
+      io.emit("new_ticket", { ticketId, subject, customerName, priority });
       io.emit("ticket_update", { ticketId, status: 'open' });
 
       // Insert database notifications for staff
@@ -7465,13 +7466,13 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
         notifStmt.run(
           `notif_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
           sm.id,
-          `تم إنشاء تذكرة دعم جديدة: "${subject}" من ${req.user?.name || 'عميل'}`,
+          `تم إنشاء تذكرة دعم جديدة: "${subject}" من ${customerName}`,
           JSON.stringify({ ticketId, screen: 'TicketDetails' })
         );
       }
 
       sendSupportEmail({
-        name: req.user?.name,
+        name: customerName,
         phone: customerPhone,
         email: email || req.user?.email,
         subject,
@@ -11169,8 +11170,11 @@ app.get(
 
 app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
   const id = `ticket_${Date.now()}`;
-  const { title, subject, description, category, priority, customerPhone, phone, email } =
+  const { title, subject, description, category, priority, customerName, name, customerPhone, phone, email } =
     req.body;
+  const finalCustomerName = (customerName || name || "").trim() || req.user.name || "عميل";
+  const finalPhone = (customerPhone || phone || "").trim() || req.user.phone || "";
+  const finalEmail = (email || "").trim() || req.user.email || "";
   const finalSubject = subject || title || "تذكرة دعم فني جديدة";
   const finalDesc = description || finalSubject;
 
@@ -11180,9 +11184,9 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
     ).run(
       id,
       req.user.id,
-      req.user.name || "عميل",
-      customerPhone || phone || req.user.phone || "",
-      email || req.user.email || "",
+      finalCustomerName,
+      finalPhone,
+      finalEmail,
       finalSubject,
       finalDesc,
       category || "عام",
@@ -11199,7 +11203,7 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
       msgId,
       id,
       req.user.id,
-      req.user.name || "عميل",
+      finalCustomerName,
       finalDesc,
       now,
     );
