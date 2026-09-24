@@ -91,36 +91,45 @@ export default function LandingScreen({ navigation }: any) {
         <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
           <View
             style={{
-              width: '100%',
-              maxWidth: 320,
-              height: 90,
-              borderRadius: 16,
+              width: 92,
+              height: 92,
+              borderRadius: 22,
               backgroundColor: '#0F0F11',
-              borderWidth: 1.5,
-              borderColor: 'rgba(212, 175, 55, 0.4)',
+              borderWidth: 2,
+              borderColor: '#D4AF37',
               overflow: 'hidden',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: 6,
               shadowColor: '#D4AF37',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.25,
-              shadowRadius: 10,
-              elevation: 6,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.5,
+              shadowRadius: 16,
+              elevation: 8,
             }}
           >
             <Image
               source={require('../../../assets/tecnorexa_official_logo.jpg')}
               style={{ width: '100%', height: '100%' }}
-              resizeMode="contain"
+              resizeMode="cover"
             />
           </View>
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 24,
+              fontWeight: '900',
+              marginTop: 10,
+              letterSpacing: 1,
+            }}
+          >
+            Tecno<Text style={{ color: '#D4AF37' }}>Rexa</Text>
+          </Text>
           <Text
             style={{
               color: '#D4AF37',
               fontSize: 13,
               fontWeight: '800',
-              marginTop: 6,
+              marginTop: 4,
               letterSpacing: 0.5,
               textAlign: 'center',
             }}
@@ -136,7 +145,7 @@ export default function LandingScreen({ navigation }: any) {
             alignItems: 'center',
             marginBottom: spacing.xl,
             width: '100%',
-            maxWidth: 420,
+            maxWidth: 240,
             alignSelf: 'center',
           }}
         >
@@ -144,15 +153,15 @@ export default function LandingScreen({ navigation }: any) {
             style={{
               width: '100%',
               aspectRatio: 1,
-              borderRadius: 24,
+              borderRadius: 20,
               overflow: 'hidden',
               borderWidth: 2,
               borderColor: '#0284C7',
               shadowColor: '#38BDF8',
-              shadowOffset: { width: 0, height: 10 },
+              shadowOffset: { width: 0, height: 8 },
               shadowOpacity: 0.45,
-              shadowRadius: 20,
-              elevation: 12,
+              shadowRadius: 16,
+              elevation: 10,
               backgroundColor: '#0A0A0A',
             }}
           >

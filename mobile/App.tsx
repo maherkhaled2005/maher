@@ -62,7 +62,7 @@ export default function App() {
   const { expoPushToken, notification } = usePushNotifications();
   const [appReady, setAppReady] = React.useState(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const circleSize = Math.max(220, Math.min(Math.min(windowWidth * 0.78, windowHeight * 0.38), 280));
+  const circleSize = Math.max(160, Math.min(Math.min(windowWidth * 0.55, windowHeight * 0.28), 200));
 
   useEffect(() => {
     if (Platform.OS === 'web') {
