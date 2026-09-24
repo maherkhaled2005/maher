@@ -1,26 +1,19 @@
 // src/constants/devices.ts
 
 export const DEVICES = [
-  { label: 'غسالة', emoji: '🧺' },
+  { label: 'غسالة ملابس', emoji: '🧺' },
+  { label: 'غسالة أطباق', emoji: '🍽️' },
   { label: 'ثلاجة', emoji: '❄️' },
-  { label: 'تكييف', emoji: '💨' },
-  { label: 'شاشة', emoji: '📺' },
-  { label: 'موبايل', emoji: '📱' },
-  { label: 'لاب توب', emoji: '💻' },
-  { label: 'مكيف سبليت', emoji: '🌀' },
-  { label: 'سخان', emoji: '🚿' },
-  { label: 'فرن', emoji: '🔥' },
-  { label: 'خلاط', emoji: '⚡' },
-  { label: 'تلفزيون', emoji: '📡' },
+  { label: 'ديب فريزر', emoji: '🧊' },
+  { label: 'تكييف وتبريد', emoji: '💨' },
   { label: 'بوتاجاز', emoji: '🍳' },
+  { label: 'فرن بلت إن', emoji: '🔥' },
+  { label: 'ميكروويف', emoji: '♨️' },
+  { label: 'سخان مياه', emoji: '🚿' },
+  { label: 'شاشة وتلفزيون', emoji: '📺' },
+  { label: 'خلاط ومحضر طعام', emoji: '⚡' },
   { label: 'مروحة', emoji: '💨' },
-  { label: 'طابعة', emoji: '🖨️' },
-  { label: 'راوتر', emoji: '📶' },
-  { label: 'UPS', emoji: '🔋' },
-  { label: 'مولد', emoji: '⚡' },
-  { label: 'مضخة مياه', emoji: '💧' },
-  { label: 'ستاند باي', emoji: '🔌' },
-  { label: 'أخرى', emoji: '⚙️' },
+  { label: 'أخرى (أجهزة منزلية)', emoji: '⚙️' },
 ] as const;
 
 export type Device = typeof DEVICES[number];

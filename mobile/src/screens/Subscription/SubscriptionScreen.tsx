@@ -136,13 +136,17 @@ export default function SubscriptionScreen({ route, navigation }: any) {
 
       setShowConfirmModal(false);
       Alert.alert(
-        '🎉 مبروك الترقية!',
-        `تم سداد ${price} ج.م وتفعيل حسابك بنجاح كـ ${planTitle}. تم تحديث صلاحياتك وواجهتك فوراً.`,
+        '⏳ تم استلام طلبك بنجاح',
+        `تم تسجيل سداد ${price} ج.م وإرفاق الإيصال بنجاح. طلبك الآن قيد المراجعة والاعتماد من قبل إدارة المنصة وسيتم تفعيل حسابك فور التحقق.`,
         [
           {
-            text: 'دخول لوحة التحكم',
+            text: 'متابعة حالة الحساب',
             onPress: () => {
-              navigation.navigate('Main', { screen: 'Home' });
+              if (navigation?.replace) {
+                navigation.replace('PendingApproval');
+              } else {
+                navigation.navigate('PendingApproval');
+              }
             },
           },
         ]

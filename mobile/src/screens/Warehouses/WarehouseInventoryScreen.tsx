@@ -75,7 +75,7 @@ export default function WarehouseInventoryScreen({ route, navigation }: any) {
 
       <FlatList
         data={inventory}
-        keyExtractor={item => item.id?.toString() || Math.random().toString()}
+        keyExtractor={(item, index) => item.id?.toString() || `inv_${index}`}
         contentContainerStyle={{ padding: 16, paddingBottom: 150 }}
         ListEmptyComponent={
           <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>

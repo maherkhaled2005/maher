@@ -44,7 +44,7 @@ const SPECIALTIES = [
 
 export default function TechnicianDashboard({ navigation }: any) {
   const { user, updateUser } = useAuthStore();
-  const [isAvailable, setIsAvailable] = useState(user?.available !== undefined ? Boolean(user.available) : true);
+  const [isAvailable, setIsAvailable] = useState(Boolean(user?.available));
   const [refreshing, setRefreshing] = useState(false);
   const [overview, setOverview] = useState<any>(null);
   const [incomingRequests, setIncomingRequests] = useState<any[]>([]);

@@ -1231,7 +1231,7 @@ app.post("/api/auth/login", async (req, res) => {
   );
 
   const cleanPhone = user.phone || normalizedPhone;
-  console.log(`📱 [Login OTP Generated] ${cleanPhone} -> ${otp}`);
+  if (process.env.NODE_ENV !== 'production') console.log(`📱 [Login OTP Generated] ${cleanPhone} -> ${otp}`);
   await sendRealSMS(cleanPhone, `رمز التحقق لتسجيل الدخول إلى TecnoRexa هو: ${otp}`);
 
   res.json({
@@ -1291,7 +1291,7 @@ app.post("/api/auth/verify-login-otp", async (req, res) => {
     }
 
     const cleanInputOtp = String(otp).trim();
-    const isMatch = (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp) || cleanInputOtp === '123456';
+    const isMatch = (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp);
 
     if (!isMatch) {
       db.prepare("UPDATE users SET otpAttempts = COALESCE(otpAttempts, 0) + 1 WHERE id = ?").run(user.id);
@@ -1385,7 +1385,7 @@ app.post("/api/auth/resend-otp", async (req, res) => {
     );
 
     const targetPhone = user.phone || cleanPhone;
-    console.log(`📱 [Resend OTP] ${targetPhone} -> ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Resend OTP] ${targetPhone} -> ${otp}`);
     await sendRealSMS(targetPhone, `رمز التحقق الجديد الخاص بك هو: ${otp}`);
 
     res.json({
@@ -1430,7 +1430,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     db.prepare("UPDATE users SET otpCode = ?, otp = ?, otpExpires = ?, lastOtpSentAt = ?, otpAttempts = 0 WHERE id = ?").run(otp, otp, otpExpires, new Date().toISOString(), user.id);
 
-    console.log(`📱 [Forgot Password OTP] ${cleanPhone} -> ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Forgot Password OTP] ${cleanPhone} -> ${otp}`);
     await sendRealSMS(cleanPhone, `رمز استعادة كلمة المرور الخاص بك في TecnoRexa هو: ${otp}`);
 
     res.json({
@@ -1465,7 +1465,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
     }
 
     const cleanInputOtp = String(otp).trim();
-    const isMatch = (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp) || cleanInputOtp === '123456';
+    const isMatch = (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp);
     if (!isMatch) {
       return res.status(400).json({ error: "رمز التحقق غير صحيح" });
     }
@@ -1580,9 +1580,9 @@ app.post("/api/auth/request-otp", async (req: any, res) => {
   try {
     const cleanPhone = normalizePhone(phone);
     const rawDigits = String(phone).trim().replace(/\D/g, '');
-    // Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    // Generate cryptographically secure 6-digit OTP
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     // Persist OTP to the user's record so verification can be validated.
     let user = db
@@ -1592,8 +1592,8 @@ app.post("/api/auth/request-otp", async (req: any, res) => {
       const userId = `user_${Date.now()}`;
       const hashedPassword = await bcrypt.hash(`otp_${Date.now()}`, 10);
       db.prepare(
-        `INSERT INTO users (id, phone, name, role, password, otp, otpExpires, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, phone, name, role, password, otp, otpCode, otpExpires, lastOtpSentAt, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         userId,
         cleanPhone,
@@ -1601,18 +1601,22 @@ app.post("/api/auth/request-otp", async (req: any, res) => {
         "customer",
         hashedPassword,
         otp,
+        otp,
         expiresAt,
+        new Date().toISOString(),
         new Date().toISOString(),
       );
     } else {
-      await db.prepare("UPDATE users SET otp = ?, otpExpires = ? WHERE id = ?").run(
+      db.prepare("UPDATE users SET otp = ?, otpCode = ?, otpExpires = ?, lastOtpSentAt = ?, otpAttempts = 0 WHERE id = ?").run(
+        otp,
         otp,
         expiresAt,
+        new Date().toISOString(),
         user.id,
       );
     }
 
-    console.log(`📱 [OTP] ${cleanPhone} -> ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`📱 [OTP] ${cleanPhone} -> ${otp}`);
 
     // Send real SMS if gateway credentials are provided
     const smsResult = await sendRealSMS(cleanPhone, `رمز تأكيد حسابك في منصة TecnoRexa هو: ${otp}`);
@@ -1622,7 +1626,6 @@ app.post("/api/auth/request-otp", async (req: any, res) => {
       message: "OTP sent",
       smsDelivered: smsResult.success,
       smsProvider: smsResult.provider,
-      devOtp: (!smsResult.success || process.env.NODE_ENV !== "production") ? otp : undefined,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1649,8 +1652,8 @@ app.post("/api/auth/verify-otp", async (req, res) => {
     }
 
     const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
-    const isMatch = (user.otpCode && user.otpCode === cleanOtp) || (user.otp && user.otp === cleanOtp) || cleanOtp === '123456';
-    const isValid = isMatch && (expiresAt >= Date.now() || cleanOtp === '123456');
+    const isMatch = (user.otpCode && user.otpCode === cleanOtp) || (user.otp && user.otp === cleanOtp);
+    const isValid = isMatch && expiresAt >= Date.now();
 
     if (!isValid) {
       return res.status(400).json({ error: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
@@ -1784,7 +1787,7 @@ app.post("/api/auth/register", async (req, res) => {
       } catch (e) {}
     }
 
-    console.log(`📱 [Registration Confirmation Code] ${cleanPhone} -> ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Registration Code] ${cleanPhone} -> ${otp}`);
     await sendRealSMS(cleanPhone, `مرحباً بك في TecnoRexa! رمز تأكيد حسابك هو: ${otp}`);
 
     const freshUser = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
@@ -1825,22 +1828,32 @@ function authenticateToken(req: any, res: any, next: any) {
 
 async function verifyAccountStatus(user: any, req: any, res: any, next: any) {
   req.user = user;
-  if (req.path === "/api/auth/me" || req.path === "/api/auth/logout") {
+  // Always allow auth-related routes
+  if (req.path.startsWith("/api/auth")) {
     return next();
   }
   try {
-    const dbUser = await db.prepare("SELECT status, banned, banReason FROM users WHERE id = ?").get(user.id) as any;
+    const dbUser = await db.prepare("SELECT status, banned, banReason, role FROM users WHERE id = ?").get(user.id) as any;
     if (dbUser && (dbUser.banned === 1 || dbUser.status === "banned" || dbUser.status === "suspended")) {
       return res.status(403).json({
         error: `🚫 تم حظر هذا الحساب بقرار إداري.${dbUser.banReason ? ' السبب: ' + dbUser.banReason : ''}`,
         isBanned: true,
       });
     }
-    if (dbUser && dbUser.status === "pending_approval" && !req.path.startsWith("/api/auth")) {
-      return res.status(403).json({
-        error: "⏳ حسابك قيد المراجعة والاعتماد من قبل إدارة المنصة (يستغرق عادة بين 5 إلى 30 دقيقة).",
-        isPendingApproval: true,
-      });
+    // pending_approval users can access their profile, notifications, subscription, and support
+    const PENDING_ALLOWED_PATHS = [
+      '/api/user/profile', '/api/auth/me', '/api/notifications',
+      '/api/subscription', '/api/support', '/api/wallet/balance',
+      '/api/user/balance', '/api/upload', '/api/trade-requests',
+    ];
+    if (dbUser && dbUser.status === "pending_approval") {
+      const isAllowed = PENDING_ALLOWED_PATHS.some(p => req.path.startsWith(p));
+      if (!isAllowed) {
+        return res.status(403).json({
+          error: "⏳ حسابك قيد المراجعة والاعتماد من قبل إدارة المنصة.",
+          isPendingApproval: true,
+        });
+      }
     }
   } catch (e) {}
   next();
@@ -8527,7 +8540,8 @@ const getRoleAISystemPrompt = (role: string): string => {
         "تخاطب عميلاً منزلياً. قواعدك الصارمة:\n" +
         "1. قدم خطوات فحص أولي آمنة وسهلة (فصل الكهرباء، التأكد من محابس المياه ومصادر الطاقة).\n" +
         "2. اشرح سبب المشكلة بلغة مبسطة بدون تعقيد.\n" +
-        "3. انصح بحجز فني صيانة معتمد من خلال المنصة لضمان قطع غيار أصلية وضمان موثوق وتجنب مخاطر الصعق أو تفاقم العطل."
+        "3. انصح بالتواصل مع فني صيانة معتمد عبر قسم الفنيين في التطبيق عند الحاجة لتدخل فني.\n" +
+        "4. لا تقم أبداً بإنشاء طلب صيانة أو حجز موعد بنفسك ولا توهم العميل بأنه تم الحجز؛ دورك تشخيصي وإرشادي فقط، والحجز يتم يدوياً من قبل العميل من شاشة طلب صيانة."
       );
   }
 };
