@@ -91,85 +91,99 @@ export default function App() {
   }, [notification]);
 
   useEffect(() => {
-    // Professional circular logo scale-down entrance animation
+    // Elegant entrance animation: scale down smoothly into focus
     Animated.parallel([
       Animated.timing(splashOpacity, {
         toValue: 1,
-        duration: 500,
+        duration: 600,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(splashScale, {
         toValue: 1,
-        friction: 6,
-        tension: 50,
+        friction: 7,
+        tension: 40,
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
 
+    // Linger comfortably (~2.8s) so user sees splash and loading clearly
     const transitionTimer = setTimeout(() => {
       Animated.timing(splashOpacity, {
         toValue: 0,
-        duration: 350,
+        duration: 400,
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setAppReady(true);
       });
-    }, Platform.OS === 'web' ? 1200 : 1800);
+    }, 2800);
 
     return () => clearTimeout(transitionTimer);
   }, []);
 
   if (!appReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' }}>
-        <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
+      <View style={{ flex: 1, backgroundColor: '#070A0F', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#070A0F" />
 
         <Animated.View
           style={{
             opacity: splashOpacity,
             transform: [{ scale: splashScale }],
             alignItems: 'center',
+            paddingHorizontal: 20,
           }}
         >
-          {/* Official TecnoRexa Circular Gold Brand Logo */}
+          {/* Official TecnoRexa Large Blue Sphere Showcase Graphic */}
           <View
             style={{
-              width: 140,
-              height: 140,
-              borderRadius: 70,
-              backgroundColor: '#111111',
-              borderWidth: 2.5,
-              borderColor: '#D4AF37',
+              width: 220,
+              height: 220,
+              borderRadius: 110,
+              backgroundColor: '#0A1118',
+              borderWidth: 3,
+              borderColor: '#00D2FF',
               overflow: 'hidden',
               justifyContent: 'center',
               alignItems: 'center',
-              shadowColor: '#D4AF37',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.45,
-              shadowRadius: 20,
-              elevation: 12,
-              marginBottom: 20,
+              shadowColor: '#00D2FF',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.6,
+              shadowRadius: 26,
+              elevation: 16,
+              marginBottom: 24,
             }}
           >
             <Image
-              source={require('./assets/tecnorexa_logo_gold.jpg')}
+              source={require('./assets/tecnorexa_sphere_showcase.jpg')}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
           </View>
 
           {/* Brand Typography */}
-          <Text style={{ color: '#FFFFFF', fontSize: 32, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }}>
-            Tecno<Text style={{ color: '#D4AF37' }}>Rexa</Text>
+          <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }}>
+            Tecno<Text style={{ color: '#00D2FF' }}>Rexa</Text>
           </Text>
-          <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 24 }}>
+          <Text style={{ color: '#94A3B8', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 24 }}>
             منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
           </Text>
 
           {/* Loading indicator with text */}
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-            <ActivityIndicator size="small" color="#D4AF37" />
-            <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: 'bold' }}>
+          <View
+            style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              gap: 10,
+              backgroundColor: 'rgba(0, 210, 255, 0.08)',
+              paddingHorizontal: 18,
+              paddingVertical: 10,
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: 'rgba(0, 210, 255, 0.25)',
+            }}
+          >
+            <ActivityIndicator size="small" color="#00D2FF" />
+            <Text style={{ color: '#00D2FF', fontSize: 14, fontWeight: '900' }}>
               جاري التحميل...
             </Text>
           </View>
