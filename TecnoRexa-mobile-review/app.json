@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "TecnoRexa",
+    "slug": "tecno-rexa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.tecnorexa.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0A",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "splash": {
+        "image": "./assets/splash-icon.jpg",
+        "resizeMode": "contain",
+        "backgroundColor": "#0A0A0A"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "owner": "maher2006",
+    "extra": {
+      "eas": {
+        "projectId": "151b9af2-362a-4101-9b46-c5d0c63f70af"
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
+  }
+}

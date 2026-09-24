@@ -8711,6 +8711,54 @@ app.get("/api/ai/credits", authenticateToken,async (req: any, res) => {
   }
 });
 
+// GET /api/ai/subscription/status — AI subscription and usage status
+app.get("/api/ai/subscription/status", authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const isOwner = req.user.role === "owner";
+
+    // Get total tokens used today
+    const todayUsage = db.prepare(`
+      SELECT SUM(tokensUsed) as total FROM ai_usage
+      WHERE userId = ? AND date(createdAt) = date('now')
+    `).get(userId) as any;
+
+    // Get total tokens used this month
+    const monthUsage = db.prepare(`
+      SELECT SUM(tokensUsed) as total FROM ai_usage
+      WHERE userId = ? AND strftime('%Y-%m', createdAt) = strftime('%Y-%m', 'now')
+    `).get(userId) as any;
+
+    // Check active subscription
+    const sub = db.prepare(`
+      SELECT * FROM subscriptions
+      WHERE userId = ? AND planId LIKE 'ai%' AND status = 'active'
+      AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
+      ORDER BY createdAt DESC LIMIT 1
+    `).get(userId) as any;
+
+    // Determine daily/monthly limits
+    const dailyLimit = isOwner ? 1000 : (sub ? 50 : 3);
+    const monthlyLimit = isOwner ? 30000 : (sub ? 1500 : 10);
+    const todayUsed = Number(todayUsage?.total) || 0;
+    const monthUsed = Number(monthUsage?.total) || 0;
+
+    const freePreviewsLeft = sub ? 0 : Math.max(0, 3 - todayUsed);
+
+    res.json({
+      isSubscribed: isOwner || !!sub,
+      startedAt: sub?.createdAt || null,
+      expiresAt: sub?.expiresAt || null,
+      dailyRemaining: Math.max(0, dailyLimit - todayUsed),
+      monthlyRemaining: Math.max(0, monthlyLimit - monthUsed),
+      price: 20,
+      freePreviewsLeft,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/ai/history", authenticateToken,async (req: any, res) => {
   try {
     const history = db

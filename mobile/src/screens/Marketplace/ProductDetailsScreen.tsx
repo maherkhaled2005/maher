@@ -87,7 +87,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         incomingProduct?.seller ||
         'متجر معتمد',
       isVerified: true,
-      phone: incomingProduct?.sellerPhone || '01000000001',
+      phone: incomingProduct?.sellerPhone || '',
     },
     description:
       incomingProduct?.description ||

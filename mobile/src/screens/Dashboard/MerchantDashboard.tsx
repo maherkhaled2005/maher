@@ -34,7 +34,7 @@ import OwnerHeader from '../../components/OwnerHeader';
 
 export default function MerchantDashboard({ navigation }: any) {
   const { user, updateUser } = useAuthStore();
-  const [showSubscription, setShowSubscription] = useState(user?.role !== 'merchant' && !user?.isPro);
+  const [showSubscription, setShowSubscription] = useState(user?.role !== 'merchant' || user?.status !== 'active');
   const [refreshing, setRefreshing] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(user?.balance || 0);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
@@ -119,14 +119,6 @@ export default function MerchantDashboard({ navigation }: any) {
     { label: 'معاينة متجري في السوق', desc: 'رؤية المنتجات كما يراها العملاء في تطبيق TecnoRexa', icon: ShoppingBag, screen: 'Marketplace', color: '#F59E0B' },
   ];
 
-  const handleSubscribe = () => {
-    if (user) {
-      updateUser({ ...user, isPro: true, role: 'merchant' });
-    }
-    setShowSubscription(false);
-    Alert.alert('🎉 مبروك!', 'تم تفعيل اشتراك التاجر بنجاح (100 ج.م)! يمكنك الآن نشر قطع الغيار واستقبال الطلبات.');
-  };
-
   const handleFulfillOrder = async (ord: any) => {
     if (ord.id && ord.id.startsWith('ord_')) {
       try {
@@ -208,7 +200,7 @@ export default function MerchantDashboard({ navigation }: any) {
           </View>
 
           <TouchableOpacity
-            onPress={handleSubscribe}
+            onPress={() => navigation.navigate('Subscription', { plan: 'merchant' })}
             style={{
               backgroundColor: colors.primary,
               paddingVertical: spacing.md,

@@ -65,7 +65,6 @@ const SettingsScreen = ({ navigation }: any) => {
     stripe_enabled: true,
     stripe_mode: 'test',
     stripe_publishable_key: '',
-    stripe_secret_key: '',
     paymob_enabled: true,
     paymob_api_key: '',
     paymob_integration_id: '412093',
@@ -726,16 +725,6 @@ const SettingsScreen = ({ navigation }: any) => {
                       onChangeText={v => updateField('stripe_publishable_key', v)}
                       placeholder="pk_test_..."
                       placeholderTextColor={colors.gray}
-                    />
-
-                    <Text style={styles.inputLabel}>Secret Key:</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={settings.stripe_secret_key}
-                      onChangeText={v => updateField('stripe_secret_key', v)}
-                      placeholder="sk_test_..."
-                      placeholderTextColor={colors.gray}
-                      secureTextEntry
                     />
                   </View>
                 )}

@@ -61,11 +61,7 @@ export default function MyProductsScreen({ navigation }: any) {
   const [formAvailable, setFormAvailable] = useState(true);
   const [formSponsored, setFormSponsored] = useState(false);
 
-  useEffect(() => {
-    if (isMerchant) {
-      setIsSubscribed(true);
-    }
-    // Fetch live products
+  const loadProducts = () => {
     fetchApi('/products')
       .then((data) => {
         if (Array.isArray(data)) {
@@ -90,6 +86,13 @@ export default function MyProductsScreen({ navigation }: any) {
       .catch(() => {
         setProducts([]);
       });
+  };
+
+  useEffect(() => {
+    if (isMerchant) {
+      setIsSubscribed(true);
+    }
+    loadProducts();
   }, [user]);
 
   const handleActivateStore = async () => {
@@ -156,58 +159,42 @@ export default function MyProductsScreen({ navigation }: any) {
         return;
       }
 
-      setProducts((prev) =>
-        prev.map((p) => {
-          if (p.id === editingProduct.id) {
-            return {
-              ...p,
-              name: formName,
-              description: formDesc,
-              price: Number(formPrice),
-              stock: Number(formStock),
-              category: formCategory,
-              isAvailable: formAvailable,
-              isSponsored: formSponsored,
-            };
-          }
-          return p;
-        })
-      );
-      Alert.alert('تم التعديل ✅', 'تم تحديث بيانات المنتج ومخزونه بنجاح.');
-    } else {
-      // Add mode
-      const newP = {
-        id: 'PRD-' + Math.floor(Math.random() * 900 + 100),
-        name: formName,
-        description: formDesc,
-        price: Number(formPrice),
-        stock: Number(formStock),
-        category: formCategory,
-        isAvailable: formAvailable,
-        isSponsored: formSponsored,
-        hasPendingOrders: false,
-        views: 1,
-        status: 'active',
-      };
-
-      // Persist to backend
       try {
-        await fetchApi('/products', {
-          method: 'POST',
-          body: JSON.stringify({
+        await fetchApi(`/products/${editingProduct.id}`, {
+          method: 'PATCH',
+          data: {
             name: formName,
             description: formDesc,
             price: Number(formPrice),
             stock: Number(formStock),
             category: formCategory,
-          }),
+            isAvailable: formAvailable,
+            isSponsored: formSponsored,
+          },
         });
-      } catch (err) {
-        console.warn('Could not persist to backend directly, using local:', err);
+        Alert.alert('تم التعديل ✅', 'تم تحديث بيانات المنتج ومخزونه بنجاح.');
+        loadProducts();
+      } catch (err: any) {
+        Alert.alert('فشل التعديل', err.message || 'تعذر تحديث المنتج.');
       }
-
-      setProducts((prev) => [newP, ...prev]);
-      Alert.alert('تم نشر المنتج بنجاح 🛍️', 'تمت إضافة المنتج إلى مخزن متجرك وسيظهر للعملاء في السوق.');
+    } else {
+      // Add mode - server first
+      try {
+        await fetchApi('/products', {
+          method: 'POST',
+          data: {
+            name: formName,
+            description: formDesc,
+            price: Number(formPrice),
+            stock: Number(formStock),
+            category: formCategory,
+          },
+        });
+        Alert.alert('تم نشر المنتج بنجاح 🛒', 'تمت إضافة المنتج وسيظهر للعملاء في السوق.');
+        loadProducts(); // reload from server
+      } catch (err: any) {
+        Alert.alert('فشل نشر المنتج', err.message || 'تعذر حفظ المنتج. يرجى المحاولة مرة أخرى.');
+      }
     }
 
     setShowFormModal(false);

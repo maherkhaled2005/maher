@@ -14,7 +14,6 @@ interface User {
   balance: number;
   avatar?: string;
   bio?: string;
-  isPro?: boolean;
   available?: number | boolean;
   developerRank?: string;
   specialty?: string;
@@ -56,7 +55,6 @@ interface AuthState {
   register: (data: any) => Promise<any>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
-  quickAccess: (role: string) => Promise<void>;
   updateUser: (user: User) => void;
 }
 
@@ -201,22 +199,6 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: false });
           throw error;
         }
-      },
-
-      quickAccess: async (role) => {
-        if (!__DEV__) {
-          throw new Error('الدخول السريع غير متاح في بيئة الإنتاج');
-        }
-        set({ isLoading: true });
-        try {
-          const data = await fetchApi('/auth/quick-access', { method: 'POST', data: { role } });
-          if (data?.success || data?.token) {
-            await saveSession(data.token, data.user);
-            set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
-            return;
-          }
-        } catch {}
-        set({ isLoading: false });
       },
 
       logout: async () => {

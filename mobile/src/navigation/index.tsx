@@ -268,7 +268,7 @@ const Stack = createStackNavigator();
 export default function AppNavigator() {
   const { isAuthenticated, user, checkAuth } = useAuthStore();
   const isBanned = !!(user && (user.status === 'banned' || user.status === 'suspended'));
-  const isPendingApproval = !!(user && (user.status === 'pending_approval' || ((user.role === 'technician' || user.role === 'merchant') && !user.isPro && user.status !== 'active')));
+  const isPendingApproval = !!(user && (user.status === 'pending_approval' || user.status === 'pending'));
   const mustChangePassword = !!(user && (user.mustChangePassword === true || (user as any).mustChangePassword === 1));
 
   React.useEffect(() => {

@@ -174,7 +174,7 @@ export default function App() {
     <ErrorBoundary>
       <View style={[{ flex: 1 }, Platform.OS === 'web' && { height: '100vh' } as any]}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
-        <StripeProvider publishableKey="pk_test_51MzTecnoRexaLiveKeyMock99887766554433221100">
+        <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_KEY || ''}>
           <RootNavigation />
         </StripeProvider>
       </View>
