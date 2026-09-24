@@ -712,13 +712,17 @@ const styles = {
     borderColor: '#27272A',
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
-    height: 52,
+    height: 54,
+    ...(Platform.OS === 'web' ? { cursor: 'text' } : {}),
   },
   input: {
     flex: 1,
+    height: '100%' as const,
     textAlign: 'right' as const,
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600' as const,
+    paddingVertical: 0,
+    ...(Platform.OS === 'web' ? { outline: 'none' } : {}),
   },
 };

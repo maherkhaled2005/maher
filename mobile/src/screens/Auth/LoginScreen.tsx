@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   ScrollView,
   Alert,
@@ -28,6 +29,8 @@ function normalizePhone(input: any): string {
 }
 
 export default function LoginScreen({ navigation }: any) {
+  const phoneInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -133,7 +136,8 @@ export default function LoginScreen({ navigation }: any) {
               <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
                 رقم الهاتف المسجل <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
-              <View
+              <Pressable
+                onPress={() => phoneInputRef.current?.focus()}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -142,16 +146,21 @@ export default function LoginScreen({ navigation }: any) {
                   borderColor: '#27272A',
                   borderRadius: borderRadius.lg,
                   paddingHorizontal: spacing.md,
-                  height: 52,
+                  height: 54,
+                  ...(Platform.OS === 'web' ? { cursor: 'text' } : {}),
                 }}
               >
                 <TextInput
+                  ref={phoneInputRef}
                   style={{
                     flex: 1,
+                    height: '100%',
                     textAlign: 'right',
                     color: '#FFFFFF',
                     fontSize: 15,
                     fontWeight: '600',
+                    paddingVertical: 0,
+                    ...(Platform.OS === 'web' ? { outline: 'none' } : {}),
                   }}
                   placeholder="01xxxxxxxxx"
                   placeholderTextColor="#71717A"
@@ -160,8 +169,10 @@ export default function LoginScreen({ navigation }: any) {
                   value={phone}
                   onChangeText={setPhone}
                 />
-                <Phone color="#D4AF37" size={18} style={{ marginLeft: 8 }} />
-              </View>
+                <View pointerEvents="none" style={{ marginLeft: 8 }}>
+                  <Phone color="#D4AF37" size={18} />
+                </View>
+              </Pressable>
             </View>
 
             {/* Password Input */}
@@ -169,7 +180,8 @@ export default function LoginScreen({ navigation }: any) {
               <Text style={{ color: '#E4E4E7', fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
                 كلمة المرور <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
-              <View
+              <Pressable
+                onPress={() => passwordInputRef.current?.focus()}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -178,20 +190,30 @@ export default function LoginScreen({ navigation }: any) {
                   borderColor: '#27272A',
                   borderRadius: borderRadius.lg,
                   paddingHorizontal: spacing.md,
-                  height: 52,
+                  height: 54,
+                  ...(Platform.OS === 'web' ? { cursor: 'text' } : {}),
                 }}
               >
-                <TouchableOpacity onPress={() => setShowPass(!showPass)} style={{ padding: 4 }}>
-                  {showPass ? <EyeOff color="#71717A" size={18} /> : <Eye color="#71717A" size={18} />}
+                <TouchableOpacity
+                  onPress={() => setShowPass(!showPass)}
+                  style={{ padding: 8, zIndex: 10 }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  {showPass ? <EyeOff color="#D4AF37" size={20} /> : <Eye color="#71717A" size={20} />}
                 </TouchableOpacity>
+
                 <TextInput
+                  ref={passwordInputRef}
                   style={{
                     flex: 1,
+                    height: '100%',
                     textAlign: 'right',
                     color: '#FFFFFF',
                     fontSize: 15,
                     fontWeight: '600',
                     marginHorizontal: 8,
+                    paddingVertical: 0,
+                    ...(Platform.OS === 'web' ? { outline: 'none' } : {}),
                   }}
                   placeholder="••••••••"
                   placeholderTextColor="#71717A"
@@ -199,13 +221,16 @@ export default function LoginScreen({ navigation }: any) {
                   value={password}
                   onChangeText={setPassword}
                 />
-                <Lock color="#D4AF37" size={18} />
-              </View>
+
+                <View pointerEvents="none">
+                  <Lock color="#D4AF37" size={18} />
+                </View>
+              </Pressable>
 
               {/* Forgot Password Link */}
               <TouchableOpacity
                 onPress={() => navigation.navigate('ForgotPassword', { phone: normalizePhone(phone) })}
-                style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                style={{ alignSelf: 'flex-start', marginTop: 8, paddingVertical: 4 }}
               >
                 <Text style={{ color: '#D4AF37', fontSize: 12, fontWeight: '700' }}>
                   نسيت كلمة المرور؟
