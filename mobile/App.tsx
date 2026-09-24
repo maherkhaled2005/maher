@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode, useEffect } from 'react';
-import { StatusBar, View, Text, TouchableOpacity, Platform, Animated, Image, ActivityIndicator } from 'react-native';
+import { StatusBar, View, Text, TouchableOpacity, Platform, Animated, Image, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { StripeProvider } from './src/components/StripeWrapper';
 import RootNavigation from './src/navigation/index';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
@@ -61,6 +61,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 export default function App() {
   const { expoPushToken, notification } = usePushNotifications();
   const [appReady, setAppReady] = React.useState(false);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const circleSize = Math.max(220, Math.min(Math.min(windowWidth * 0.78, windowHeight * 0.38), 280));
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -136,27 +138,27 @@ export default function App() {
           {/* Official TecnoRexa Blue Sphere Showcase Graphic with Royal Gold Border */}
           <View
             style={{
-              width: 220,
-              height: 220,
-              borderRadius: 110,
+              width: circleSize,
+              height: circleSize,
+              borderRadius: circleSize / 2,
               backgroundColor: '#0F0E0B',
-              borderWidth: 3.5,
+              borderWidth: 4,
               borderColor: '#D4AF37',
               overflow: 'hidden',
               justifyContent: 'center',
               alignItems: 'center',
               shadowColor: '#D4AF37',
               shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.65,
-              shadowRadius: 28,
-              elevation: 18,
+              shadowOpacity: 0.75,
+              shadowRadius: 30,
+              elevation: 20,
               marginBottom: 24,
             }}
           >
             <Image
               source={require('./assets/tecnorexa_sphere_showcase.jpg')}
-              style={{ width: '74%', height: '74%' }}
-              resizeMode="contain"
+              style={{ width: '100%', height: '100%', borderRadius: circleSize / 2 }}
+              resizeMode="cover"
             />
           </View>
 
