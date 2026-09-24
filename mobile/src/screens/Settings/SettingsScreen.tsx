@@ -72,7 +72,7 @@ const SettingsScreen = ({ navigation }: any) => {
     fawry_merchant_code: '',
     fawry_security_key: '',
     vodafone_cash_enabled: true,
-    vodafone_cash_number: '01012345678',
+    vodafone_cash_number: '01064739664',
     cod_enabled: true,
 
     // Commissions & Limits
@@ -84,8 +84,8 @@ const SettingsScreen = ({ navigation }: any) => {
 
     // General Settings
     platform_name: 'TecnoRexa',
-    support_email: 'support@tecnorexa.com',
-    support_phone: '+201064739664',
+    support_email: 'tecnorexa@gmail.com',
+    support_phone: '01064739664',
     maintenance_mode: false,
     allow_registrations: true,
     marketplace_enabled: true,

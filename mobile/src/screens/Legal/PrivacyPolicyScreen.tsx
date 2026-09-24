@@ -109,7 +109,7 @@ export const PrivacyPolicyScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.footerCard}>
           <Text style={styles.footerText}>
             آخر تحديث للسياسة: سبتمبر 2026{'\n'}
-            لأي استفسارات قانونية أو تقديم شكوى خصوصية: support@tecnorexa.com
+            لأي استفسارات قانونية أو تقديم شكوى خصوصية: tecnorexa@gmail.com
           </Text>
         </View>
       </ScrollView>

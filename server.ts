@@ -8163,8 +8163,8 @@ app.get("/api/settings", authenticateToken,requireAdmin,async (req: any, res) =>
     });
 
     res.json({
-      siteName: settingsMap.siteName || "Techno Rexa",
-      supportEmail: settingsMap.supportEmail || "support@technorexa.com",
+      siteName: settingsMap.siteName || "TecnoRexa",
+      supportEmail: settingsMap.supportEmail || "tecnorexa@gmail.com",
       maintenanceMode: !!settingsMap.maintenance_mode,
       emergencyLock: !!settingsMap.emergency_lock,
       disableRegistration: !!settingsMap.disable_registration,
