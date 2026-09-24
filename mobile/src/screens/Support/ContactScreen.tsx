@@ -39,25 +39,45 @@ export default function ContactScreen({ navigation }: any) {
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async () => {
-    if (!name.trim() || !message.trim()) {
-      Alert.alert('تنبيه', 'يرجى إدخال الاسم وتفاصيل الرسالة');
+    const finalName = user ? (user.name || 'مستخدم مسجل') : name.trim();
+    const finalPhone = user ? (user.phone || '') : phone.trim();
+    const finalEmail = user ? (user.email || '') : email.trim();
+
+    if (!user && !finalName) {
+      Alert.alert('تنبيه', 'يرجى إدخال الاسم بالكامل');
       return;
     }
-    if (!user && (!phone.trim() || phone.trim().length < 11)) {
+    if (!message.trim()) {
+      Alert.alert('تنبيه', 'يرجى كتابة نص الرسالة');
+      return;
+    }
+    if (!user && (!finalPhone || finalPhone.length < 11)) {
       Alert.alert('تنبيه', 'يرجى إدخال رقم هاتف صحيح للتواصل معك');
       return;
     }
 
     setLoading(true);
     try {
+      // Also send directly to tecnorexa@gmail.com
+      fetchApi('/contact', {
+        method: 'POST',
+        data: {
+          name: finalName,
+          phone: finalPhone,
+          email: finalEmail || undefined,
+          subject: subject.trim() || 'رسالة استفسار لخدمة العملاء',
+          message: message.trim(),
+        },
+      }).catch(() => {});
+
       if (!user) {
         // Guest Support Flow (No login required)
         const res = await fetchApi('/support/guest-ticket', {
           method: 'POST',
           data: {
-            name: name.trim(),
-            phone: phone.trim(),
-            email: email.trim() || undefined,
+            name: finalName,
+            phone: finalPhone,
+            email: finalEmail || undefined,
             subject: subject.trim() || 'طلب مساعدة من زائر المنصة',
             description: message.trim(),
           },
@@ -83,7 +103,7 @@ export default function ContactScreen({ navigation }: any) {
             method: 'POST',
             data: {
               conversationId: conv.id,
-              content: `[تذكرة دعم من ${name.trim()}]\n\n${message.trim()}`,
+              content: `[تذكرة دعم من ${finalName}]\n\n${message.trim()}`,
               type: 'text',
             },
           });
@@ -93,9 +113,9 @@ export default function ContactScreen({ navigation }: any) {
             data: {
               title: subject.trim() || 'رسالة تواصل من صفحة اتصل بنا',
               subject: subject.trim() || 'رسالة تواصل',
-              customerName: name.trim(),
-              customerPhone: phone.trim() || user.phone,
-              email: email.trim(),
+              customerName: finalName,
+              customerPhone: finalPhone,
+              email: finalEmail,
               description: message.trim(),
               type: 'inquiry',
               priority: 'medium',
@@ -276,7 +296,7 @@ export default function ContactScreen({ navigation }: any) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => openLink('mailto:support@tecnorexa.com')}
+              onPress={() => openLink('mailto:tecnorexa@gmail.com')}
               style={{
                 flex: 1,
                 minWidth: '47%',
@@ -307,7 +327,7 @@ export default function ContactScreen({ navigation }: any) {
                 البريد الرسمي
               </Text>
               <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700', marginTop: 2 }}>
-                support@tecnorexa.com
+                tecnorexa@gmail.com
               </Text>
             </TouchableOpacity>
 
@@ -328,21 +348,21 @@ export default function ContactScreen({ navigation }: any) {
                   width: 44,
                   height: 44,
                   borderRadius: 22,
-                  backgroundColor: 'rgba(245,158,11,0.15)',
+                  backgroundColor: 'rgba(16,185,129,0.15)',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginBottom: spacing.xs,
                   borderWidth: 1,
-                  borderColor: '#F59E0B',
+                  borderColor: '#10B981',
                 }}
               >
-                <Clock color="#F59E0B" size={20} />
+                <Clock color="#10B981" size={20} />
               </View>
               <Text style={{ color: colors.white, fontWeight: '900', fontSize: 13 }}>
-                ساعات العمل
+                خدمة متواصلة
               </Text>
-              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700', marginTop: 2 }}>
-                يومياً 9 ص - 10 م
+              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '900', marginTop: 2 }}>
+                شغال دائماً (24/7)
               </Text>
             </View>
           </View>
@@ -379,75 +399,103 @@ export default function ContactScreen({ navigation }: any) {
             </View>
 
             <View style={{ gap: spacing.sm }}>
-              <View>
-                <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
-                  الاسم بالكامل *
-                </Text>
-                <TextInput
+              {user ? (
+                <View
                   style={{
-                    backgroundColor: '#0A0A0A',
+                    backgroundColor: '#111',
                     borderRadius: borderRadius.md,
                     padding: spacing.md,
-                    color: colors.white,
-                    textAlign: 'right',
                     borderWidth: 1,
-                    borderColor: colors.border,
-                    fontSize: 13,
+                    borderColor: 'rgba(212, 175, 55, 0.3)',
+                    flexDirection: 'row-reverse',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 6,
                   }}
-                  placeholder="أدخل اسمك الكامل"
-                  placeholderTextColor={colors.gray}
-                  value={name}
-                  onChangeText={setName}
-                />
-              </View>
+                >
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                    <Text style={{ color: colors.white, fontSize: 13, fontWeight: 'bold' }}>
+                      إرسال باسم: {user.name}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: 'bold' }}>
+                    {user.phone}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <View>
+                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
+                      الاسم بالكامل *
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: '#0A0A0A',
+                        borderRadius: borderRadius.md,
+                        padding: spacing.md,
+                        color: colors.white,
+                        textAlign: 'right',
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        fontSize: 13,
+                      }}
+                      placeholder="أدخل اسمك الكامل"
+                      placeholderTextColor={colors.gray}
+                      value={name}
+                      onChangeText={setName}
+                    />
+                  </View>
 
-              <View>
-                <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
-                  رقم الهاتف للتواصل {!user && <Text style={{ color: colors.danger }}>*</Text>}
-                </Text>
-                <TextInput
-                  style={{
-                    backgroundColor: '#0A0A0A',
-                    borderRadius: borderRadius.md,
-                    padding: spacing.md,
-                    color: colors.white,
-                    textAlign: 'right',
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    fontSize: 13,
-                  }}
-                  placeholder="01xxxxxxxxx"
-                  placeholderTextColor={colors.gray}
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  maxLength={11}
-                />
-              </View>
+                  <View>
+                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
+                      رقم الهاتف للتواصل <Text style={{ color: colors.danger }}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: '#0A0A0A',
+                        borderRadius: borderRadius.md,
+                        padding: spacing.md,
+                        color: colors.white,
+                        textAlign: 'right',
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        fontSize: 13,
+                      }}
+                      placeholder="01xxxxxxxxx"
+                      placeholderTextColor={colors.gray}
+                      value={phone}
+                      onChangeText={setPhone}
+                      keyboardType="phone-pad"
+                      maxLength={11}
+                    />
+                  </View>
 
-              <View>
-                <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
-                  البريد الإلكتروني
-                </Text>
-                <TextInput
-                  style={{
-                    backgroundColor: '#0A0A0A',
-                    borderRadius: borderRadius.md,
-                    padding: spacing.md,
-                    color: colors.white,
-                    textAlign: 'right',
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    fontSize: 13,
-                  }}
-                  placeholder="example@email.com"
-                  placeholderTextColor={colors.gray}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
+                  <View>
+                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
+                      البريد الإلكتروني
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: '#0A0A0A',
+                        borderRadius: borderRadius.md,
+                        padding: spacing.md,
+                        color: colors.white,
+                        textAlign: 'right',
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        fontSize: 13,
+                      }}
+                      placeholder="example@email.com"
+                      placeholderTextColor={colors.gray}
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                </>
+              )}
 
               <View>
                 <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
