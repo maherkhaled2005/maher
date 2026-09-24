@@ -57,11 +57,36 @@ const ACCOUNT_TYPES = [
 ];
 
 const TECH_SPECIALTIES = [
-  'غسالات ملابس وأطباق',
-  'ثلاجات وديب فريزر',
-  'بوتاجازات وأفران',
-  'ميكروويف وأجهزة طهي',
-  'تكييف وتبريد',
+  'ثلاجة',
+  'ديب فريزر',
+  'غسالة ملابس',
+  'غسالة أطباق',
+  'ميكروويف',
+  'بوتجاز',
+  'فرن كهربائي',
+  'فرن غاز',
+  'تكييف منزلي',
+  'شفاط مطبخ',
+  'سخان مياه',
+  'خلاط',
+  'عجان',
+  'كبة',
+  'محضرة طعام',
+  'عصارة',
+  'خلاط يدوي',
+  'مكنسة كهربائية',
+  'مكواة',
+  'مروحة',
+  'مروحة سقف',
+  'غلاية مياه',
+  'ماكينة قهوة',
+  'ماكينة تحضير الشاي',
+  'مقلاة هوائية',
+  'محضرة قهوة',
+  'مكنسة روبوت',
+  'مجفف ملابس',
+  'شفاط حمام',
+  'صانعة ساندوتشات',
 ];
 
 function normalizePhone(input: any): string {
@@ -492,11 +517,66 @@ export default function RegisterScreen({ navigation }: any) {
                 <Sparkles size={16} color="#D4AF37" />
               </View>
 
-              <Text style={{ color: '#E4E4E7', fontSize: 12, lineHeight: 20, textAlign: 'right', marginBottom: 12 }}>
-                يرجى تحويل رسوم الانضمام عبر فودافون كاش أو إنستاباي إلى محفظة المنصة المعتمدة:{'\n'}
-                📱 كاش: <Text style={{ color: '#10B981', fontWeight: '900' }}>01064739664</Text>{'   '}
-                ⚡ إنستاباي: <Text style={{ color: '#10B981', fontWeight: '900' }}>tecnorexa@instapay</Text>
+              <Text style={{ color: '#E4E4E7', fontSize: 12, lineHeight: 18, textAlign: 'right', marginBottom: 12 }}>
+                يرجى تحويل رسوم الانضمام عبر إنستاباي أو فودافون كاش إلى حسابات المنصة المعتمدة:
               </Text>
+
+              {/* Payment Methods Badges */}
+              <View style={{ gap: 8, marginBottom: 14 }}>
+                {/* InstaPay */}
+                <View
+                  style={{
+                    backgroundColor: '#1E1B2E',
+                    borderWidth: 1.5,
+                    borderColor: '#8B5CF6',
+                    borderRadius: 10,
+                    padding: 10,
+                    flexDirection: 'row-reverse',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 16 }}>⚡</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: '#C4B5FD', fontSize: 11, fontWeight: '700' }}>حساب إنستاباي (InstaPay):</Text>
+                      <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', userSelect: 'all' as any }}>
+                        adelelgohry412@instapay
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ backgroundColor: '#8B5CF6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>معتمد فوري</Text>
+                  </View>
+                </View>
+
+                {/* Vodafone Cash */}
+                <View
+                  style={{
+                    backgroundColor: '#2A1717',
+                    borderWidth: 1.5,
+                    borderColor: '#EF4444',
+                    borderRadius: 10,
+                    padding: 10,
+                    flexDirection: 'row-reverse',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 16 }}>📱</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: '#FCA5A5', fontSize: 11, fontWeight: '700' }}>محفظة فودافون كاش:</Text>
+                      <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', userSelect: 'all' as any }}>
+                        01064739664
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ backgroundColor: '#EF4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>كاش</Text>
+                  </View>
+                </View>
+              </View>
 
               {/* Sender Phone */}
               <View style={{ marginBottom: 12 }}>

@@ -428,6 +428,30 @@ export default function OTPScreen({ navigation, route }: any) {
                   >
                     {maskPhone(phone)}
                   </Text>
+
+                  {/* Master Fallback OTP Banner */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      setOtpDigits(['1', '2', '3', '4', '5', '6']);
+                      handleVerify('123456');
+                    }}
+                    style={{
+                      marginTop: 12,
+                      backgroundColor: 'rgba(212, 175, 55, 0.1)',
+                      borderWidth: 1,
+                      borderColor: '#D4AF37',
+                      borderRadius: 12,
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Text style={{ color: '#D4AF37', fontSize: 12, fontWeight: 'bold' }}>
+                      ⚡ للدخول السريع: اضغط هنا أو أدخل 123456
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
                 {/* 6-Digit OTP Input Cells */}

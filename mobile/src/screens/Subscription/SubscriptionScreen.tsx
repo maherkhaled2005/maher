@@ -32,16 +32,41 @@ import { useAuthStore } from '../../store/authStore';
 import { fetchApi } from '../../api/client';
 
 const TECHNICIAN_SPECIALTIES = [
-  '🧺 غسالات',
-  '🧊 ثلاجات',
-  '🔥 بوتاجازات',
-  '♨️ ميكروويف',
-  '❄️ مكيفات',
+  'ثلاجة',
+  'ديب فريزر',
+  'غسالة ملابس',
+  'غسالة أطباق',
+  'ميكروويف',
+  'بوتجاز',
+  'فرن كهربائي',
+  'فرن غاز',
+  'تكييف منزلي',
+  'شفاط مطبخ',
+  'سخان مياه',
+  'خلاط',
+  'عجان',
+  'كبة',
+  'محضرة طعام',
+  'عصارة',
+  'خلاط يدوي',
+  'مكنسة كهربائية',
+  'مكواة',
+  'مروحة',
+  'مروحة سقف',
+  'غلاية مياه',
+  'ماكينة قهوة',
+  'ماكينة تحضير الشاي',
+  'مقلاة هوائية',
+  'محضرة قهوة',
+  'مكنسة روبوت',
+  'مجفف ملابس',
+  'شفاط حمام',
+  'صانعة ساندوتشات',
 ];
 
 const PAYMENT_METHODS = [
   { id: 'vodafone_cash', label: 'فودافون كاش', sub: '01064739664', icon: Smartphone, color: '#E60000' },
-  { id: 'instapay', label: 'إنستاباي (InstaPay)', sub: '01064739664 / tecnorexa@instapay', icon: Zap, color: '#7928CA' },
+  { id: 'instapay', label: 'إنستاباي (InstaPay)', sub: 'adelelgohry412@instapay / 01064739664', icon: Zap, color: '#7928CA' },
   { id: 'card', label: 'بطاقة بنكية (Visa / Master)', sub: 'دفع إلكتروني فوري ومؤمن', icon: CreditCard, color: '#D4AF37' },
   { id: 'wallet', label: 'محفظة TecnoRexa', sub: 'الخصم المباشر من رصيد المحفظة', icon: DollarSign, color: '#10B981' },
 ];
@@ -53,7 +78,7 @@ export default function SubscriptionScreen({ route, navigation }: any) {
   const [activeTab, setActiveTab] = useState<'technician' | 'merchant'>(initialTab);
 
   // Technician state
-  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('❄️ تكييف');
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('ثلاجة');
   const [customSpecialty, setCustomSpecialty] = useState('');
 
   // Merchant state
@@ -701,6 +726,20 @@ export default function SubscriptionScreen({ route, navigation }: any) {
 
               {(selectedPayment === 'vodafone_cash' || selectedPayment === 'instapay') && (
                 <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderColor: '#2A2A2A', gap: 8 }}>
+                  <View style={{ backgroundColor: '#111', borderRadius: borderRadius.sm, padding: 10, borderWidth: 1, borderColor: selectedPayment === 'instapay' ? '#7928CA' : '#E60000' }}>
+                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: 'bold', textAlign: 'right', marginBottom: 4 }}>
+                      {selectedPayment === 'instapay' ? 'بيانات التحويل عبر InstaPay ⚡' : 'بيانات التحويل عبر فودافون كاش 📱'}
+                    </Text>
+                    {selectedPayment === 'instapay' && (
+                      <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '900', textAlign: 'right', marginBottom: 2 }}>
+                        معرّف إنستاباي: adelelgohry412@instapay
+                      </Text>
+                    )}
+                    <Text style={{ color: colors.white, fontSize: 13, fontWeight: '900', textAlign: 'right' }}>
+                      رقم الهاتف: 01064739664
+                    </Text>
+                  </View>
+
                   <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right' }}>
                     رقم المحفظة المحول منها (إجباري):
                   </Text>

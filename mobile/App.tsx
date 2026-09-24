@@ -155,8 +155,8 @@ export default function App() {
           >
             <Image
               source={require('./assets/tecnorexa_sphere_showcase.jpg')}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
+              style={{ width: '74%', height: '74%' }}
+              resizeMode="contain"
             />
           </View>
 

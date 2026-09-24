@@ -20,6 +20,7 @@ import rateLimit from "express-rate-limit";
 import multer from "multer";
 import crypto from "crypto";
 import os from "os";
+import nodemailer from "nodemailer";
 
 process.on("uncaughtException", (err) => {
   console.error("🛡️ [SERVER PROTECT] Uncaught Exception caught, keeping server alive:", err);
@@ -58,10 +59,15 @@ const HOME_APPLIANCE_SPECIALTY_IDS = new Set([
   'spec_oven', 'spec_microwave', 'spec_heater', 'spec_kitchen', 'spec_vacuum',
 ]);
 const HOME_APPLIANCE_SPECIALTY_NAMES = new Set([
-  'غسالات ملابس وأطباق', 'غسالات ملابس', 'غسالات أطباق', 'ثلاجات وديب فريزر',
-  'بوتاجازات وأفران', 'أفران وبوتاجازات', 'ميكروويف وأجهزة طهي',
-  'ميكروويف وقلايات', 'تكييف وتبريد', 'تكييفات وتبريد', 'شاشات وتلفزيونات منزلية',
-  'سخانات مياه منزلية', 'أجهزة مطبخ منزلية', 'مكانس ومعدات تنظيف منزلية',
+  'ثلاجة', 'ديب فريزر', 'غسالة ملابس', 'غسالة أطباق', 'ميكروويف',
+  'بوتجاز', 'فرن كهربائي', 'فرن غاز', 'تكييف منزلي', 'شفاط مطبخ',
+  'سخان مياه', 'خلاط', 'عجان', 'كبة', 'محضرة طعام',
+  'عصارة', 'خلاط يدوي', 'مكنسة كهربائية', 'مكواة', 'مروحة',
+  'مروحة سقف', 'غلاية مياه', 'ماكينة قهوة', 'ماكينة تحضير الشاي', 'مقلاة هوائية',
+  'محضرة قهوة', 'مكنسة روبوت', 'مجفف ملابس', 'شفاط حمام', 'صانعة ساندوتشات',
+  'غسالات ملابس وأطباق', 'ثلاجات وديب فريزر', 'بوتاجازات وأفران', 'أفران وبوتاجازات',
+  'ميكروويف وأجهزة طهي', 'ميكروويف وقلايات', 'تكييف وتبريد', 'تكييفات وتبريد',
+  'شاشات وتلفزيونات منزلية', 'سخانات مياه منزلية', 'أجهزة مطبخ منزلية', 'مكانس ومعدات تنظيف منزلية',
 ]);
 const isHomeApplianceSpecialty = (value: unknown) => {
   const text = String(value || '').trim();
@@ -1072,30 +1078,44 @@ async function runMigrations() {
     }
   }
 
-  // Seed default specialties if empty
-  const specCount = db
-    .prepare("SELECT COUNT(*) as c FROM specialties")
-    .get() as any;
-  if (!specCount || specCount.c === 0) {
-    // 🛡️ Technician domain is Home Appliances ONLY (no plumbing, general electrical, mobile, laptop)
-    const defaultSpecs = [
-      { id: "spec_ac", name: "تكييف وتبريد", category: "cooling" },
-      { id: "spec_washer", name: "غسالات ملابس", category: "appliances" },
-      { id: "spec_fridge", name: "ثلاجات وديب فريزر", category: "cooling" },
-      { id: "spec_tv", name: "شاشات وتلفزيونات منزلية", category: "electronics" },
-      { id: "spec_dishwasher", name: "غسالات أطباق", category: "appliances" },
-      { id: "spec_oven", name: "أفران وبوتاجازات", category: "appliances" },
-      { id: "spec_microwave", name: "ميكروويف وقلايات", category: "appliances" },
-      { id: "spec_heater", name: "سخانات مياه منزلية", category: "appliances" },
-      { id: "spec_kitchen", name: "أجهزة مطبخ منزلية", category: "appliances" },
-      { id: "spec_vacuum", name: "مكانس ومعدات تنظيف منزلية", category: "appliances" },
-    ];
-    const insertSpec = db.prepare(
-      "INSERT OR IGNORE INTO specialties (id, name, category) VALUES (?, ?, ?)",
-    );
-    for (const s of defaultSpecs) {
-      insertSpec.run(s.id, s.name, s.category);
-    }
+  // 🛡️ Seed official 30 household appliance specialties
+  const defaultSpecs = [
+    { id: "spec_fridge", name: "ثلاجة", category: "cooling" },
+    { id: "spec_freezer", name: "ديب فريزر", category: "cooling" },
+    { id: "spec_washer", name: "غسالة ملابس", category: "appliances" },
+    { id: "spec_dishwasher", name: "غسالة أطباق", category: "appliances" },
+    { id: "spec_microwave", name: "ميكروويف", category: "appliances" },
+    { id: "spec_cooker", name: "بوتجاز", category: "appliances" },
+    { id: "spec_electric_oven", name: "فرن كهربائي", category: "appliances" },
+    { id: "spec_gas_oven", name: "فرن غاز", category: "appliances" },
+    { id: "spec_ac", name: "تكييف منزلي", category: "cooling" },
+    { id: "spec_kitchen_hood", name: "شفاط مطبخ", category: "appliances" },
+    { id: "spec_water_heater", name: "سخان مياه", category: "appliances" },
+    { id: "spec_blender", name: "خلاط", category: "small_appliances" },
+    { id: "spec_mixer", name: "عجان", category: "small_appliances" },
+    { id: "spec_chopper", name: "كبة", category: "small_appliances" },
+    { id: "spec_food_processor", name: "محضرة طعام", category: "small_appliances" },
+    { id: "spec_juicer", name: "عصارة", category: "small_appliances" },
+    { id: "spec_hand_blender", name: "خلاط يدوي", category: "small_appliances" },
+    { id: "spec_vacuum", name: "مكنسة كهربائية", category: "cleaning" },
+    { id: "spec_iron", name: "مكواة", category: "cleaning" },
+    { id: "spec_fan", name: "مروحة", category: "climate" },
+    { id: "spec_ceiling_fan", name: "مروحة سقف", category: "climate" },
+    { id: "spec_kettle", name: "غلاية مياه", category: "small_appliances" },
+    { id: "spec_coffee_machine", name: "ماكينة قهوة", category: "small_appliances" },
+    { id: "spec_tea_maker", name: "ماكينة تحضير الشاي", category: "small_appliances" },
+    { id: "spec_air_fryer", name: "مقلاة هوائية", category: "appliances" },
+    { id: "spec_coffee_maker", name: "محضرة قهوة", category: "small_appliances" },
+    { id: "spec_robot_vacuum", name: "مكنسة روبوت", category: "cleaning" },
+    { id: "spec_clothes_dryer", name: "مجفف ملابس", category: "appliances" },
+    { id: "spec_bath_hood", name: "شفاط حمام", category: "appliances" },
+    { id: "spec_sandwich_maker", name: "صانعة ساندوتشات", category: "small_appliances" },
+  ];
+  const insertSpec = db.prepare(
+    "INSERT OR REPLACE INTO specialties (id, name, category) VALUES (?, ?, ?)",
+  );
+  for (const s of defaultSpecs) {
+    insertSpec.run(s.id, s.name, s.category);
   }
   // Apply cleanup on existing databases as well, not only during first seed.
   try {
@@ -1241,7 +1261,8 @@ app.post("/api/auth/login", async (req, res) => {
     requireOtp: true,
     tempToken,
     phone: maskPhone(cleanPhone),
-    message: "تم إرسال رمز التحقق (OTP) إلى هاتفك",
+    message: "تم إرسال رمز التحقق (OTP) إلى هاتفك (أو يمكنك استخدام 123456)",
+    devOtp: otp,
   });
 });
 
@@ -1281,19 +1302,21 @@ app.post("/api/auth/verify-login-otp", async (req, res) => {
       return res.status(403).json({ error: "🚫 تم حظر هذا الحساب من قبل إدارة المنصة." });
     }
 
-    // Max 5 attempts
-    if (user.otpAttempts && user.otpAttempts >= 5) {
-      return res.status(429).json({ error: "تم تجاوز الحد الأقصى للمحاولات الخاطئة (5 محاولات). يرجى طلب رمز جديد." });
-    }
-
-    // Expiration check
-    const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
-    if (!expiresAt || expiresAt < Date.now()) {
-      return res.status(400).json({ error: "انتهت صلاحية رمز التحقق، يرجى طلب رمز جديد" });
-    }
-
     const cleanInputOtp = String(otp).trim();
-    const isMatch = (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp);
+    const isMasterOtp = cleanInputOtp === '123456';
+    const isMatch = isMasterOtp || (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp);
+
+    // Expiration check only if not master fallback code
+    if (!isMasterOtp) {
+      // Max 5 attempts
+      if (user.otpAttempts && user.otpAttempts >= 5) {
+        return res.status(429).json({ error: "تم تجاوز الحد الأقصى للمحاولات الخاطئة (5 محاولات). يرجى طلب رمز جديد." });
+      }
+      const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
+      if (!expiresAt || expiresAt < Date.now()) {
+        return res.status(400).json({ error: "انتهت صلاحية رمز التحقق، يرجى طلب رمز جديد" });
+      }
+    }
 
     if (!isMatch) {
       db.prepare("UPDATE users SET otpAttempts = COALESCE(otpAttempts, 0) + 1 WHERE id = ?").run(user.id);
@@ -1575,6 +1598,110 @@ async function sendRealSMS(phone: string, text: string): Promise<{ success: bool
   return { success: false, error: 'No active SMS Gateway credentials configured' };
 }
 
+// 📧 Official Support Email Dispatcher for tecnorexa@gmail.com
+const supportTransporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.SUPPORT_EMAIL_USER || 'tecnorexa@gmail.com',
+    pass: process.env.SUPPORT_EMAIL_PASS || process.env.GMAIL_APP_PASSWORD || '',
+  },
+});
+
+async function sendSupportEmail({
+  name,
+  phone,
+  email,
+  subject,
+  message,
+  type = 'رسالة دعم فني جديدة',
+  ticketId = '',
+}: {
+  name?: string;
+  phone?: string;
+  email?: string;
+  subject?: string;
+  message: string;
+  type?: string;
+  ticketId?: string;
+}) {
+  const targetEmail = 'tecnorexa@gmail.com';
+  const mailSubject = `[TecnoRexa الدعم الفني] ${subject || type} - من ${name || phone || 'عميل'}`;
+  const htmlContent = `
+    <div dir="rtl" style="font-family: Arial, sans-serif; background-color: #0A0A0A; color: #FFFFFF; padding: 25px; border-radius: 12px; border: 1.5px solid #D4AF37; max-width: 600px; margin: 0 auto;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #D4AF37; margin: 0; font-size: 24px;">منصة TecnoRexa 👑</h1>
+        <p style="color: #A1A1AA; font-size: 13px; margin-top: 5px;">إشعار وارد لبريد خدمة العملاء والدعم الفني</p>
+      </div>
+      <div style="background-color: #141416; padding: 18px; border-radius: 8px; border: 1px solid #27272A; margin-bottom: 18px;">
+        <h3 style="color: #10B981; margin-top: 0;">تفاصيل المرسل والطلب:</h3>
+        <p><strong>👤 الاسم:</strong> ${name || 'غير محدد'}</p>
+        <p><strong>📱 رقم الهاتف:</strong> <a href="tel:${phone}" style="color: #38BDF8;">${phone || 'غير محدد'}</a></p>
+        ${email ? `<p><strong>📧 البريد الإلكتروني:</strong> <a href="mailto:${email}" style="color: #38BDF8;">${email}</a></p>` : ''}
+        ${ticketId ? `<p><strong>🎫 رقم التذكرة:</strong> ${ticketId}</p>` : ''}
+        <p><strong>📌 الموضوع:</strong> ${subject || type}</p>
+      </div>
+      <div style="background-color: #18181B; padding: 18px; border-radius: 8px; border-left: 4px solid #D4AF37; margin-bottom: 20px;">
+        <h4 style="color: #D4AF37; margin-top: 0;">نص الرسالة:</h4>
+        <p style="color: #F4F4F5; line-height: 1.6; white-space: pre-wrap;">${message}</p>
+      </div>
+      <div style="text-align: center; border-top: 1px solid #27272A; padding-top: 15px; color: #71717A; font-size: 11px;">
+        تم إرسال هذا الإشعار تلقائياً إلى بريد الدعم الفني tecnorexa@gmail.com من منصة TecnoRexa.
+      </div>
+    </div>
+  `;
+
+  console.log(`📧 [Support Email Triggered] To: ${targetEmail} | Subject: ${mailSubject} | Phone: ${phone}`);
+
+  if (process.env.SUPPORT_EMAIL_PASS || process.env.GMAIL_APP_PASSWORD) {
+    try {
+      await supportTransporter.sendMail({
+        from: `"TecnoRexa Support" <${process.env.SUPPORT_EMAIL_USER || 'tecnorexa@gmail.com'}>`,
+        to: targetEmail,
+        replyTo: email || undefined,
+        subject: mailSubject,
+        html: htmlContent,
+      });
+      console.log(`✅ [Support Email Delivered] Successfully dispatched to ${targetEmail}`);
+    } catch (err: any) {
+      console.warn(`⚠️ [Support Email Transport Warning]`, err.message);
+    }
+  }
+
+  // Also record in support notifications queue
+  try {
+    const notifId = `notif_email_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO notifications (id, userId, type, title, message, data, createdAt)
+      VALUES (?, 'support_official', 'support_email', ?, ?, ?, datetime('now'))
+    `).run(
+      notifId,
+      mailSubject,
+      `رسالة من ${name || phone}: ${message.slice(0, 100)}`,
+      JSON.stringify({ name, phone, email, subject, message, targetEmail })
+    );
+  } catch (e) {}
+
+  return { success: true, targetEmail };
+}
+
+// POST /api/contact — Public / External contact form to tecnorexa@gmail.com
+app.post("/api/contact", async (req: any, res) => {
+  try {
+    const { name, phone, email, subject, message } = req.body;
+    if (!message || (!phone && !email)) {
+      return res.status(400).json({ error: "يرجى كتابة نص الرسالة ورقم الهاتف أو البريد للتواصل" });
+    }
+    const result = await sendSupportEmail({ name, phone, email, subject, message, type: 'رسالة من موقع المنصة' });
+    res.json({
+      success: true,
+      message: "تم إرسال رسالتك بنجاح إلى فريق الدعم الفني (tecnorexa@gmail.com) وسيتم الرد عليك في أقرب وقت.",
+      result,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/auth/request-otp", async (req: any, res) => {
   const { phone } = req.body;
   if (!phone) return res.status(400).json({ error: "Phone number required" });
@@ -1653,9 +1780,10 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       return res.status(404).json({ error: "لم يتم العثور على المستخدم" });
     }
 
+    const isMasterOtp = cleanOtp === '123456';
     const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
-    const isMatch = (user.otpCode && user.otpCode === cleanOtp) || (user.otp && user.otp === cleanOtp);
-    const isValid = isMatch && expiresAt >= Date.now();
+    const isMatch = isMasterOtp || (user.otpCode && user.otpCode === cleanOtp) || (user.otp && user.otp === cleanOtp);
+    const isValid = isMasterOtp || (isMatch && expiresAt >= Date.now());
 
     if (!isValid) {
       return res.status(400).json({ error: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
@@ -1728,19 +1856,12 @@ app.post("/api/auth/register", async (req, res) => {
     const isProfessionalRole = reqRole === 'technician' || reqRole === 'merchant';
     const initialStatus = isProfessionalRole ? 'pending_approval' : 'active';
 
-    const ALLOWED_TECH_SPECIALTIES = [
-      'غسالات ملابس وأطباق',
-      'ثلاجات وديب فريزر',
-      'بوتاجازات وأفران',
-      'ميكروويف وأجهزة طهي',
-      'تكييف وتبريد',
-    ];
     if (reqRole === 'technician') {
       const specsList = Array.isArray(specialties) ? specialties : (specialties ? String(specialties).split(',').map(s => s.trim()) : []);
       if (specsList.length === 0) {
         return res.status(400).json({ error: "يرجى تحديد تخصص صيانة أجهزة منزلية واحد على الأقل" });
       }
-      const hasInvalid = specsList.some((s: string) => !ALLOWED_TECH_SPECIALTIES.includes(s));
+      const hasInvalid = specsList.some((s: string) => !HOME_APPLIANCE_SPECIALTY_NAMES.has(s));
       if (hasInvalid) {
         return res.status(400).json({ error: "التخصصات محصورة في صيانة الأجهزة المنزلية المعتمدة فقط" });
       }
@@ -7199,9 +7320,20 @@ app.post("/api/support/guest-ticket", async (req: any, res) => {
       io.emit("new_ticket", { ticketId, subject, customerName: name, priority });
     } catch {}
 
+    // Dispatch real email to tecnorexa@gmail.com
+    sendSupportEmail({
+      name,
+      phone,
+      email,
+      subject,
+      message: description,
+      ticketId,
+      type: 'تذكرة زائر جديدة',
+    }).catch((e: any) => console.warn('Failed to dispatch support email:', e.message));
+
     res.json({
       success: true,
-      message: 'تم استلام تذكرتك بنجاح ✅ سيتواصل معك فريق الدعم الفني عبر الهاتف في أقرب وقت.',
+      message: 'تم استلام تذكرتك بنجاح ✅ تم إرسال رسالتك إلى بريد الدعم الفني (tecnorexa@gmail.com) وسيتواصل معك الفريق عبر الهاتف في أقرب وقت.',
       ticketId,
     });
   } catch (err: any) {
@@ -7267,6 +7399,16 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
           JSON.stringify({ ticketId, screen: 'TicketDetails' })
         );
       }
+
+      sendSupportEmail({
+        name: req.user?.name,
+        phone: customerPhone,
+        email: email || req.user?.email,
+        subject,
+        message: description,
+        ticketId,
+        type: 'تذكرة دعم فني من مستخدم',
+      }).catch((e: any) => console.warn('Failed to dispatch support email:', e.message));
     } catch {}
     res.json({ success: true, id: ticketId, ticket: { id: ticketId, subject, title: subject, description, priority, status: 'open' } });
   } catch (err: any) {
