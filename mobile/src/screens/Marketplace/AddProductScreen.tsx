@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import {
   ImagePlus,
+  Camera,
   ChevronDown,
   Package,
   Upload,
@@ -145,13 +146,46 @@ export default function AddProductScreen({ navigation }: any) {
         if (asset.base64) {
           setForm(prev => ({ ...prev, image: `data:image/jpeg;base64,${asset.base64}` }));
         } else {
-          setForm(prev => ({ ...prev, image: uri }));
         }
       }
     } catch (err) {
       console.warn('Image picker error:', err);
     }
   };
+
+  const handleCameraCapture = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permissionResult.granted) {
+          Alert.alert('تنبيه', 'يجب منح صلاحية الكاميرا لالتقاط صورة المنتج مباشرة.');
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        const uri = asset.uri;
+        setImagePreview(uri);
+        if (asset.base64) {
+          setForm(prev => ({ ...prev, image: `data:image/jpeg;base64,${asset.base64}` }));
+        } else {
+          setForm(prev => ({ ...prev, image: uri }));
+        }
+      }
+    } catch (err) {
+      console.warn('Camera error:', err);
+    }
+  };
+
 
 
   const handlePublish = async () => {
@@ -282,41 +316,77 @@ export default function AddProductScreen({ navigation }: any) {
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity
-                onPress={handlePickImage}
-                style={{
-                  width: '100%',
-                  height: 130,
-                  backgroundColor: colors.darkCard,
-                  borderWidth: 1.5,
-                  borderColor: colors.primary,
-                  borderStyle: 'dashed',
-                  borderRadius: borderRadius.lg,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                <View
+              <View style={{ flexDirection: 'row-reverse', gap: 10, marginBottom: spacing.sm }}>
+                <TouchableOpacity
+                  onPress={handleCameraCapture}
                   style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: 'rgba(212,175,55,0.15)',
+                    flex: 1,
+                    height: 110,
+                    backgroundColor: colors.darkCard,
+                    borderWidth: 1.5,
+                    borderColor: colors.primary,
+                    borderStyle: 'dashed',
+                    borderRadius: borderRadius.lg,
                     alignItems: 'center',
                     justifyContent: 'center',
+                    gap: 6,
                   }}
                 >
-                  <ImagePlus size={22} color={colors.primary} />
-                </View>
-                <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>
-                  اضغط لرفع صورة من جهازك
-                </Text>
-                <Text style={{ color: colors.gray, fontSize: 11 }}>
-                  PNG, JPG أو WEBP
-                </Text>
-              </TouchableOpacity>
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: 'rgba(212,175,55,0.15)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Camera size={20} color={colors.primary} />
+                  </View>
+                  <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 12 }}>
+                    تصوير بالكاميرا 📸
+                  </Text>
+                  <Text style={{ color: colors.gray, fontSize: 10 }}>
+                    التقاط صورة مباشرة
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handlePickImage}
+                  style={{
+                    flex: 1,
+                    height: 110,
+                    backgroundColor: colors.darkCard,
+                    borderWidth: 1.5,
+                    borderColor: '#3B82F6',
+                    borderStyle: 'dashed',
+                    borderRadius: borderRadius.lg,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: 'rgba(59,130,246,0.15)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <ImagePlus size={20} color="#3B82F6" />
+                  </View>
+                  <Text style={{ color: '#3B82F6', fontWeight: '800', fontSize: 12 }}>
+                    اختيار من المعرض 🖼️
+                  </Text>
+                  <Text style={{ color: colors.gray, fontSize: 10 }}>
+                    من ألبوم الصور
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
 
 

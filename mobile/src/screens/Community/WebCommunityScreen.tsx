@@ -37,10 +37,15 @@ import {
   Clock,
   Volume2,
   Film,
+  Camera,
+  Image as ImageIcon,
+  ImagePlus,
+  Upload,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { colors, borderRadius } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
-import { api, fetchApi } from '../../api/client';
+import { api, fetchApi, uploadFile } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -114,8 +119,8 @@ const WebCommunityScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
       {/* Role Header with ☰ Drawer */}
       <OwnerHeader
-        title="مجتمع الويب والفيديوهات"
-        subtitle="المنشورات والريلز التفاعلية والكورسات"
+        title="مجتمع TecnoRexa"
+        subtitle="شروحات صيانة الأجهزة والريلز التفاعلية والكورسات"
         navigation={navigation}
         currentScreen="WebCommunity"
         showBack={true}
@@ -489,6 +494,7 @@ const ReelsTab: React.FC = () => {
 
   // Add Reel Modal state
   const [showAddReelModal, setShowAddReelModal] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<any>(null);
   const [reelVideoUrl, setReelVideoUrl] = useState('');
   const [reelCaption, setReelCaption] = useState('');
   const [publishingReel, setPublishingReel] = useState(false);
@@ -516,15 +522,77 @@ const ReelsTab: React.FC = () => {
     loadReels();
   }, [loadReels]);
 
+  const handleRecordVideo = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!camPerm.granted) {
+          Alert.alert('صلاحية مطلوبة', 'يرجى منح صلاحية الكاميرا لتسجيل الفيديو');
+          return;
+        }
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['videos', 'images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setSelectedMedia(result.assets[0]);
+      }
+    } catch (e) {
+      Alert.alert('خطأ', 'تعذر تشغيل الكاميرا');
+    }
+  };
+
+  const handlePickVideo = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!libPerm.granted) {
+          Alert.alert('صلاحية مطلوبة', 'يرجى منح صلاحية الوصول لمعرض الفيديوهات');
+          return;
+        }
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['videos', 'images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setSelectedMedia(result.assets[0]);
+      }
+    } catch (e) {
+      Alert.alert('خطأ', 'تعذر اختيار الفيديو من المعرض');
+    }
+  };
+
   const handlePublishReel = async () => {
-    if (!reelVideoUrl.trim()) {
-      Alert.alert('تنبيه', 'يرجى إدخال رابط الفيديو المباشر أو المقطع المرفوع');
+    if (!selectedMedia && !reelVideoUrl.trim()) {
+      Alert.alert('تنبيه', 'يرجى تصوير مقطع بالكاميرا أو اختيار فيديو من المعرض');
       return;
     }
     setPublishingReel(true);
     try {
+      let finalVideoUrl = reelVideoUrl.trim();
+
+      if (selectedMedia?.uri) {
+        try {
+          const fileToUpload = {
+            uri: selectedMedia.uri,
+            type: selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg'),
+            name: selectedMedia.fileName || (selectedMedia.type === 'video' ? `reel_${Date.now()}.mp4` : `photo_${Date.now()}.jpg`),
+          };
+          const uploadRes = await uploadFile('/upload', fileToUpload);
+          if (uploadRes?.url) {
+            finalVideoUrl = uploadRes.url;
+          }
+        } catch {
+          finalVideoUrl = selectedMedia.uri;
+        }
+      }
+
       const res = await api.post('/reels', {
-        videoUrl: reelVideoUrl.trim(),
+        videoUrl: finalVideoUrl || '/uploads/sample_reel.mp4',
         description: reelCaption.trim() || 'فيديو شروحات صيانة جديد',
       });
       if (res.data?.success) {
@@ -540,6 +608,7 @@ const ReelsTab: React.FC = () => {
         };
         setReels(prev => [newReelItem, ...prev]);
         setShowAddReelModal(false);
+        setSelectedMedia(null);
         setReelVideoUrl('');
         setReelCaption('');
         Alert.alert('🎉 مبروك!', 'تم نشر فيديو الريلز بنجاح وهو متاح للمشاهدة الآن.');
@@ -780,20 +849,89 @@ const ReelsTab: React.FC = () => {
               <TouchableOpacity onPress={() => setShowAddReelModal(false)}>
                 <X color={colors.gray} size={22} />
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>نشر فيديو ريلز جديد 🎬</Text>
             </View>
 
             <ScrollView style={{ paddingVertical: 10 }}>
-              <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
-                رابط الفيديو أو المقطع (Direct Video URL) *
+              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '800', textAlign: 'right', marginBottom: 8 }}>
+                اختر الفيديو أو صوره مباشرة 🎥
               </Text>
-              <TextInput
-                style={[styles.modalInput, { textAlign: 'right', marginBottom: 12 }]}
-                placeholder="https://example.com/reel.mp4"
-                placeholderTextColor={colors.gray}
-                value={reelVideoUrl}
-                onChangeText={setReelVideoUrl}
-              />
+
+              {selectedMedia ? (
+                <View style={{
+                  backgroundColor: '#1C1917',
+                  borderRadius: borderRadius.md,
+                  padding: 12,
+                  marginBottom: 14,
+                  borderWidth: 1,
+                  borderColor: colors.primary,
+                  flexDirection: 'row-reverse',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(212,175,55,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Film size={20} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right' }} numberOfLines={1}>
+                        {selectedMedia.fileName || 'تم تحديد الفيديو بنجاح ✅'}
+                      </Text>
+                      <Text style={{ color: colors.primary, fontSize: 10, textAlign: 'right' }}>
+                        جاهز للنشر على مجتمع TecnoRexa
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedMedia(null)} style={{ padding: 6 }}>
+                    <X size={18} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row-reverse', gap: 10, marginBottom: 14 }}>
+                  <TouchableOpacity
+                    onPress={handleRecordVideo}
+                    style={{
+                      flex: 1,
+                      height: 100,
+                      backgroundColor: '#18181B',
+                      borderWidth: 1.5,
+                      borderColor: colors.primary,
+                      borderStyle: 'dashed',
+                      borderRadius: borderRadius.lg,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Camera size={24} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 12 }}>
+                      تصوير فيديو 📸
+                    </Text>
+                    <Text style={{ color: colors.gray, fontSize: 10 }}>بالكاميرا الآن</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handlePickVideo}
+                    style={{
+                      flex: 1,
+                      height: 100,
+                      backgroundColor: '#18181B',
+                      borderWidth: 1.5,
+                      borderColor: '#3B82F6',
+                      borderStyle: 'dashed',
+                      borderRadius: borderRadius.lg,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <ImagePlus size={24} color="#3B82F6" />
+                    <Text style={{ color: '#3B82F6', fontWeight: '800', fontSize: 12 }}>
+                      من المعرض 📁
+                    </Text>
+                    <Text style={{ color: colors.gray, fontSize: 10 }}>اختيار مقطع محفوظ</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>
                 وصف الفيديو والوسوم (Caption & Hashtags)

@@ -97,7 +97,37 @@ export default function EditProfileScreen({ navigation }: any) {
 
   const [loading, setLoading] = useState(false);
 
-  const handlePickAvatar = async () => {
+  const pickFromCamera = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('تنبيه', 'يرجى منح صلاحية الكاميرا لالتقاط صورة شخصية.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        base64: true,
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        const newAvatar = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+        setForm((prev) => ({ ...prev, avatar: newAvatar }));
+        try {
+          await api.post('/user/avatar', { avatar: newAvatar });
+          if (user) {
+            updateUser({ ...user, avatar: newAvatar });
+          }
+        } catch {}
+      }
+    } catch (err: any) {
+      Alert.alert('خطأ', 'تعذر تشغيل الكاميرا');
+    }
+  };
+
+  const pickFromGallery = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
@@ -125,6 +155,19 @@ export default function EditProfileScreen({ navigation }: any) {
     } catch (err: any) {
       Alert.alert('خطأ', 'تعذر فتح معرض الصور');
     }
+  };
+
+  const handlePickAvatar = () => {
+    Alert.alert(
+      'تحديث الصورة الشخصية 👤',
+      'اختر طريقة تعيين الصورة:',
+      [
+        { text: '📸 التقاط بالكاميرا', onPress: pickFromCamera },
+        { text: '🖼️ اختيار من المعرض', onPress: pickFromGallery },
+        { text: 'إلغاء', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
   };
 
   const getRoleBadge = (role?: string) => {
@@ -501,41 +544,28 @@ export default function EditProfileScreen({ navigation }: any) {
               />
             </View>
 
-            {/* Avatar URL */}
-            <View>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'flex-end',
-                  alignItems: 'center',
-                  gap: 6,
-                  marginBottom: 8,
-                }}
-              >
-                <Text style={{ color: colors.white, fontWeight: '800', fontSize: 14 }}>
-                  رابط الصورة الشخصية (URL)
-                </Text>
-                <Camera size={16} color={colors.primary} />
-              </View>
-              <TextInput
-                style={{
-                  backgroundColor: '#1A1A1A',
-                  borderWidth: 1,
-                  borderColor: 'rgba(212, 175, 55, 0.25)',
-                  borderRadius: borderRadius.md,
-                  padding: 14,
-                  textAlign: 'right',
-                  color: colors.white,
-                  fontWeight: '600',
-                  fontSize: 15,
-                }}
-                autoCapitalize="none"
-                value={form.avatar}
-                onChangeText={t => setForm({ ...form, avatar: t })}
-                placeholder="https://..."
-                placeholderTextColor="#666"
-              />
-            </View>
+            {/* Change Avatar Button */}
+            <TouchableOpacity
+              onPress={handlePickAvatar}
+              style={{
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                backgroundColor: '#1A1A1A',
+                borderWidth: 1,
+                borderColor: 'rgba(212, 175, 55, 0.4)',
+                borderRadius: borderRadius.md,
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                marginBottom: 6,
+              }}
+            >
+              <Camera size={18} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14 }}>
+                تغيير الصورة الشخصية (تصوير أو من المعرض) 📸
+              </Text>
+            </TouchableOpacity>
 
             {/* Technician 3 Specialties (For Technicians) */}
             {user?.role === 'technician' && (

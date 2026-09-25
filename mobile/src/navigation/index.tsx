@@ -99,6 +99,7 @@ import MarketingScreen from '../screens/Marketing/MarketingScreen';
 import MediaApprovalScreen from '../screens/Media/MediaApprovalScreen';
 import OfflineLibraryScreen from '../screens/Media/OfflineLibraryScreen';
 import OnboardingModal from '../components/OnboardingModal';
+import FloatingAIButton from '../components/FloatingAIButton';
 
 // ─────────────────────────────────────────────────────────────
 // Tab definitions per role
@@ -354,6 +355,7 @@ export default function AppNavigator() {
         )}
       </Stack.Navigator>
       <OnboardingModal user={user} />
+      <FloatingAIButton />
     </NavigationContainer>
   );
 }
