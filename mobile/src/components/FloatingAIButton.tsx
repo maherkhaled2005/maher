@@ -1,35 +1,26 @@
 import React, { useRef, useEffect } from 'react';
 import {
   TouchableOpacity,
-  Text,
   View,
   StyleSheet,
   Platform,
   Animated,
 } from 'react-native';
-import { useNavigation, useNavigationState } from '@react-navigation/native';
 import { Bot, Sparkles } from 'lucide-react-native';
-import { colors } from '../theme';
 import { useAuthStore } from '../store/authStore';
+import { navigationRef } from '../navigation/navigationRef';
 
-export default function FloatingAIButton() {
-  const navigation = useNavigation<any>();
+interface FloatingAIButtonProps {
+  currentRoute?: string;
+  onNavigate?: () => void;
+}
+
+export default function FloatingAIButton({ currentRoute, onNavigate }: FloatingAIButtonProps) {
   const { isAuthenticated } = useAuthStore();
 
   // Subtle breathing pulse animation for the golden aura
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0.4)).current;
-
-  // Determine current active route safely
-  const currentRouteName = useNavigationState((state) => {
-    if (!state) return '';
-    const route = state.routes[state.index];
-    if (route?.state) {
-      const childState = route.state as any;
-      return childState.routes[childState.index]?.name || route.name;
-    }
-    return route?.name || '';
-  });
 
   useEffect(() => {
     const pulseLoop = Animated.loop(
@@ -65,13 +56,15 @@ export default function FloatingAIButton() {
   }, []);
 
   // Do not render if not logged in or if already on AIChat screen
-  if (!isAuthenticated || currentRouteName === 'AIChat') {
+  if (!isAuthenticated || currentRoute === 'AIChat') {
     return null;
   }
 
   const handlePress = () => {
-    if (navigation?.navigate) {
-      navigation.navigate('AIChat');
+    if (onNavigate) {
+      onNavigate();
+    } else if (navigationRef.isReady()) {
+      navigationRef.navigate('AIChat');
     }
   };
 

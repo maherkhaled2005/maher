@@ -1,6 +1,7 @@
 // src/navigation/index.tsx
 import React from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { navigationRef } from './navigationRef';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, ActivityIndicator, Platform, Image } from 'react-native';
@@ -288,8 +289,26 @@ export default function AppNavigator() {
     },
   };
 
+  const [activeRoute, setActiveRoute] = React.useState<string>('');
+
+  const updateActiveRoute = React.useCallback(() => {
+    try {
+      if (navigationRef.isReady()) {
+        const route = navigationRef.getCurrentRoute();
+        setActiveRoute(route?.name || '');
+      }
+    } catch {
+      // safe fallback
+    }
+  }, []);
+
   return (
-    <NavigationContainer theme={darkNavTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={darkNavTheme}
+      onReady={updateActiveRoute}
+      onStateChange={updateActiveRoute}
+    >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <>
@@ -368,7 +387,7 @@ export default function AppNavigator() {
         )}
       </Stack.Navigator>
       <OnboardingModal user={user} />
-      <FloatingAIButton />
+      <FloatingAIButton currentRoute={activeRoute} />
     </NavigationContainer>
   );
 }
