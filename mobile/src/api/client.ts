@@ -7,7 +7,7 @@ const getBaseURL = (): string => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin) {
     return `${window.location.origin}/api`;
   }
-  return process.env.EXPO_PUBLIC_API_URL || 'https://api.tecnorexa.com/api';
+  return process.env.EXPO_PUBLIC_API_URL || 'http://46.224.87.124/api';
 };
 
 export const api = axios.create({
