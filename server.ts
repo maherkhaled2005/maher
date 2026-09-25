@@ -2047,7 +2047,7 @@ function requireAdmin(req: any, res: any, next: any) {
   const role = normalizeRoleServer(req.user.role);
   const isLeadProgrammer = (role === "programmer" || role === "lead_developer") && 
     (req.user?.developerRank === "lead" || req.user?.programmerLevel === "lead" || req.user?.phone === "01064739664");
-  if (role === "owner" || role === "manager" || isLeadProgrammer) return next();
+  if (role === "owner" || role === "manager" || role === "programmer" || role === "lead_developer" || isLeadProgrammer) return next();
   res.status(403).json({ error: "Admin access required" });
 }
 
@@ -2182,11 +2182,11 @@ const handleErrorAssign = async (req: any, res: any) => {
 };
 
 // Register shared routes for both /api/owner and /api/admin
-app.get("/api/owner/technicians/upgrades", authenticateToken, requireOwner, handleTechUpgradesList);
-app.get("/api/admin/technicians/upgrades", authenticateToken, requireOwner, handleTechUpgradesList);
+app.get("/api/owner/technicians/upgrades", authenticateToken, requireAdmin, handleTechUpgradesList);
+app.get("/api/admin/technicians/upgrades", authenticateToken, requireAdmin, handleTechUpgradesList);
 
-app.post("/api/owner/technicians/upgrades/:id/action", authenticateToken, requireOwner, handleTechUpgradeAction);
-app.post("/api/admin/technicians/upgrades/:id/action", authenticateToken, requireOwner, handleTechUpgradeAction);
+app.post("/api/owner/technicians/upgrades/:id/action", authenticateToken, requireAdmin, handleTechUpgradeAction);
+app.post("/api/admin/technicians/upgrades/:id/action", authenticateToken, requireAdmin, handleTechUpgradeAction);
 
 app.post("/api/owner/chat/:id/warning", authenticateToken, requireAdmin, handleChatWarning);
 app.post("/api/admin/chat/:id/warning", authenticateToken, requireAdmin, handleChatWarning);

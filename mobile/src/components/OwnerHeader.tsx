@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar } from 'react-native';
 import {
   Menu,
   ChevronRight,
@@ -233,14 +233,16 @@ export default function OwnerHeader({
   );
 }
 
+const STATUSBAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : Platform.OS === 'ios' ? 44 : 8;
+
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: Platform.OS === 'ios' ? 44 : Platform.OS === 'android' ? 32 : 12,
-    paddingBottom: spacing.sm + 2,
+    paddingHorizontal: spacing.sm,
+    paddingTop: STATUSBAR_HEIGHT + (Platform.OS === 'web' ? 6 : 2),
+    paddingBottom: 6,
     backgroundColor: '#0A0A0A',
     borderBottomWidth: 1,
     borderBottomColor: '#1F1F1F',
@@ -248,7 +250,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? ({ position: 'sticky', top: 0 } as any) : {}),
   },
   sideGroup: {
-    minWidth: 44,
+    minWidth: 38,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -264,39 +266,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     maxWidth: '100%',
   },
   numBadge: {
     backgroundColor: 'rgba(212, 175, 55, 0.15)',
     borderWidth: 1,
     borderColor: colors.primary,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 5,
     flexShrink: 0,
   },
   numText: {
     color: colors.primary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
   },
   titleText: {
     color: colors.white,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
     textAlign: 'center',
     flexShrink: 1,
   },
   subtitleText: {
     color: colors.gray,
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 10,
+    marginTop: 1,
     textAlign: 'center',
   },
   hamburgerBtn: {
-    width: 42,
-    height: 42,
+    width: 36,
+    height: 36,
     borderRadius: borderRadius.md,
     backgroundColor: '#161616',
     borderWidth: 1,
@@ -307,18 +309,18 @@ const styles = StyleSheet.create({
   },
   crownBadge: {
     position: 'absolute',
-    top: -3,
-    right: -3,
+    top: -2,
+    right: -2,
     backgroundColor: colors.primary,
-    borderRadius: 8,
-    width: 16,
-    height: 16,
+    borderRadius: 7,
+    width: 14,
+    height: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtn: {
-    width: 40,
-    height: 40,
+    width: 34,
+    height: 34,
     borderRadius: borderRadius.md,
     backgroundColor: '#161616',
     borderWidth: 1,

@@ -84,9 +84,11 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
   const currentRole = normalizeRole(user?.role || '');
   const isOwner = currentRole === 'owner';
   const isManager = currentRole === 'manager';
+  const isProgrammer = currentRole === 'programmer';
   const isTech = currentRole === 'technician';
   const isSupport = currentRole === 'customer_support';
-  const isCustomer = !isOwner && !isManager && !isTech && !isSupport;
+  const isCustomer = !isOwner && !isManager && !isProgrammer && !isTech && !isSupport;
+  const canManageUpgrades = isOwner || isProgrammer || isManager;
 
   const [technicians, setTechnicians] = useState<TechItem[]>([]);
   const [upgrades, setUpgrades] = useState<UpgradeCandidate[]>([]);
@@ -135,7 +137,7 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
         setTechnicians(tData);
       }
 
-      if (isOwner || isManager) {
+      if (canManageUpgrades) {
         const uData = await fetchApi('/owner/technicians/upgrades').catch(() => []);
         if (Array.isArray(uData)) {
           setUpgrades(uData);
@@ -408,10 +410,10 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
       ]}
     >
       {/* 1. Header Logic Based on Role */}
-      {isOwner || isManager ? (
+      {canManageUpgrades ? (
         <OwnerHeader
-          title={isOwner ? "فريق الفنيين والترقيات" : "إدارة كادر الفنيين والترقيات"}
-          subtitle={isOwner ? "كادر الصيانة واعتماد ترقيات 300 ج.م" : "كادر الصيانة المعتمد ومراجعة طلبات الانضمام"}
+          title={isOwner ? "فريق الفنيين والترقيات" : isProgrammer ? "إدارة واعتماد الفنيين (رئيس التقني)" : "إدارة كادر الفنيين والترقيات"}
+          subtitle={isOwner ? "كادر الصيانة واعتماد ترقيات 300 ج.م 👑" : isProgrammer ? "صلاحية سيادية لاعتماد طلبات الانضمام 💻" : "كادر الصيانة ومراجعة طلبات الانضمام 👔"}
           sectionNumber={10}
           navigation={navigation}
           currentScreen="TechniciansTeam"
@@ -563,8 +565,8 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
           })}
         </ScrollView>
 
-        {/* Manager/Owner Tabs */}
-        {(isOwner || isManager) && (
+        {/* Manager/Owner/Programmer Tabs */}
+        {canManageUpgrades && (
           <View style={{ flexDirection: 'row-reverse', gap: spacing.xs, marginTop: spacing.xs }}>
             <TouchableOpacity
               onPress={() => setActiveTab('technicians')}

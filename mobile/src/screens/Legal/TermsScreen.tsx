@@ -1,4 +1,3 @@
-// mobile/src/screens/Legal/TermsScreen.tsx
 import React from 'react';
 import {
   View,
@@ -7,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { FileText, ArrowRight, CheckSquare, Clock, Award, ShieldAlert } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -16,12 +17,20 @@ interface Props {
 }
 
 export const TermsScreen: React.FC<Props> = ({ navigation }) => {
+  const handleBack = () => {
+    if (navigation?.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Register');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={handleBack}
           style={styles.backButton}
         >
           <ArrowRight size={22} color={colors.primary} />
@@ -127,6 +136,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
   },
   header: {
     flexDirection: 'row-reverse',

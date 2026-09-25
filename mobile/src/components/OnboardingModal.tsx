@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  DeviceEventEmitter,
+  useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -209,15 +211,21 @@ const ROLE_INFO: Record<string, RoleInfoItem> = {
   },
 };
 
+export const openRoleRulesModal = () => {
+  DeviceEventEmitter.emit('SHOW_ROLE_LAWS');
+};
+
 export default function OnboardingModal({ user }: OnboardingModalProps) {
   const [visible, setVisible] = useState(false);
   const [agreed, setAgreed] = useState(true);
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   useEffect(() => {
     if (!user || !user.id) return;
     const checkStatus = async () => {
       try {
-        const key = `tr_onboarded_${user.id}`;
+        const normRole = normalizeRole(user.role || 'customer');
+        const key = `tr_onboarded_${user.id}_${normRole}_v3`;
         const done = await AsyncStorage.getItem(key);
         if (!done) {
           setVisible(true);
@@ -225,12 +233,22 @@ export default function OnboardingModal({ user }: OnboardingModalProps) {
       } catch (e) {}
     };
     checkStatus();
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('SHOW_ROLE_LAWS', () => {
+      setVisible(true);
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
 
   const handleDismiss = async () => {
     if (user?.id) {
       try {
-        await AsyncStorage.setItem(`tr_onboarded_${user.id}`, 'true');
+        const normRole = normalizeRole(user.role || 'customer');
+        await AsyncStorage.setItem(`tr_onboarded_${user.id}_${normRole}_v3`, 'true');
       } catch (e) {}
     }
     setVisible(false);
@@ -242,12 +260,15 @@ export default function OnboardingModal({ user }: OnboardingModalProps) {
   const info = ROLE_INFO[role] || ROLE_INFO.customer;
   const Icon = info.icon;
 
+  const modalWidth = Math.min(screenWidth - 32, 460);
+  const modalMaxHeight = Math.min(screenHeight * 0.88, 660);
+
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={() => {}}
+      onRequestClose={() => setVisible(false)}
     >
       <View
         style={{
@@ -261,12 +282,11 @@ export default function OnboardingModal({ user }: OnboardingModalProps) {
         <View
           style={{
             backgroundColor: '#141416',
-            borderRadius: 24,
+            borderRadius: 20,
             borderWidth: 1.5,
             borderColor: '#D4AF37',
-            width: '100%',
-            maxWidth: 480,
-            maxHeight: '90%',
+            width: modalWidth,
+            maxHeight: modalMaxHeight,
             overflow: 'hidden',
             shadowColor: '#D4AF37',
             shadowOffset: { width: 0, height: 8 },

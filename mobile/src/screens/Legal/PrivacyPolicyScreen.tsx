@@ -1,4 +1,3 @@
-// mobile/src/screens/Legal/PrivacyPolicyScreen.tsx
 import React from 'react';
 import {
   View,
@@ -7,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { ShieldCheck, ArrowRight, Lock, Eye, CheckCircle2 } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -16,12 +17,20 @@ interface Props {
 }
 
 export const PrivacyPolicyScreen: React.FC<Props> = ({ navigation }) => {
+  const handleBack = () => {
+    if (navigation?.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Register');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={handleBack}
           style={styles.backButton}
         >
           <ArrowRight size={22} color={colors.primary} />
@@ -121,6 +130,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
   },
   header: {
     flexDirection: 'row-reverse',

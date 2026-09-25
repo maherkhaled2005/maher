@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   SafeAreaView,
+  StatusBar,
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -255,24 +256,36 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
+  const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0;
+
   return (
     <SafeAreaView
       style={[
-        { flex: 1, backgroundColor: '#0A0A0A', height: Platform.OS === 'web' ? ('100vh' as any) : '100%' }
+        {
+          flex: 1,
+          backgroundColor: '#0A0A0A',
+          height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+          paddingTop: statusBarHeight,
+        },
       ]}
     >
         <ScrollView
           style={[{ flex: 1 }, Platform.OS === 'web' && { overflowY: 'auto' } as any]}
-          contentContainerStyle={{ padding: spacing.xl, paddingBottom: 150, flexGrow: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.sm,
+            paddingBottom: 150,
+            flexGrow: 1,
+          }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           {/* Clean Header */}
           <View style={{ alignItems: 'center', marginBottom: spacing.md, marginTop: spacing.xs }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 }}>
               إنشاء حساب جديد
             </Text>
-            <Text style={{ color: '#A1A1AA', fontSize: 12, marginTop: 4 }}>
+            <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 2 }}>
               انضم إلى منصة TecnoRexa
             </Text>
           </View>
@@ -710,20 +723,34 @@ export default function RegisterScreen({ navigation }: any) {
             {/* Terms & Privacy Links */}
             <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
               <Text style={{ color: '#52525B', fontSize: 12 }}>•</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
-                <Text style={{ color: '#71717A', fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' }}>
+              <TouchableOpacity
+                onPress={() => {
+                  triggerSelectionHaptic();
+                  navigation.navigate('PrivacyPolicy');
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' }}>
                   سياسة الخصوصية
                 </Text>
               </TouchableOpacity>
               <Text style={{ color: '#52525B', fontSize: 12 }}>•</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Terms')}>
-                <Text style={{ color: '#71717A', fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' }}>
+              <TouchableOpacity
+                onPress={() => {
+                  triggerSelectionHaptic();
+                  navigation.navigate('Terms');
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' }}>
                   الشروط والأحكام
                 </Text>
               </TouchableOpacity>
               <Text style={{ color: '#52525B', fontSize: 12 }}>•</Text>
             </View>
-            <Text style={{ color: '#52525B', fontSize: 11, textAlign: 'center', marginTop: 6 }}>
+            <Text style={{ color: '#71717A', fontSize: 11, textAlign: 'center', marginTop: 6 }}>
               بالتسجيل أنت توافق على شروط الاستخدام وسياسة الخصوصية
             </Text>
           </View>

@@ -287,6 +287,8 @@ export default function AppNavigator() {
             <Stack.Screen name="Landing" component={LandingScreen} />
             <Stack.Screen name="Contact" component={ContactScreen} />
             <Stack.Screen name="FAQ" component={FAQScreen} />
+            <Stack.Screen name="Terms" component={TermsScreen} />
+            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
           </>
         ) : isBanned ? (
           <Stack.Screen name="Banned" component={BannedScreen} />

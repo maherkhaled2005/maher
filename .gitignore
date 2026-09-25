@@ -5,6 +5,8 @@ coverage/
 .DS_Store
 *.log
 .env*
+*.env
+server_credentials.*
 !.env.example
 *.db-shm
 *.db-wal

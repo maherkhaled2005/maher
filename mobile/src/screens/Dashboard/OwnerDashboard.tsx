@@ -41,6 +41,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { fetchApi } from '../../api/client';
 import OwnerSideDrawer, { OWNER_SECTIONS } from '../../components/OwnerSideDrawer';
+import { openRoleRulesModal } from '../../components/OnboardingModal';
 import { generateExecutiveReportHTML, exportExecutiveCSV } from '../../utils/executiveReport';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -208,44 +209,48 @@ export default function OwnerDashboard({ navigation }: any) {
         }
         showsVerticalScrollIndicator={true}
       >
-        {/* Top Header with Hamburger ☰ button and Owner Badge */}
+        {/* Top Header with Hamburger ☰ button, Rules button, Export, and Owner Badge */}
         <View style={styles.header}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <TouchableOpacity
               style={styles.menuBtn}
               onPress={() => setDrawerVisible(true)}
               accessibilityLabel="فتح قائمة الأقسام"
             >
-              <Menu size={22} color={colors.primary} />
+              <Menu size={20} color={colors.primary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.rulesBtn}
+              onPress={() => openRoleRulesModal()}
+              accessibilityLabel="ميثاق وقوانين المالك"
+            >
+              <Text style={styles.rulesBtnText}>📜 القوانين</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.exportBtn}
               onPress={() => setExportModalVisible(true)}
             >
-              <Download size={16} color={colors.dark} />
+              <Download size={14} color={colors.dark} />
               <Text style={styles.exportBtnText}>تصدير 📑</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ alignItems: 'flex-end' }}>
               <View style={styles.badgeRow}>
                 <Text style={styles.badge}>مالك المنصة 👑</Text>
-                <Crown size={18} color={colors.primary} />
               </View>
-              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '900', marginTop: 2 }}>
-                {user?.name?.trim() ? user.name : 'إدارة منصة TecnoRexa'}
-              </Text>
-              <Text style={{ color: colors.gray, fontSize: 11, marginTop: 1 }}>
-                أهلاً بك سيادة المالك في غرفة القيادة
+              <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '900', marginTop: 1 }} numberOfLines={1}>
+                {user?.name?.trim() ? user.name : 'إدارة TecnoRexa'}
               </Text>
             </View>
             <View
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
+                width: 34,
+                height: 34,
+                borderRadius: 17,
                 backgroundColor: '#1E1B13',
                 borderWidth: 1.5,
                 borderColor: colors.primary,
@@ -253,7 +258,7 @@ export default function OwnerDashboard({ navigation }: any) {
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '900' }}>
+              <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '900' }}>
                 {user?.name && user.name.trim().length > 0
                   ? user.name.trim().charAt(0)
                   : '👑'}
@@ -262,25 +267,21 @@ export default function OwnerDashboard({ navigation }: any) {
           </View>
         </View>
 
-        {/* Drawer Quick Callout Banner */}
+        {/* Drawer Quick Callout Banner - Compact Sleek Pill */}
         <TouchableOpacity
           onPress={() => setDrawerVisible(true)}
           style={styles.drawerBanner}
+          activeOpacity={0.8}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <ChevronRight size={18} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 13 }}>تصفح الآن</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <ChevronRight size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 12 }}>تصفح ☰</Text>
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>
-                {`${OWNER_SECTIONS.length} قسماً إدارياً ورقابياً بانتظارك`}
-              </Text>
-              <Sparkles size={16} color={colors.primary} />
-            </View>
-            <Text style={{ color: colors.gray, fontSize: 11 }}>
-              اضغط هنا أو على أيقونة الـ ☰ لفتح القائمة الجانبية الكاملة
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ color: colors.white, fontWeight: '800', fontSize: 12 }}>
+              {`${OWNER_SECTIONS.length} قسماً إدارياً ورقابياً`}
             </Text>
+            <Sparkles size={14} color={colors.primary} />
           </View>
         </TouchableOpacity>
 
@@ -676,6 +677,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0A0A0A',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 2 : 0,
   },
   scrollView: {
     flex: 1,
@@ -688,12 +690,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs + 2,
     paddingTop: spacing.xs,
   },
   menuBtn: {
-    width: 44,
-    height: 44,
+    width: 36,
+    height: 36,
     borderRadius: borderRadius.md,
     backgroundColor: '#161616',
     borderWidth: 1,
@@ -701,19 +703,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  rulesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: borderRadius.md,
+  },
+  rulesBtnText: {
+    color: colors.primary,
+    fontWeight: '800',
+    fontSize: 11,
+  },
   exportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: borderRadius.md,
   },
   exportBtnText: {
     color: colors.dark,
     fontWeight: '900',
-    fontSize: 12,
+    fontSize: 11,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -722,12 +740,12 @@ const styles = StyleSheet.create({
   },
   badge: {
     color: colors.primary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
   },
   greeting: {
     color: colors.white,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
     marginTop: 2,
   },
@@ -738,9 +756,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#141414',
     borderWidth: 1,
     borderColor: colors.primary + '55',
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    marginBottom: spacing.sm,
   },
   tabRow: {
     flexDirection: 'row',

@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
 import { Phone, Lock, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
@@ -71,7 +72,12 @@ export default function LoginScreen({ navigation }: any) {
   return (
     <SafeAreaView
       style={[
-        { flex: 1, backgroundColor: '#0A0A0A', height: Platform.OS === 'web' ? ('100vh' as any) : '100%' },
+        {
+          flex: 1,
+          backgroundColor: '#0A0A0A',
+          height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+          paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+        },
       ]}
     >
       <KeyboardAvoidingView
