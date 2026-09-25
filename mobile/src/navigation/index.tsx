@@ -175,12 +175,12 @@ const getTabsForRole = (role: string): TabDef[] => {
       { name: 'Wallet', label: 'المحفظة', Icon: Wallet, screen: WalletScreen },
       { name: 'Profile', label: 'حسابي', Icon: User, screen: ProfileScreen },
     ],
-    // 👤 العميل: الرئيسية | السوق | الفنيين | الذكاء الاصطناعي | حسابي
+    // 👤 العميل: الرئيسية | السوق | الطلبات | الفنيين | حسابي
     customer: [
       { name: 'Home', label: 'الرئيسية', Icon: Home, screen: HomeScreen },
       { name: 'Marketplace', label: 'السوق', Icon: ShoppingBag, screen: MarketplaceScreen },
+      { name: 'Orders', label: 'الطلبات', Icon: Package, screen: OrdersScreen },
       { name: 'TechniciansTeam', label: 'الفنيين', Icon: Wrench, screen: TechniciansTeamScreen },
-      { name: 'AIChat', label: 'الذكاء الاصطناعي', Icon: Bot, screen: AIChatScreen },
       { name: 'Profile', label: 'حسابي', Icon: User, screen: ProfileScreen },
     ],
   };
@@ -289,13 +289,13 @@ export default function AppNavigator() {
     },
   };
 
-  const [activeRoute, setActiveRoute] = React.useState<string>('');
+  const [activeRoute, setActiveRoute] = React.useState<string>('Home');
 
   const updateActiveRoute = React.useCallback(() => {
     try {
       if (navigationRef.isReady()) {
         const route = navigationRef.getCurrentRoute();
-        setActiveRoute(route?.name || '');
+        setActiveRoute(route?.name || 'Home');
       }
     } catch {
       // safe fallback

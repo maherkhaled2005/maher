@@ -55,8 +55,9 @@ export default function FloatingAIButton({ currentRoute, onNavigate }: FloatingA
     return () => pulseLoop.stop();
   }, []);
 
-  // Do not render if not logged in or if already on AIChat screen
-  if (!isAuthenticated || currentRoute === 'AIChat') {
+  // Only render on the main home dashboard screen for all roles
+  const isHomeScreen = currentRoute === 'Home' || currentRoute === 'Main' || currentRoute === 'Dashboard';
+  if (!isAuthenticated || !isHomeScreen) {
     return null;
   }
 
