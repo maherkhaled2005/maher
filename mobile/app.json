@@ -6,10 +6,17 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0A0A",
+    "primaryColor": "#D4AF37",
     "splash": {
-      "image": "./assets/splash-icon.jpg",
+      "image": "./assets/splash_poster.jpg",
       "resizeMode": "contain",
-      "backgroundColor": "#0A0A0A"
+      "backgroundColor": "#0A0A0A",
+      "dark": {
+        "image": "./assets/splash_poster.jpg",
+        "resizeMode": "contain",
+        "backgroundColor": "#0A0A0A"
+      }
     },
     "ios": {
       "supportsTablet": true
@@ -17,14 +24,20 @@
     "android": {
       "package": "com.tecnorexa.app",
       "versionCode": 1,
+      "backgroundColor": "#0A0A0A",
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0A",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "splash": {
-        "image": "./assets/splash-icon.jpg",
+        "image": "./assets/splash_poster.jpg",
         "resizeMode": "contain",
-        "backgroundColor": "#0A0A0A"
+        "backgroundColor": "#0A0A0A",
+        "dark": {
+          "image": "./assets/splash_poster.jpg",
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0A0A"
+        }
       }
     },
     "web": {

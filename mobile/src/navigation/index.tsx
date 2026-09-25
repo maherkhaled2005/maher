@@ -1,6 +1,6 @@
 // src/navigation/index.tsx
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, ActivityIndicator, Platform, Image } from 'react-native';
@@ -275,8 +275,21 @@ export default function AppNavigator() {
     checkAuth?.();
   }, []);
 
+  const darkNavTheme = {
+    ...DarkTheme,
+    dark: true,
+    colors: {
+      ...DarkTheme.colors,
+      background: '#0A0A0A',
+      card: '#121212',
+      text: '#FFFFFF',
+      border: '#1E293B',
+      primary: '#D4AF37',
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={darkNavTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <>
