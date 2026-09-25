@@ -47,6 +47,7 @@ import { colors, spacing, borderRadius } from '../theme';
 import Logo from './Logo';
 import { useAuthStore } from '../store/authStore';
 import { normalizeRole } from '../utils/permissions';
+import { openRoleRulesModal } from './OnboardingModal';
 
 export interface RoleSectionItem {
   id: number;
@@ -330,7 +331,7 @@ export default function RoleSideDrawer({
   const HeaderIcon = config.icon;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent statusBarTranslucent={true} animationType="fade" onRequestClose={onClose}>
       <View style={{ flex: 1, flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.75)' }}>
         {/* Clickable backdrop */}
         <TouchableOpacity
@@ -434,6 +435,35 @@ export default function RoleSideDrawer({
             contentContainerStyle={{ padding: spacing.sm, paddingBottom: 60 }}
             showsVerticalScrollIndicator={true}
           >
+            {/* View Role Laws Button */}
+            <TouchableOpacity
+              onPress={() => {
+                onClose();
+                openRoleRulesModal(effectiveRole);
+              }}
+              activeOpacity={0.8}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 10,
+                paddingHorizontal: spacing.sm,
+                marginBottom: 8,
+                borderRadius: borderRadius.md,
+                backgroundColor: config.color + '1A',
+                borderWidth: 1.5,
+                borderColor: config.color + '66',
+              }}
+            >
+              <ChevronLeft size={16} color={config.color} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ color: colors.white, fontWeight: '900', fontSize: 13 }}>
+                  ميثاق وقوانين {config.title}
+                </Text>
+                <ShieldCheck size={18} color={config.color} />
+              </View>
+            </TouchableOpacity>
+
             {filteredSections.map((sec) => {
               const Icon = sec.icon;
               const isActive = currentScreen === sec.screen;

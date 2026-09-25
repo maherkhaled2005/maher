@@ -76,7 +76,7 @@ export default function LoginScreen({ navigation }: any) {
           flex: 1,
           backgroundColor: '#0A0A0A',
           height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
-          paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+          paddingTop: Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 36) : 0,
         },
       ]}
     >

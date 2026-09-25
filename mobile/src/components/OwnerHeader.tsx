@@ -233,7 +233,7 @@ export default function OwnerHeader({
   );
 }
 
-const STATUSBAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : Platform.OS === 'ios' ? 44 : 8;
+const STATUSBAR_HEIGHT = Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 36) : Platform.OS === 'ios' ? 44 : 8;
 
 const styles = StyleSheet.create({
   container: {

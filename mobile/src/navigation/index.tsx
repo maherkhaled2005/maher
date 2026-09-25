@@ -255,7 +255,6 @@ function BottomTabs() {
           />
         ))}
       </Tab.Navigator>
-      <OnboardingModal user={user} />
     </>
   );
 }
@@ -354,6 +353,7 @@ export default function AppNavigator() {
           </>
         )}
       </Stack.Navigator>
+      <OnboardingModal user={user} />
     </NavigationContainer>
   );
 }

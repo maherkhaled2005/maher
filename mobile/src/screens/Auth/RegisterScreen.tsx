@@ -256,7 +256,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
-  const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0;
+  const statusBarHeight = Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 36) : 0;
 
   return (
     <SafeAreaView

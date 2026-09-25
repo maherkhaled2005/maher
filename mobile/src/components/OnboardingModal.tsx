@@ -26,9 +26,10 @@ import {
 } from 'lucide-react-native';
 import { colors, spacing, borderRadius } from '../theme';
 import { normalizeRole } from '../utils/permissions';
+import { useAuthStore } from '../store/authStore';
 
 interface OnboardingModalProps {
-  user: any;
+  user?: any;
 }
 
 interface RoleInfoItem {
@@ -211,13 +212,17 @@ const ROLE_INFO: Record<string, RoleInfoItem> = {
   },
 };
 
-export const openRoleRulesModal = () => {
-  DeviceEventEmitter.emit('SHOW_ROLE_LAWS');
+export const openRoleRulesModal = (specificRole?: string) => {
+  DeviceEventEmitter.emit('SHOW_ROLE_LAWS', specificRole);
 };
 
-export default function OnboardingModal({ user }: OnboardingModalProps) {
+export default function OnboardingModal({ user: propUser }: OnboardingModalProps) {
+  const { user: authUser } = useAuthStore();
+  const user = propUser || authUser;
+
   const [visible, setVisible] = useState(false);
   const [agreed, setAgreed] = useState(true);
+  const [activeRole, setActiveRole] = useState<string | null>(null);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   useEffect(() => {
@@ -236,7 +241,12 @@ export default function OnboardingModal({ user }: OnboardingModalProps) {
   }, [user?.id, user?.role]);
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('SHOW_ROLE_LAWS', () => {
+    const sub = DeviceEventEmitter.addListener('SHOW_ROLE_LAWS', (customRole?: string) => {
+      if (customRole) {
+        setActiveRole(customRole);
+      } else {
+        setActiveRole(null);
+      }
       setVisible(true);
     });
     return () => {
@@ -247,16 +257,17 @@ export default function OnboardingModal({ user }: OnboardingModalProps) {
   const handleDismiss = async () => {
     if (user?.id) {
       try {
-        const normRole = normalizeRole(user.role || 'customer');
+        const normRole = normalizeRole(activeRole || user.role || 'customer');
         await AsyncStorage.setItem(`tr_onboarded_${user.id}_${normRole}_v3`, 'true');
       } catch (e) {}
     }
+    setActiveRole(null);
     setVisible(false);
   };
 
   if (!user || !visible) return null;
 
-  const role = normalizeRole(user.role || 'customer');
+  const role = normalizeRole(activeRole || user.role || 'customer');
   const info = ROLE_INFO[role] || ROLE_INFO.customer;
   const Icon = info.icon;
 
@@ -267,8 +278,12 @@ export default function OnboardingModal({ user }: OnboardingModalProps) {
     <Modal
       visible={visible}
       transparent
+      statusBarTranslucent={true}
       animationType="fade"
-      onRequestClose={() => setVisible(false)}
+      onRequestClose={() => {
+        setActiveRole(null);
+        setVisible(false);
+      }}
     >
       <View
         style={{
