@@ -139,69 +139,65 @@ export default function OwnerHeader({
           ) : null}
         </View>
 
-        {/* Left side: Back Button or Main Action Badges (responsive & uncrowded) */}
-        <View style={[styles.sideGroup, { flexDirection: 'row', gap: 6, alignItems: 'center' }]}>
-          {showBack ? (
-            <>
-              {onRefresh && (
-                <TouchableOpacity style={styles.iconBtn} onPress={onRefresh} activeOpacity={0.8} accessibilityLabel="تحديث">
-                  <RefreshCw size={17} color={colors.gray} />
-                </TouchableOpacity>
-              )}
-              {rightAction}
-              <TouchableOpacity
-                style={[styles.iconBtn, { borderColor: activeColor + '55', backgroundColor: '#1A1A1A' }]}
-                onPress={() => {
-                  if (navigation?.canGoBack && navigation.canGoBack()) {
-                    navigation.goBack();
-                  } else if (navigation?.navigate) {
-                    navigation.navigate('Home');
-                  }
-                }}
-                activeOpacity={0.8}
-                accessibilityLabel="العوده للخلف"
-              >
-                <ChevronRight size={22} color={activeColor} />
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              {/* Notifications Button */}
-              <TouchableOpacity
-                style={styles.iconBtn}
-                onPress={() => navigation?.navigate && navigation.navigate('Notifications')}
-                activeOpacity={0.8}
-                accessibilityLabel="الإشعارات"
-              >
-                <Bell size={18} color={colors.gray} />
-                {unreadNotifications > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                      {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+        {/* Left side: Notifications + Chat + Optional Back button (Always Available) */}
+        <View style={[styles.sideGroup, { flexDirection: 'row', gap: 5, alignItems: 'center' }]}>
+          {/* Notifications Button */}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => navigation?.navigate && navigation.navigate('Notifications')}
+            activeOpacity={0.8}
+            accessibilityLabel="الإشعارات"
+          >
+            <Bell size={17} color={colors.gray} />
+            {unreadNotifications > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-              {/* Chat Button */}
-              <TouchableOpacity
-                style={styles.iconBtn}
-                onPress={() => navigation?.navigate && navigation.navigate('ChatList')}
-                activeOpacity={0.8}
-                accessibilityLabel="المحادثات"
-              >
-                <MessageCircle size={18} color={colors.gray} />
-                {unreadMessages > 0 && (
-                  <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.badgeText, { color: '#0A0A0A' }]}>
-                      {unreadMessages > 99 ? '99+' : unreadMessages}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+          {/* Chat Button */}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => navigation?.navigate && navigation.navigate('ChatList')}
+            activeOpacity={0.8}
+            accessibilityLabel="المحادثات"
+          >
+            <MessageCircle size={17} color={colors.gray} />
+            {unreadMessages > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.badgeText, { color: '#0A0A0A' }]}>
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-              {rightAction}
-            </>
+          {rightAction}
+
+          {onRefresh && showBack && (
+            <TouchableOpacity style={styles.iconBtn} onPress={onRefresh} activeOpacity={0.8} accessibilityLabel="تحديث">
+              <RefreshCw size={15} color={colors.gray} />
+            </TouchableOpacity>
+          )}
+
+          {showBack && (
+            <TouchableOpacity
+              style={[styles.iconBtn, { borderColor: activeColor + '55', backgroundColor: '#1A1A1A' }]}
+              onPress={() => {
+                if (navigation?.canGoBack && navigation.canGoBack()) {
+                  navigation.goBack();
+                } else if (navigation?.navigate) {
+                  navigation.navigate('Home');
+                }
+              }}
+              activeOpacity={0.8}
+              accessibilityLabel="العوده للخلف"
+            >
+              <ChevronRight size={20} color={activeColor} />
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -259,46 +255,46 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xs,
-    marginHorizontal: spacing.xs,
+    paddingHorizontal: 4,
+    marginHorizontal: 2,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     maxWidth: '100%',
   },
   numBadge: {
     backgroundColor: 'rgba(212, 175, 55, 0.15)',
     borderWidth: 1,
     borderColor: colors.primary,
-    paddingHorizontal: 5,
+    paddingHorizontal: 4,
     paddingVertical: 1,
-    borderRadius: 5,
+    borderRadius: 4,
     flexShrink: 0,
   },
   numText: {
     color: colors.primary,
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
   },
   titleText: {
     color: colors.white,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     textAlign: 'center',
     flexShrink: 1,
   },
   subtitleText: {
     color: colors.gray,
-    fontSize: 10,
+    fontSize: 9.5,
     marginTop: 1,
     textAlign: 'center',
   },
   hamburgerBtn: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: borderRadius.md,
     backgroundColor: '#161616',
     borderWidth: 1,
@@ -319,8 +315,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: borderRadius.md,
     backgroundColor: '#161616',
     borderWidth: 1,

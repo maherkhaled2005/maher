@@ -18,6 +18,7 @@ import {
 import {
   Crown,
   Menu,
+  Bell,
   DollarSign,
   Users,
   ShoppingCart,
@@ -217,7 +218,25 @@ export default function OwnerDashboard({ navigation }: any) {
               onPress={() => setDrawerVisible(true)}
               accessibilityLabel="فتح قائمة الأقسام"
             >
-              <Menu size={20} color={colors.primary} />
+              <Menu size={18} color={colors.primary} />
+            </TouchableOpacity>
+
+            {/* Notifications Button */}
+            <TouchableOpacity
+              style={styles.menuBtn}
+              onPress={() => navigation?.navigate && navigation.navigate('Notifications')}
+              accessibilityLabel="الإشعارات"
+            >
+              <Bell size={17} color={colors.primary} />
+            </TouchableOpacity>
+
+            {/* Chat Button */}
+            <TouchableOpacity
+              style={styles.menuBtn}
+              onPress={() => navigation?.navigate && navigation.navigate('ChatList')}
+              accessibilityLabel="المحادثات"
+            >
+              <MessageCircle size={17} color={colors.primary} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -232,7 +251,7 @@ export default function OwnerDashboard({ navigation }: any) {
               style={styles.exportBtn}
               onPress={() => setExportModalVisible(true)}
             >
-              <Download size={14} color={colors.dark} />
+              <Download size={13} color={colors.dark} />
               <Text style={styles.exportBtnText}>تصدير 📑</Text>
             </TouchableOpacity>
           </View>
