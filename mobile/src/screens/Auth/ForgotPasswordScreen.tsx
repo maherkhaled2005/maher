@@ -193,15 +193,16 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
         style={{ flex: 1 }}
       >
         <ScrollView
-          style={{ flex: 1 }}
+          style={[{ flex: 1 }, Platform.OS === 'web' && ({ overflowY: 'auto' } as any)]}
           contentContainerStyle={{
             flexGrow: 1,
             padding: spacing.xl,
+            paddingTop: Platform.OS === 'web' ? 40 : spacing.xl,
             paddingBottom: 120,
-            justifyContent: 'center',
+            justifyContent: Platform.OS === 'web' ? 'flex-start' : 'center',
           }}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={Platform.OS === 'web'}
         >
           {/* Back Button */}
           <TouchableOpacity

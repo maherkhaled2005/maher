@@ -78,14 +78,14 @@ export default function LandingScreen({ navigation }: any) {
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
 
       <ScrollView
-        style={{ flex: 1 }}
+        style={[{ flex: 1 }, Platform.OS === 'web' && ({ overflowY: 'auto' } as any)]}
         contentContainerStyle={{
           paddingHorizontal: spacing.lg,
           paddingTop: Platform.OS === 'ios' ? spacing.md : spacing.lg,
           paddingBottom: 150,
           flexGrow: 1,
         }}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === 'web'}
       >
         {/* 1. Official Clean Brand Logo Header */}
         <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>

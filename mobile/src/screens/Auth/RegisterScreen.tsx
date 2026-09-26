@@ -270,44 +270,55 @@ export default function RegisterScreen({ navigation }: any) {
       ]}
     >
         <ScrollView
-          style={[{ flex: 1 }, Platform.OS === 'web' && { overflowY: 'auto' } as any]}
+          style={[{ flex: 1, width: '100%' }, Platform.OS === 'web' && ({ overflowY: 'auto' } as any)]}
           contentContainerStyle={{
-            paddingHorizontal: spacing.lg,
-            paddingTop: spacing.sm,
-            paddingBottom: 150,
+            paddingHorizontal: spacing.md,
+            paddingTop: Platform.OS === 'web' ? 40 : spacing.sm,
+            paddingBottom: 160,
             flexGrow: 1,
+            alignItems: 'center',
           }}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={Platform.OS === 'web'}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Clean Header */}
-          <View style={{ alignItems: 'center', marginBottom: spacing.md, marginTop: spacing.xs }}>
-            <Image
-              source={require('../../../assets/icon.png')}
-              style={{
-                width: 62,
-                height: 62,
-                borderRadius: 18,
-                marginBottom: 10,
-                borderWidth: 1.5,
-                borderColor: '#D4AF37',
-                shadowColor: '#D4AF37',
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.35,
-                shadowRadius: 8,
-              }}
-              resizeMode="cover"
-            />
-            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 }}>
-              إنشاء حساب جديد
-            </Text>
-            <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 2 }}>
-              انضم إلى منصة TecnoRexa
-            </Text>
-          </View>
+          {/* Card Container for Luxury Web & Clean Mobile */}
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 480,
+              backgroundColor: Platform.OS === 'web' ? '#141416' : 'transparent',
+              borderWidth: Platform.OS === 'web' ? 1 : 0,
+              borderColor: 'rgba(212, 175, 55, 0.25)',
+              borderRadius: 20,
+              padding: Platform.OS === 'web' ? 28 : 0,
+              shadowColor: '#D4AF37',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: Platform.OS === 'web' ? 0.15 : 0,
+              shadowRadius: 20,
+            }}
+          >
+            {/* Clean Header */}
+            <View style={{ alignItems: 'center', marginBottom: spacing.md, marginTop: spacing.xs }}>
+              <Image
+                source={require('../../../assets/icon.png')}
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 16,
+                  marginBottom: 10,
+                }}
+                resizeMode="contain"
+              />
+              <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 }}>
+                إنشاء حساب جديد
+              </Text>
+              <Text style={{ color: '#A1A1AA', fontSize: 12, marginTop: 2 }}>
+                انضم إلى منصة TecnoRexa المتكاملة
+              </Text>
+            </View>
 
-          {/* Role Selection - Compact Horizontal Segmented Bar */}
-          <View style={{ width: '100%', maxWidth: 440, alignSelf: 'center', marginBottom: spacing.md }}>
+            {/* Role Selection - Compact Horizontal Segmented Bar */}
+            <View style={{ width: '100%', marginBottom: spacing.md }}>
             <View
               style={{
                 flexDirection: 'row',
@@ -770,7 +781,8 @@ export default function RegisterScreen({ navigation }: any) {
               بالتسجيل أنت توافق على شروط الاستخدام وسياسة الخصوصية
             </Text>
           </View>
-        </ScrollView>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

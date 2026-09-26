@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   GLOBAL WEB SCROLL FOR TECNOREXA (Natural, fluid, unrestricted scrolling)
+   GLOBAL WEB STYLING & SCROLL FOR TECNOREXA (Fluid, Unrestricted Scrolling)
    ========================================================================== */
 :root {
   --css-interop-darkMode: class dark;
@@ -18,6 +18,7 @@ html, body {
   background-color: #0A0A0A;
   color: #FFFFFF;
   overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 #root {
@@ -31,28 +32,26 @@ html, body {
 }
 
 /* Universal box-sizing for React Native Web */
-#root, #root div {
+#root, #root *, #root *::before, #root *::after {
   box-sizing: border-box;
 }
 
-/* Critical flexbox height fix for React Native Web in Chrome:
-   Ensures all intermediate navigation, card, and screen flex wrappers
-   have min-height: 0 and do not expand past the viewport */
-#root div[class*="css-"] {
+/* Intermediate flexbox height fix for React Native Web in Chrome:
+   Ensures intermediate navigation cards don't expand unbounded */
+.r-13awgt0,
+.r-12vffkv {
   min-height: 0 !important;
-  min-width: 0 !important;
 }
 
-/* Stack cards, tab scenes, and screen roots must be bounded to 100% of their parent */
+/* Stack cards and screen roots bounded to viewport */
 .r-1p0dtai,
-.r-13awgt0,
-.r-2llsf,
-div[style*="background-color: rgb(10, 10, 10)"] {
-  flex: 1 1 0% !important;
+.r-2llsf {
   max-height: 100% !important;
 }
 
-/* Universal smooth scrolling for all ScrollView containers across all screens */
+/* ==========================================================================
+   Universal Smooth Scrolling for ALL ScrollViews across ALL screens
+   ========================================================================== */
 .r-overflowY-1rnoaur,
 .r-150rngu,
 [data-testid="scroll-view"],
@@ -61,34 +60,60 @@ div[style*="overflow-y: scroll"],
 div[style*="overflowY: auto"],
 div[style*="overflowY: scroll"] {
   overflow-y: auto !important;
+  overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto !important;
   touch-action: pan-y !important;
   flex: 1 1 0% !important;
   min-height: 0 !important;
   max-height: 100% !important;
 }
 
-/* Ensure ScrollView content container can grow and be scrolled naturally */
+/* CRITICAL: Allow touch pan-y on all children so touches starting on inputs,
+   buttons, or badges NEVER lock or block scrolling on Mobile Chrome */
+.r-150rngu *,
+.r-overflowY-1rnoaur *,
+div[style*="overflow-y: auto"] * {
+  touch-action: pan-y !important;
+}
+
+/* Ensure ScrollView content container stretches naturally and flows top-to-bottom */
 div[style*="overflow-y: auto"] > div,
 div[style*="overflow-y: scroll"] > div,
 .r-150rngu > div {
   min-height: 100%;
   flex-grow: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Elegant scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #0A0A0A;
-}
-::-webkit-scrollbar-thumb {
-  background: #D4AF37;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #F5A623;
+/* ==========================================================================
+   Luxury Golden Scrollbar for Desktop Web Browsers
+   ========================================================================== */
+@media (pointer: fine) {
+  /* Ensure scrollbars are always visible and styled on PC */
+  .r-overflowY-1rnoaur,
+  .r-150rngu,
+  div[style*="overflow-y: auto"],
+  div[style*="overflow-y: scroll"] {
+    scrollbar-width: thin !important;
+    scrollbar-color: #D4AF37 #121214 !important;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    display: block !important;
+  }
+  ::-webkit-scrollbar-track {
+    background: #121214 !important;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #D4AF37 !important;
+    border-radius: 4px !important;
+    border: 1px solid #1A1A1A !important;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #F5A623 !important;
+  }
 }

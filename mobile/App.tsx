@@ -104,7 +104,7 @@ export default function App() {
     Animated.parallel([
       Animated.timing(splashOpacity, {
         toValue: 1,
-        duration: 500,
+        duration: 400,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(splashScale, {
@@ -115,16 +115,17 @@ export default function App() {
       }),
     ]).start();
 
-    // Linger comfortably (~2.8s) so user sees golden splash and loading clearly
+    // Fast and smooth on Web (400ms), comfortable brand impression on Native (2200ms)
+    const splashDuration = Platform.OS === 'web' ? 400 : 2200;
     const transitionTimer = setTimeout(() => {
       Animated.timing(splashOpacity, {
         toValue: 0,
-        duration: 400,
+        duration: 250,
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setAppReady(true);
       });
-    }, 2800);
+    }, splashDuration);
 
     return () => clearTimeout(transitionTimer);
   }, []);
