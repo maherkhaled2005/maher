@@ -17,9 +17,7 @@ html, body {
   width: 100%;
   background-color: #0A0A0A;
   color: #FFFFFF;
-  overscroll-behavior: none;
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 #root {
@@ -28,6 +26,8 @@ html, body {
   display: flex;
   flex-direction: column;
   background-color: #0A0A0A;
+  overflow: hidden;
+  position: relative;
 }
 
 /* Universal box-sizing for React Native Web */
@@ -35,12 +35,46 @@ html, body {
   box-sizing: border-box;
 }
 
-/* Ensure smooth native scrolling for all scroll containers without window jitter */
+/* Critical flexbox height fix for React Native Web in Chrome:
+   Ensures all intermediate navigation, card, and screen flex wrappers
+   have min-height: 0 and do not expand past the viewport */
+#root div[class*="css-"] {
+  min-height: 0 !important;
+  min-width: 0 !important;
+}
+
+/* Stack cards, tab scenes, and screen roots must be bounded to 100% of their parent */
+.r-1p0dtai,
+.r-13awgt0,
+.r-2llsf,
+div[style*="background-color: rgb(10, 10, 10)"] {
+  flex: 1 1 0% !important;
+  max-height: 100% !important;
+}
+
+/* Universal smooth scrolling for all ScrollView containers across all screens */
 .r-overflowY-1rnoaur,
+.r-150rngu,
 [data-testid="scroll-view"],
-div[style*="overflow-y"] {
+div[style*="overflow-y: auto"],
+div[style*="overflow-y: scroll"],
+div[style*="overflowY: auto"],
+div[style*="overflowY: scroll"] {
+  overflow-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior-y: contain !important;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+/* Ensure ScrollView content container can grow and be scrolled naturally */
+div[style*="overflow-y: auto"] > div,
+div[style*="overflow-y: scroll"] > div,
+.r-150rngu > div {
+  min-height: 100%;
+  flex-grow: 1;
 }
 
 /* Elegant scrollbar styling */

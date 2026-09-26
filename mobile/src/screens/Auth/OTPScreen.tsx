@@ -193,7 +193,7 @@ export default function OTPScreen({ navigation, route }: any) {
       style={{
         flex: 1,
         backgroundColor: '#0A0A0A',
-        height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+        height: '100%',
       }}
     >
       <KeyboardAvoidingView

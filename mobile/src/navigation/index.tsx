@@ -214,6 +214,11 @@ function BottomTabs() {
   return (
     <>
       <Tab.Navigator
+        sceneContainerStyle={{
+          flex: 1,
+          height: '100%',
+          overflow: 'hidden',
+        }}
         screenOptions={({ route }) => {
           const tab = tabs.find(t => t.name === route.name);
           const Icon = tab?.Icon;
@@ -309,7 +314,16 @@ export default function AppNavigator() {
       onReady={updateActiveRoute}
       onStateChange={updateActiveRoute}
     >
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          cardStyle: {
+            flex: 1,
+            height: '100%',
+            overflow: 'hidden',
+          },
+        }}
+      >
         {!isAuthenticated ? (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />

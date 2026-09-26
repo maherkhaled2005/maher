@@ -374,7 +374,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.dark, height: Platform.OS === 'web' ? ('100vh' as any) : '100%' }}
+      style={{ flex: 1, backgroundColor: colors.dark, height: '100%' }}
     >
       <OwnerHeader
         title={roleInfo.title}

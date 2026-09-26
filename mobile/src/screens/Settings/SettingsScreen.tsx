@@ -211,7 +211,7 @@ const SettingsScreen = ({ navigation }: any) => {
 
   if (!isOwner) {
     return (
-      <View style={[styles.container, { height: Platform.OS === 'web' ? ('100vh' as any) : '100%' }]}>
+      <View style={[styles.container, { height: '100%' }]}>
         <OwnerHeader
           title="الإعدادات والتفضيلات"
           navigation={navigation}
@@ -585,7 +585,7 @@ const SettingsScreen = ({ navigation }: any) => {
   }
 
   return (
-    <View style={[styles.container, { height: Platform.OS === 'web' ? ('100vh' as any) : '100%' }]}>
+    <View style={[styles.container, { height: '100%' }]}>
       <OwnerHeader
         title="الإعدادات العامة للنظام"
         sectionNumber={18}

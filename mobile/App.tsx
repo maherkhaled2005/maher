@@ -71,11 +71,18 @@ export default function App() {
         html, body, #root {
           height: 100%;
           width: 100%;
-          display: flex;
-          flex-direction: column;
+          overflow: hidden;
+          margin: 0;
+          padding: 0;
         }
         #root {
-          flex: 1;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+        }
+        #root div[class*="css-"] {
+          min-height: 0 !important;
+          min-width: 0 !important;
         }
       `;
       document.head.appendChild(style);
@@ -200,7 +207,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <View style={[{ flex: 1 }, Platform.OS === 'web' && { height: '100vh' } as any]}>
+      <View style={[{ flex: 1 }, Platform.OS === 'web' && { height: '100%', maxHeight: '100%', overflow: 'hidden' } as any]}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
         <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_KEY || ''}>
           <RootNavigation />

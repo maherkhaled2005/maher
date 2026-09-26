@@ -114,7 +114,7 @@ const WebCommunityScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const TABS = ['المنشورات', 'الريلز', 'فيديوهات الإصلاح', 'الكورسات'];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { height: Platform.OS === 'web' ? ('100vh' as any) : '100%' }]}>
+    <SafeAreaView style={[styles.safeArea, { height: '100%' }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.dark} />
 
       {/* Role Header with ☰ Drawer */}
