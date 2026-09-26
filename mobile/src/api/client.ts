@@ -10,7 +10,7 @@ const getBaseURL = (): string => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1')) {
     return `${window.location.origin}/api`;
   }
-  return 'http://46.224.87.124/api';
+  return 'https://technorexa.com/api';
 };
 
 export const api = axios.create({
