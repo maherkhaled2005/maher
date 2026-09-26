@@ -12,6 +12,7 @@ import {
   Platform,
   SafeAreaView,
   StatusBar,
+  Image,
 } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
 import { Phone, Lock, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
@@ -97,26 +98,22 @@ export default function LoginScreen({ navigation }: any) {
         >
           {/* Header & Logo Section */}
           <View style={{ alignItems: 'center', marginBottom: spacing.md }}>
-            <View
+            <Image
+              source={require('../../../assets/icon.png')}
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: 18,
-                backgroundColor: '#141414',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 10,
-                borderWidth: 1.5,
+                width: 72,
+                height: 72,
+                borderRadius: 20,
+                marginBottom: 12,
+                borderWidth: 2,
                 borderColor: '#D4AF37',
                 shadowColor: '#D4AF37',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: 6,
-                elevation: 4,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.45,
+                shadowRadius: 10,
               }}
-            >
-              <Wrench color="#D4AF37" size={28} />
-            </View>
+              resizeMode="cover"
+            />
 
             <Text
               style={{

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar, Image } from 'react-native';
 import {
   Menu,
   ChevronRight,
@@ -105,8 +105,8 @@ export default function OwnerHeader({
   return (
     <>
       <View style={[styles.container, { borderBottomColor: activeColor + '33' }]}>
-        {/* Right side (RTL Start): ☰ Hamburger Button & Role Badge */}
-        <View style={styles.sideGroup}>
+        {/* Right side (RTL Start): ☰ Hamburger Button, Role Badge & Official TR Logo */}
+        <View style={[styles.sideGroup, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
           <TouchableOpacity
             style={[styles.hamburgerBtn, { borderColor: activeColor + '55' }]}
             onPress={() => setDrawerOpen(true)}
@@ -118,6 +118,11 @@ export default function OwnerHeader({
               <RoleIcon size={10} color="#0A0A0A" />
             </View>
           </TouchableOpacity>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={{ width: 28, height: 28, borderRadius: 8, borderWidth: 1, borderColor: activeColor + '44' }}
+            resizeMode="cover"
+          />
         </View>
 
         {/* Center: Title and Subtitle / Section Number */}

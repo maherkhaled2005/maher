@@ -9,11 +9,11 @@
     "backgroundColor": "#0A0A0A",
     "primaryColor": "#D4AF37",
     "splash": {
-      "image": "./assets/splash_poster.jpg",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0A",
       "dark": {
-        "image": "./assets/splash_poster.jpg",
+        "image": "./assets/splash.png",
         "resizeMode": "contain",
         "backgroundColor": "#0A0A0A"
       }
@@ -30,11 +30,11 @@
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "splash": {
-        "image": "./assets/splash_poster.jpg",
+        "image": "./assets/splash.png",
         "resizeMode": "contain",
         "backgroundColor": "#0A0A0A",
         "dark": {
-          "image": "./assets/splash_poster.jpg",
+          "image": "./assets/splash.png",
           "resizeMode": "contain",
           "backgroundColor": "#0A0A0A"
         }
