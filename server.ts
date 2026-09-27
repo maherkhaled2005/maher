@@ -2209,7 +2209,12 @@ app.post("/api/admin/errors/:id/assign", authenticateToken, requireAdmin, handle
 app.use("/api/owner", authenticateToken, requireOwner);
 app.use("/api/manager", authenticateToken, requireAdmin);
 app.use("/api/programmer", authenticateToken, requireProgrammer);
-app.use("/api/system", authenticateToken, requireProgrammer);
+app.use("/api/system", (req: any, res: any, next: any) => {
+  if (req.path === '/payment-info' || req.originalUrl?.includes('/api/system/payment-info')) {
+    return next();
+  }
+  return authenticateToken(req, res, () => requireProgrammer(req, res, next));
+});
 
 function addReputationPoints(userId: string, points: number, reason: string) {
   try {
