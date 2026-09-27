@@ -52,6 +52,10 @@ export default function ChatScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
+  const isGroupOrDevChat = Boolean(String(chatId || '').includes('dev') || String(chatId || '').includes('group') || String(chatId || '').includes('team'));
+  const hasDirectPhone = Boolean(phone && phone !== '01000000000' && phone !== '01000000001');
+  const canCall = !isGroupOrDevChat && hasDirectPhone;
+
   const scrollViewRef = useRef<ScrollView>(null);
 
   const loadMessages = useCallback(async (silent = false) => {
@@ -238,41 +242,29 @@ export default function ChatScreen({ route, navigation }: any) {
             <RefreshCw color={colors.primary} size={16} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleCall}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: '#181818',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Phone color={colors.white} size={18} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleCall}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: '#181818',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Video color={colors.white} size={18} />
-          </TouchableOpacity>
+          {canCall && (
+            <TouchableOpacity
+              onPress={handleCall}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: '#181818',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Phone color={colors.white} size={18} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       {/* Chat Area & Input wrapped in KeyboardAvoidingView */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {/* Messages Scroll Area */}
         <ScrollView

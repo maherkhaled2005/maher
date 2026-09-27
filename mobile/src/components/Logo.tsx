@@ -11,7 +11,7 @@ export default function Logo({ size = 20, showText = true, imageSize = 28 }: Log
   return (
     <View style={styles.container}>
       <Image
-        source={require('../../assets/icon.png')}
+        source={require('../../assets/login-logo.png')}
         style={{
           width: imageSize,
           height: imageSize,

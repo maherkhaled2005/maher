@@ -278,27 +278,29 @@ export default function CourseDetailsModal({
               {course.description || 'كورس تطبيقي عملي لشرح صيانة الأجهزة وإصلاح الدوائر الكهربائية بأسلوب مبسط ومعتمد.'}
             </Text>
 
-            {/* Revenue Split Label for Instructor */}
-            <View
-              style={{
-                backgroundColor: 'rgba(16,185,129,0.12)',
-                borderWidth: 1,
-                borderColor: '#10B981',
-                borderRadius: borderRadius.md,
-                padding: spacing.sm,
-                marginBottom: spacing.md,
-                flexDirection: 'row-reverse',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#10B981', fontWeight: '800', fontSize: 11 }}>
-                💡 نسبة أرباح المدرب الكورس:
-              </Text>
-              <Text style={{ color: colors.white, fontWeight: '900', fontSize: 11 }}>
-                80% للمدرب / 20% عمولة المنصة
-              </Text>
-            </View>
+            {/* Revenue Split Label for Instructor only */}
+            {Boolean(user?.id === course?.trainerId || (user?.role && ['technician', 'owner', 'manager', 'programmer'].includes(user.role))) && (
+              <View
+                style={{
+                  backgroundColor: 'rgba(16,185,129,0.12)',
+                  borderWidth: 1,
+                  borderColor: '#10B981',
+                  borderRadius: borderRadius.md,
+                  padding: spacing.sm,
+                  marginBottom: spacing.md,
+                  flexDirection: 'row-reverse',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#10B981', fontWeight: '800', fontSize: 11 }}>
+                  💡 نسبة أرباح المدرب الكورس:
+                </Text>
+                <Text style={{ color: colors.white, fontWeight: '900', fontSize: 11 }}>
+                  80% للمدرب / 20% عمولة المنصة
+                </Text>
+              </View>
+            )}
 
             {/* Enrolled / Buy Banner */}
             {!enrolled ? (

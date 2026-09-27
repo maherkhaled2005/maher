@@ -61,8 +61,25 @@ export default function AdminAddUserScreen({ navigation }: any) {
     );
   }
 
-  const availableRoles = ALL_ROLES;
-  const selectedRoleObj = ALL_ROLES.find((r) => r.id === role) || availableRoles[0];
+  const availableRoles = isLeadProgrammer
+    ? [
+        { id: 'owner', label: '👑 المالك (صاحب المنظومة)', icon: '👑', ownerOnly: false },
+        { id: 'programmer', label: '💻 مبرمج / مطور نظام', icon: '💻', ownerOnly: false },
+        { id: 'manager', label: '👔 المدير العام', icon: '👔', ownerOnly: false },
+        { id: 'customer_support', label: '🎧 خدمة العملاء والدعم الفني', icon: '🎧', ownerOnly: false },
+        { id: 'technician', label: '🔧 فني صيانة معتمد (يتطلب سداد اشتراك 300 ج.م)', icon: '🔧', ownerOnly: false },
+        { id: 'merchant', label: '🏪 تاجر ومورد قطع غيار (يتطلب سداد اشتراك 100 ج.م)', icon: '🏪', ownerOnly: false },
+        { id: 'customer', label: '👤 عميل', icon: '👤', ownerOnly: false },
+      ]
+    : [
+        { id: 'manager', label: '👔 المدير العام', icon: '👔', ownerOnly: false },
+        { id: 'customer_support', label: '🎧 خدمة العملاء والدعم الفني', icon: '🎧', ownerOnly: false },
+        { id: 'technician', label: '🔧 فني صيانة معتمد (يتطلب سداد اشتراك 300 ج.م)', icon: '🔧', ownerOnly: false },
+        { id: 'merchant', label: '🏪 تاجر ومورد قطع غيار (يتطلب سداد اشتراك 100 ج.م)', icon: '🏪', ownerOnly: false },
+        { id: 'customer', label: '👤 عميل', icon: '👤', ownerOnly: false },
+      ];
+
+  const selectedRoleObj = availableRoles.find((r) => r.id === role) || availableRoles[0];
 
   const handleSave = async () => {
     const cleanName = name.trim();

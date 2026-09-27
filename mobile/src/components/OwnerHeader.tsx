@@ -229,7 +229,7 @@ export default function OwnerHeader({
   );
 }
 
-const STATUSBAR_HEIGHT = Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 36) : Platform.OS === 'ios' ? 44 : 8;
+const STATUSBAR_HEIGHT = Platform.OS === 'web' ? 6 : 4;
 
 const styles = StyleSheet.create({
   container: {
@@ -237,8 +237,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.sm,
-    paddingTop: STATUSBAR_HEIGHT + (Platform.OS === 'web' ? 6 : 2),
-    paddingBottom: 6,
+    paddingTop: STATUSBAR_HEIGHT + 4,
+    paddingBottom: 8,
     backgroundColor: '#0A0A0A',
     borderBottomWidth: 1,
     borderBottomColor: '#1F1F1F',

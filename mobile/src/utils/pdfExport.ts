@@ -402,3 +402,135 @@ export async function exportUsersToPDF({
     Alert.alert('خطأ في التصدير', error?.message || 'تعذر توليد ملف PDF.');
   }
 }
+
+export interface OrderInvoiceOptions {
+  order: any;
+}
+
+export async function exportOrderInvoiceToPDF({ order }: OrderInvoiceOptions): Promise<void> {
+  const isMaintenance = order?.type === 'maintenance';
+  const orderId = order?.id || 'ORD-000';
+  const customerName = order?.customerName || order?.user?.name || 'العميل المعتمد';
+  const techName = order?.technicianName || order?.technician?.name || (isMaintenance ? 'الفني المعتمد' : 'المتجر المعتمد');
+  const total = Number(order?.total || 0).toLocaleString();
+  const dateStr = order?.createdAt ? new Date(order.createdAt).toLocaleDateString('ar-EG') : new Date().toLocaleDateString('ar-EG');
+  const items = Array.isArray(order?.items) ? order.items : [];
+
+  const itemsHtml = items.map((it: any, idx: number) => `
+    <tr>
+      <td style="text-align: center; width: 40px;">${idx + 1}</td>
+      <td style="font-weight: bold;">${it.name || it.productName || 'بند طلب'}</td>
+      <td style="text-align: center;">${it.quantity || 1}</td>
+      <td style="text-align: center;">${Number(it.price || 0).toLocaleString()} ج.م</td>
+      <td style="text-align: center; font-weight: bold;">${(Number(it.price || 0) * (it.quantity || 1)).toLocaleString()} ج.م</td>
+    </tr>
+  `).join('');
+
+  const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>فاتورة وتقرير معتمد #${orderId}</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #ffffff; color: #1e293b; padding: 30px; margin: 0; direction: rtl; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #D4AF37; padding-bottom: 20px; margin-bottom: 25px; }
+    .logo-text { font-size: 26px; font-weight: 900; color: #0f172a; }
+    .logo-text span { color: #D4AF37; }
+    .badge { background: rgba(212,175,55,0.15); color: #B45309; padding: 6px 14px; border-radius: 8px; font-weight: bold; font-size: 13px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; background: #f8fafc; padding: 18px; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+    .info-label { color: #64748b; font-weight: 600; }
+    .info-value { color: #0f172a; font-weight: 800; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+    th { background: #0f172a; color: #ffffff; padding: 12px; font-size: 12px; font-weight: 800; text-align: right; }
+    td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; text-align: right; }
+    .total-box { display: flex; justify-content: flex-end; margin-bottom: 25px; }
+    .total-card { background: #0f172a; color: #ffffff; padding: 15px 25px; border-radius: 10px; text-align: left; }
+    .total-card span { color: #D4AF37; font-size: 20px; font-weight: 900; }
+    .warranty-box { background: #f0fdf4; border: 1.5px solid #22c55e; border-radius: 10px; padding: 15px; margin-bottom: 25px; text-align: right; }
+    .warranty-title { color: #15803d; font-weight: 900; font-size: 14px; margin-bottom: 5px; }
+    .warranty-desc { color: #166534; font-size: 11px; line-height: 18px; }
+    .footer { text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 11px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="logo-text">Tecno<span>Rexa</span></div>
+      <div style="font-size: 12px; color: #64748b; margin-top: 4px;">المنظومة الذكية لصيانة وتوريد الأجهزة المنزلية</div>
+    </div>
+    <div style="text-align: left;">
+      <div class="badge">${isMaintenance ? 'شهادة صيانة وضمان معتمد' : 'فاتورة شراء رسمية'}</div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 6px;">رقم الطلب: #${orderId}</div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-row"><span class="info-label">اسم العميل:</span><span class="info-value">${customerName}</span></div>
+    <div class="info-row"><span class="info-label">تاريخ العملية:</span><span class="info-value">${dateStr}</span></div>
+    <div class="info-row"><span class="info-label">${isMaintenance ? 'الفني المعتمد:' : 'المتجر / التاجر:'}</span><span class="info-value">${techName}</span></div>
+    <div class="info-row"><span class="info-label">حالة الطلب:</span><span class="info-value">${order?.status === 'completed' ? 'مكتمل بنجاح ✅' : order?.status || 'نشط'}</span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align: center; width: 40px;">#</th>
+        <th>البيان / الخدمة</th>
+        <th style="text-align: center;">الكمية</th>
+        <th style="text-align: center;">السعر الفردي</th>
+        <th style="text-align: center;">الإجمالي</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemsHtml || `<tr><td style="text-align:center;">1</td><td>${order?.deviceType ? `صيانة وإصلاح ${order.deviceType} (${order.deviceBrand || ''})` : 'خدمة صيانة وإصلاح أجهزة منزلية'}</td><td style="text-align:center;">1</td><td style="text-align:center;">${total} ج.م</td><td style="text-align:center; font-weight:bold;">${total} ج.م</td></tr>`}
+    </tbody>
+  </table>
+
+  <div class="total-box">
+    <div class="total-card">
+      <div style="font-size: 12px; color: #cbd5e1;">المبلغ الإجمالي النهائي:</div>
+      <div style="margin-top: 4px;"><span>${total} ج.م</span></div>
+    </div>
+  </div>
+
+  <div class="warranty-box">
+    <div class="warranty-title">🛡️ شهادة الضمان والاعتماد الرسمي من TecnoRexa</div>
+    <div class="warranty-desc">
+      تضمن منصة TecnoRexa أعمال الصيانة وقطع الغيار الموضحة أعلاه وفق معايير الجودة الفنية المعتمدة. في حال حدوث أي عطل ضمن فترة الضمان المقررة، يرجى تقديم رقم هذا الطلب #${orderId} لخدمة العملاء.
+    </div>
+  </div>
+
+  <div class="footer">
+    تم استخراج هذه الوثيقة آلياً من منصة TecnoRexa | جميع الحقوق محفوظة &copy; ${new Date().getFullYear()}
+  </div>
+</body>
+</html>`;
+
+  try {
+    if (Platform.OS === 'web') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+      } else {
+        Alert.alert('تنبيه', 'يرجى السماح بالنوافذ المنبثقة لطباعة الفاتورة.');
+      }
+    } else {
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          UTI: '.pdf',
+          mimeType: 'application/pdf',
+          dialogTitle: `فاتورة طلب #${orderId}`,
+        });
+      } else {
+        Alert.alert('تم التصدير', `تم حفظ الفاتورة بنجاح في:\n${uri}`);
+      }
+    }
+  } catch (error: any) {
+    Alert.alert('خطأ في التصدير', error?.message || 'تعذر توليد ملف الفاتورة PDF.');
+  }
+}

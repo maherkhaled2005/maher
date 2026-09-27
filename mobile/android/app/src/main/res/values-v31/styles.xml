@@ -12,7 +12,7 @@
     <item name="android:statusBarColor">#070A0F</item>
     <item name="android:navigationBarColor">#070A0F</item>
     <item name="android:windowSplashScreenBackground">#070A0F</item>
-    <item name="android:windowSplashScreenAnimatedIcon">@drawable/splashscreen_logo</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/transparent_splash</item>
     <item name="android:windowSplashScreenIconBackgroundColor">#070A0F</item>
   </style>
 </resources>

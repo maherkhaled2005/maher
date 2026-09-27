@@ -26,7 +26,9 @@ import {
   ChevronRight,
   Upload,
   CheckCircle2,
+  Copy,
 } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
 import { fetchApi } from '../../api/client';
@@ -115,7 +117,7 @@ export default function SubscriptionScreen({ route, navigation }: any) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState({
     instapayHandle: 'adelelgohry412@instapay',
-    vodafoneCashNumber: '01064739664',
+    vodafoneCashNumber: '01020000000',
   });
 
   useEffect(() => {
@@ -124,7 +126,7 @@ export default function SubscriptionScreen({ route, navigation }: any) {
         if (data?.instapayHandle || data?.vodafoneCashNumber) {
           setPaymentSettings({
             instapayHandle: data.instapayHandle || 'adelelgohry412@instapay',
-            vodafoneCashNumber: data.vodafoneCashNumber || '01064739664',
+            vodafoneCashNumber: data.vodafoneCashNumber || '01020000000',
           });
         }
       })
@@ -764,17 +766,41 @@ export default function SubscriptionScreen({ route, navigation }: any) {
               {(selectedPayment === 'vodafone_cash' || selectedPayment === 'instapay') && (
                 <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderColor: '#2A2A2A', gap: 8 }}>
                   <View style={{ backgroundColor: '#111', borderRadius: borderRadius.sm, padding: 10, borderWidth: 1, borderColor: selectedPayment === 'instapay' ? '#7928CA' : '#E60000' }}>
-                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: 'bold', textAlign: 'right', marginBottom: 4 }}>
+                    <Text style={{ color: colors.white, fontSize: 12, fontWeight: 'bold', textAlign: 'right', marginBottom: 6 }}>
                       {selectedPayment === 'instapay' ? 'بيانات التحويل عبر InstaPay ⚡' : 'بيانات التحويل عبر فودافون كاش 📱'}
                     </Text>
                     {selectedPayment === 'instapay' && (
-                      <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '900', textAlign: 'right', marginBottom: 2 }}>
-                        معرّف إنستاباي: {paymentSettings.instapayHandle}
-                      </Text>
+                      <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '900', textAlign: 'right' }}>
+                          معرّف إنستاباي: {paymentSettings.instapayHandle}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(paymentSettings.instapayHandle);
+                            Alert.alert('تم النسخ', 'تم نسخ معرّف إنستاباي إلى الحافظة بنجاح.');
+                          }}
+                          style={{ backgroundColor: 'rgba(212,175,55,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        >
+                          <Copy size={12} color="#D4AF37" />
+                          <Text style={{ color: '#D4AF37', fontSize: 11, fontWeight: 'bold' }}>نسخ</Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
-                    <Text style={{ color: colors.white, fontSize: 13, fontWeight: '900', textAlign: 'right' }}>
-                      رقم الهاتف: {paymentSettings.vodafoneCashNumber}
-                    </Text>
+                    <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ color: colors.white, fontSize: 13, fontWeight: '900', textAlign: 'right' }}>
+                        رقم الهاتف: {paymentSettings.vodafoneCashNumber}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          await Clipboard.setStringAsync(paymentSettings.vodafoneCashNumber);
+                          Alert.alert('تم النسخ', 'تم نسخ رقم الهاتف إلى الحافظة بنجاح.');
+                        }}
+                        style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                      >
+                        <Copy size={12} color="#FFFFFF" />
+                        <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }}>نسخ</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right' }}>

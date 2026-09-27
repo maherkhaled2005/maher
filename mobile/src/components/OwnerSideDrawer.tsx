@@ -147,7 +147,7 @@ export const TECHNICIAN_SECTIONS: RoleSectionItem[] = [
   { id: 3, label: 'سوق قطع الغيار والأدوات', sub: 'شراء قطع الغيار الأصلية بأفضل أسعار', screen: 'Marketplace', icon: ShoppingBag, color: '#F59E0B' },
   { id: 4, label: 'محفظتي وأرباح الصيانة', sub: 'سحب الأرباح إلى فودافون كاش وإنستاباي', screen: 'Wallet', icon: Wallet, color: '#10B981' },
   { id: 5, label: 'محادثات العملاء المباشرة', sub: 'التواصل الفوري مع أصحاب الأجهزة', screen: 'ChatList', icon: MessageSquare, color: '#06B6D4' },
-  { id: 6, label: 'مجتمع الفنيين والفيديوهات', sub: 'شروحات الصيانة وتبادل الخبرات المهنية', screen: 'WebCommunity', icon: Film, color: '#E11D48' },
+  { id: 6, label: 'مجتمع TecnoRexa', sub: 'شروحات الصيانة وتبادل الخبرات المهنية', screen: 'WebCommunity', icon: Film, color: '#E11D48' },
   { id: 7, label: 'أكاديمية وكورسات الصيانة', sub: 'دورات صيانة معتمدة ونشر دورات جديدة', screen: 'Courses', icon: BookOpen, color: '#F59E0B' },
   { id: 8, label: 'تشخيص الأعطال بالذكاء', sub: 'مساعد فوري لتحديد أعطال الأجهزة بدقة', screen: 'AIChat', icon: Bot, color: '#8B5CF6' },
   { id: 9, label: 'تذاكر الدعم والمساعدة', sub: 'التواصل مع إدارة المنصة للمساعدة', screen: 'Tickets', icon: Headphones, color: '#EF4444' },

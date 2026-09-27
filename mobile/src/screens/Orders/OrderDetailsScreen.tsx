@@ -39,6 +39,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { api } from '../../api/client';
+import { exportOrderInvoiceToPDF } from '../../utils/pdfExport';
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any; desc: string }> = {
   pending: { label: 'قيد الانتظار', color: colors.warning, icon: Clock, desc: 'في انتظار قبول الفني للطلب' },
@@ -711,6 +712,27 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
                 </Text>
               </TouchableOpacity>
             )}
+
+            <TouchableOpacity
+              onPress={() => exportOrderInvoiceToPDF({ order })}
+              style={{
+                backgroundColor: 'rgba(212,175,55,0.15)',
+                borderWidth: 1,
+                borderColor: colors.primary,
+                paddingVertical: 10,
+                borderRadius: borderRadius.md,
+                alignItems: 'center',
+                flexDirection: 'row-reverse',
+                justifyContent: 'center',
+                gap: 6,
+                marginTop: 8,
+              }}
+            >
+              <FileText size={16} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 13 }}>
+                استخراج فاتورة وشهادة ضمان PDF 📄
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 

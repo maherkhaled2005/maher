@@ -425,14 +425,24 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim() })
   : null;
 
-// ========== 3. SOCKET.IO HANDLERS ==========
+// ========== 3. SOCKET.IO HANDLERS & PRESENCE ==========
+const onlineSocketUsers = new Map<string, string>(); // socket.id -> userId
+const userSocketCount = new Map<string, number>();   // userId -> connection count
+
 io.on("connection", (socket) => {
   console.log(`⚡ [SOCKET] User connected: ${socket.id}`);
 
   socket.on("auth", async (userId) => {
+    if (!userId) return;
     socket.join(userId);
+    onlineSocketUsers.set(socket.id, userId);
+    const count = (userSocketCount.get(userId) || 0) + 1;
+    userSocketCount.set(userId, count);
+    if (count === 1) {
+      io.emit("user_presence", { userId, status: "online" });
+    }
     console.log(
-      `👤 [SOCKET] User ${userId} connected and joined personal room`,
+      `👤 [SOCKET] User ${userId} connected and joined personal room (active connections: ${count})`,
     );
   });
 
@@ -458,9 +468,24 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("check_presence", (targetUserId: string) => {
+    const isOnline = (userSocketCount.get(targetUserId) || 0) > 0;
+    socket.emit("presence_status", { userId: targetUserId, status: isOnline ? "online" : "offline" });
+  });
+
   socket.on("disconnect", async () => {
+    const userId = onlineSocketUsers.get(socket.id);
+    if (userId) {
+      onlineSocketUsers.delete(socket.id);
+      const count = Math.max((userSocketCount.get(userId) || 1) - 1, 0);
+      if (count === 0) {
+        userSocketCount.delete(userId);
+        io.emit("user_presence", { userId, status: "offline" });
+      } else {
+        userSocketCount.set(userId, count);
+      }
+    }
     console.log(`❌ [SOCKET] User disconnected: ${socket.id}`);
-    // Handle offline status if needed
   });
 });
 
@@ -2939,7 +2964,7 @@ app.get("/api/system/payment-info", async (req, res) => {
     const vodafoneRow = db.prepare("SELECT value FROM system_settings WHERE key = 'vodafone_cash_number'").get() as any;
     res.json({
       instapayHandle: (instapayRow?.value && String(instapayRow.value).trim()) || 'adelelgohry412@instapay',
-      vodafoneCashNumber: (vodafoneRow?.value && String(vodafoneRow.value).trim()) || '01064739664',
+      vodafoneCashNumber: (vodafoneRow?.value && String(vodafoneRow.value).trim()) || '01020000000',
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4112,15 +4137,27 @@ app.post("/api/support/tickets/:id/actions", authenticateToken,async (req: any, 
     } else if (action === 'transfer_manager') {
       await db.prepare("UPDATE support_tickets SET status = 'in_progress', priority = 'critical' WHERE id = ?").run(id);
       const msgId = `tmsg_${Date.now()}`;
+      const textMsg = 'تم تحويل هذه التذكرة لإدارة المنصة من قبل الدعم الفني. جاري المتابعة الإدارية.';
       db.prepare("INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, ?)").run(
-        msgId, id, req.user?.id || 'admin', 'إدارة المنصة 👑', 'تم تحويل هذه التذكرة لإدارة المنصة من قبل الدعم الفني. جاري المتابعة الإدارية.', new Date().toISOString()
+        msgId, id, req.user?.id || 'admin', 'إدارة المنصة 👑', textMsg, new Date().toISOString()
       );
+      try {
+        db.prepare("INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, datetime('now'))").run(
+          msgId, id, req.user?.id || 'admin', 'إدارة المنصة 👑', textMsg
+        );
+      } catch {}
     } else if (action === 'transfer_tech') {
       await db.prepare("UPDATE support_tickets SET status = 'in_progress' WHERE id = ?").run(id);
       const msgId = `tmsg_${Date.now()}`;
+      const textMsg = 'تم توجيه الاستفسار للمشرف الهندسي لفحص مواصفات الجهاز.';
       db.prepare("INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, ?)").run(
-        msgId, id, req.user?.id || 'support', 'التنسيق الفني 🔧', 'تم توجيه الاستفسار للمشرف الهندسي لفحص مواصفات الجهاز.', new Date().toISOString()
+        msgId, id, req.user?.id || 'support', 'التنسيق الفني 🔧', textMsg, new Date().toISOString()
       );
+      try {
+        db.prepare("INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, datetime('now'))").run(
+          msgId, id, req.user?.id || 'support', 'التنسيق الفني 🔧', textMsg
+        );
+      } catch {}
     } else if (action === 'transfer_programmer') {
       await db.prepare("UPDATE support_tickets SET status = 'in_progress', priority = 'critical' WHERE id = ?").run(id);
       const bugId = `bug_${Date.now()}`;
@@ -4136,9 +4173,15 @@ app.post("/api/support/tickets/:id/actions", authenticateToken,async (req: any, 
         req.user?.name || 'خدمة العملاء'
       );
       const msgId = `tmsg_${Date.now()}`;
+      const textMsg = 'تم تصعيد البلاغ مباشرة للمسؤول التقني وفريق التطوير البرمجي كخطأ تقني لفحص الكود والسيرفرات.';
       db.prepare("INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, ?)").run(
-        msgId, id, req.user?.id || 'support', 'فريق التطوير والبرمجة 💻', 'تم تصعيد البلاغ مباشرة للمهندس ماهر وفريق التطوير البرمجي كخطأ تقني لفحص الكود والسيرفرات.', new Date().toISOString()
+        msgId, id, req.user?.id || 'support', 'فريق التطوير والبرمجة 💻', textMsg, new Date().toISOString()
       );
+      try {
+        db.prepare("INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, datetime('now'))").run(
+          msgId, id, req.user?.id || 'support', 'فريق التطوير والبرمجة 💻', textMsg
+        );
+      } catch {}
     }
     res.json({ success: true, message: 'تم تطبيق الإجراء على التذكرة بنجاح.' });
   } catch (err: any) {
@@ -4313,7 +4356,7 @@ app.get("/api/technician/overview", authenticateToken, requireActiveTechnician, 
 
     const overallRating = ratingRow?.avgRating ? Number(Number(ratingRow.avgRating).toFixed(1)) : (user.rating ? Number(user.rating) : 0);
     const ratingCount = ratingRow?.cnt ? Number(ratingRow.cnt) : (user.ratingCount ? Number(user.ratingCount) : 0);
-    const workedHours = Number(user.workedHours || (completedOrders * 1.5) || 0);
+    const workedHours = Number((completedOrders * 2.0).toFixed(1));
 
     const kpis = {
       pendingRequests,
@@ -5970,9 +6013,9 @@ app.post(
 
     const normalizedRole = normalizeRoleServer(userRole || "customer");
 
-    // Restrictions: Owner and Programmer roles cannot be created from general form
-    if (['owner', 'programmer'].includes(normalizedRole)) {
-      return res.status(403).json({ error: "لا يمكن إضافة حساب مالك أو رئيس التقني من هذا النموذج." });
+    // Restrictions: Only Lead Programmer (Maher Khaled) can create owner or programmer accounts
+    if (['owner', 'programmer'].includes(normalizedRole) && !isLeadProgrammer) {
+      return res.status(403).json({ error: "فقط رئيس التقني (المبرمج الرئيسي) يملك صلاحية إضافة حسابات المالك والمبرمجين 🛡️" });
     }
 
     // Professional roles (technician / merchant) require payment before activation!
@@ -5992,12 +6035,13 @@ app.post(
       const initialPassword = String(password || '123456').trim();
       const hashedPassword = bcrypt.hashSync(initialPassword, 10);
       const userId = `user_${Date.now()}`;
+      const devRank = normalizedRole === 'programmer' ? (req.body.developerRank || 'junior') : 'none';
 
       db.prepare(`
         INSERT INTO users (
           id, name, phone, email, password, role, developerRank, programmerLevel,
           status, verified, phoneVerified, balance, mustChangePassword, createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, 'none', 'none', ?, 1, 1, 0, 1, datetime('now'))
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 0, 1, datetime('now'))
       `).run(
         userId,
         name.trim(),
@@ -6005,6 +6049,8 @@ app.post(
         cleanEmail,
         hashedPassword,
         normalizedRole,
+        devRank,
+        devRank,
         initialStatus,
       );
 
@@ -6846,7 +6892,7 @@ app.get("/api/users/find", authenticateToken,async (req: any, res) => {
     const isRestricted = ["customer", "technician", "merchant"].includes(callerRole);
     let filterClause = "";
     if (isRestricted) {
-      filterClause = " AND role NOT IN ('owner', 'manager', 'programmer', 'lead_developer')";
+      filterClause = " AND role NOT IN ('owner', 'manager', 'programmer', 'lead_developer') AND id NOT IN ('programmer_maher', 'user_owner') AND phone != '01064739664' AND name NOT LIKE '%ماهر خالد%'";
     }
 
     const users = db
@@ -6865,7 +6911,7 @@ app.get("/api/users/find", authenticateToken,async (req: any, res) => {
   }
 });
 
-app.get("/api/users/:id", authenticateToken,async (req: any, res) => {
+app.get("/api/users/:id", authenticateToken, async (req: any, res) => {
   try {
     const user = db
       .prepare(
@@ -6873,6 +6919,13 @@ app.get("/api/users/:id", authenticateToken,async (req: any, res) => {
       )
       .get(req.params.id) as any;
     if (!user) return res.status(404).json({ error: "User not found" });
+
+    const callerRole = normalizeRoleServer(req.user?.role);
+    const isRestricted = ["customer", "technician", "merchant"].includes(callerRole);
+    if (isRestricted && (['owner', 'manager', 'programmer', 'lead_developer'].includes(user.role) || user.phone === '01064739664' || user.id === 'programmer_maher')) {
+      return res.status(403).json({ error: "غير مصرح بالوصول إلى بيانات الإدارة العليا 🛡️" });
+    }
+
     res.json(user);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -8994,7 +9047,7 @@ const getRoleAISystemPrompt = (role: string): string => {
     case "programmer":
       return (
         "أنت المساعد البرمجي والمعماري التقني لمنصة TecnoRexa.\n" +
-        "تخاطب فريق التطوير البرمجي (بإشراف الباشمهندس ماهر خالد).\n" +
+        "تخاطب فريق التطوير البرمجي والمسؤول التقني للمنصة.\n" +
         "قدم حلولاً برمجية متقدمة في Node.js، TypeScript، React Native، PostgreSQL، والتكامل الآمن مع APIs والبنية التحتية بدون أي كود تجريبي."
       );
     case "customer_support":
@@ -9620,11 +9673,38 @@ app.post("/api/errors", authenticateToken,async (req: any, res) => {
   }
 });
 
-app.patch("/api/errors/:id/status", authenticateToken,async (req: any, res) => {
+app.patch("/api/errors/:id/status", authenticateToken, async (req: any, res) => {
   const { status } = req.body;
   try {
-    await db.prepare("UPDATE developer_bugs SET status = ? WHERE id = ?").run(
+    await db.prepare("UPDATE developer_bugs SET status = ?, updatedAt = datetime('now') WHERE id = ?").run(
       status,
+      req.params.id,
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/errors/:id/status", authenticateToken, async (req: any, res) => {
+  const { status } = req.body;
+  try {
+    await db.prepare("UPDATE developer_bugs SET status = ?, updatedAt = datetime('now') WHERE id = ?").run(
+      status,
+      req.params.id,
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/errors/:id", authenticateToken, async (req: any, res) => {
+  const { status, assignedTo } = req.body;
+  try {
+    await db.prepare("UPDATE developer_bugs SET status = COALESCE(?, status), assignedTo = COALESCE(?, assignedTo), updatedAt = datetime('now') WHERE id = ?").run(
+      status ?? null,
+      assignedTo ?? null,
       req.params.id,
     );
     res.json({ success: true });
@@ -11028,8 +11108,40 @@ app.put(
     const { status, progress } = req.body;
     try {
       await db.prepare(
-        "UPDATE developer_tasks SET status = ?, progress = ? WHERE id = ?",
-      ).run(status, progress, req.params.id);
+        "UPDATE developer_tasks SET status = COALESCE(?, status), progress = COALESCE(?, progress), updatedAt = datetime('now') WHERE id = ?",
+      ).run(status ?? null, progress ?? null, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.put(
+  "/api/dev/tasks/:id/status",
+  authenticateToken,
+  requireProgrammer, async (req: any, res) => {
+    const { status } = req.body;
+    try {
+      await db.prepare(
+        "UPDATE developer_tasks SET status = ?, updatedAt = datetime('now') WHERE id = ?",
+      ).run(status, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.patch(
+  "/api/dev/tasks/:id/status",
+  authenticateToken,
+  requireProgrammer, async (req: any, res) => {
+    const { status } = req.body;
+    try {
+      await db.prepare(
+        "UPDATE developer_tasks SET status = ?, updatedAt = datetime('now') WHERE id = ?",
+      ).run(status, req.params.id);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -11606,13 +11718,13 @@ app.post(
         ).run(
           notifId,
           ticket.customerId,
-          `تم تصعيد تذكرتك #${ticketId} إلى الفريق البرمجي والمهندس ماهر خالد لفحص الخلل التقني.`
+          `تم تصعيد تذكرتك #${ticketId} إلى الفريق البرمجي والمسؤول التقني لفحص الخلل التقني.`
         );
       }
 
       res.json({
         success: true,
-        message: "تم تحويل التذكرة رسمياً للمهندس ماهر خالد وفريق البرمجة كعطل تقني عالي الأولوية.",
+        message: "تم تحويل التذكرة رسمياً للمسؤول التقني وفريق البرمجة كعطل تقني عالي الأولوية.",
         taskId,
         bugId,
       });

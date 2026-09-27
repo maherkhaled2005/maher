@@ -117,7 +117,7 @@ export default function LoginScreen({ navigation }: any) {
             {/* Header & Logo Section */}
             <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
               <Image
-                source={require('../../../assets/icon.png')}
+                source={require('../../../assets/login-logo.png')}
                 style={{
                   width: 72,
                   height: 72,

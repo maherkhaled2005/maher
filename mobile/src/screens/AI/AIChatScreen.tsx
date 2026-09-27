@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   ScrollView,
   Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
 import {
   Sparkles,
@@ -112,6 +113,9 @@ export default function AIChatScreen({ navigation }: any) {
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [questionsLeft, setQuestionsLeft] = useState(3);
+
+  const customerMessagesSent = messages.filter((m) => m.role === 'user').length;
+  const isCustomerLocked = currentRole === 'customer' && !subStatus.isSubscribed && customerMessagesSent >= 3;
 
   const loadSubscriptionStatus = useCallback(async () => {
     try {
@@ -465,7 +469,7 @@ export default function AIChatScreen({ navigation }: any) {
 
       {/* 3. Main Chat View */}
       {activeTab === 'chat' ? (
-        <View style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} style={{ flex: 1 }}>
           {/* Quick Prompt Chips */}
           <View style={{ backgroundColor: '#111111', paddingVertical: 6, borderBottomWidth: 1, borderColor: '#222' }}>
             <ScrollView
@@ -626,54 +630,101 @@ export default function AIChatScreen({ navigation }: any) {
             </View>
           )}
 
-          {/* Chat Input Bar */}
-          <View
-            style={{
-              flexDirection: 'row-reverse',
-              alignItems: 'center',
-              backgroundColor: '#141414',
-              borderRadius: borderRadius.full,
-              paddingHorizontal: spacing.md,
-              borderWidth: 1.5,
-              borderColor: colors.primary,
-              gap: spacing.sm,
-              position: 'absolute',
-              bottom: spacing.md,
-              left: spacing.md,
-              right: spacing.md,
-            }}
-          >
-            <TextInput
+          {/* Chat Input Bar or Customer 3-Message Lock */}
+          {isCustomerLocked ? (
+            <View
               style={{
-                flex: 1,
-                paddingVertical: 10,
-                color: colors.white,
-                textAlign: 'right',
-                fontSize: 13,
-              }}
-              placeholder="اكتب سؤالك أو وصف العطل بالتفصيل..."
-              placeholderTextColor={colors.gray}
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={() => handleSendMessage()}
-            />
-
-            <TouchableOpacity
-              onPress={() => handleSendMessage()}
-              disabled={isTyping || !inputText.trim()}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: inputText.trim() ? colors.primary : '#222',
+                backgroundColor: '#18181B',
+                borderRadius: borderRadius.lg,
+                padding: spacing.md,
+                marginHorizontal: spacing.md,
+                marginBottom: spacing.md,
+                borderWidth: 1.5,
+                borderColor: '#EF4444',
                 alignItems: 'center',
-                justifyContent: 'center',
               }}
             >
-              <Send size={16} color={inputText.trim() ? '#0A0A0A' : colors.gray} />
-            </TouchableOpacity>
-          </View>
-        </View>
+              <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '900', marginBottom: 4, textAlign: 'center' }}>
+                ⚠️ استهلكت الـ 3 رسائل المجانية للاستشارة السريعة
+              </Text>
+              <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'center', marginBottom: 10, lineHeight: 16 }}>
+                للحصول على فحص ميداني شامل لجهازك أو متابعة الأعطال المعقدة، يمكنك طلب فني معتمد أو التواصل مع الدعم الفني:
+              </Text>
+              <View style={{ flexDirection: 'row-reverse', gap: 8, width: '100%' }}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('TechniciansTeam')}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.primary,
+                    paddingVertical: 10,
+                    borderRadius: borderRadius.md,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#0A0A0A', fontSize: 12, fontWeight: '900' }}>طلب فني صيانة 🔧</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Tickets')}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#27272A',
+                    paddingVertical: 10,
+                    borderRadius: borderRadius.md,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: colors.white, fontSize: 12, fontWeight: '800' }}>خدمة العملاء 🎧</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View
+              style={{
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                backgroundColor: '#141414',
+                borderRadius: borderRadius.full,
+                paddingHorizontal: spacing.md,
+                borderWidth: 1.5,
+                borderColor: colors.primary,
+                gap: spacing.sm,
+                marginHorizontal: spacing.md,
+                marginBottom: Platform.OS === 'ios' ? 14 : 8,
+                marginTop: 4,
+              }}
+            >
+              <TextInput
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  color: colors.white,
+                  textAlign: 'right',
+                  fontSize: 13,
+                }}
+                placeholder="اكتب سؤالك أو وصف العطل بالتفصيل..."
+                placeholderTextColor={colors.gray}
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={() => handleSendMessage()}
+              />
+
+              <TouchableOpacity
+                onPress={() => handleSendMessage()}
+                disabled={isTyping || !inputText.trim()}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: inputText.trim() ? colors.primary : '#222',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Send size={16} color={inputText.trim() ? '#0A0A0A' : colors.gray} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </KeyboardAvoidingView>
       ) : activeTab === 'persona' ? (
         /* Owner Tab: Persona */
         <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: 150 }}>

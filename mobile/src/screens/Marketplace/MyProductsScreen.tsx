@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Switch,
   Platform,
+  Image,
 } from 'react-native';
 import {
   Plus,
@@ -247,7 +248,7 @@ export default function MyProductsScreen({ navigation }: any) {
         rightAction={
           isSubscribed ? (
             <TouchableOpacity
-              onPress={handleOpenAddModal}
+              onPress={() => navigation.navigate('AddProduct')}
               style={{
                 backgroundColor: colors.primary,
                 paddingHorizontal: 12,
@@ -399,13 +400,24 @@ export default function MyProductsScreen({ navigation }: any) {
                   <Text style={{ color: colors.gray, fontSize: 10, fontWeight: '700' }}>#{p.id}</Text>
                 </View>
 
-                {/* Title & Desc */}
-                <Text style={{ fontSize: 15, fontWeight: '900', color: colors.white, textAlign: 'right', marginBottom: 4 }}>
-                  {p.name}
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.gray, textAlign: 'right', lineHeight: 18, marginBottom: 10 }}>
-                  {p.description}
-                </Text>
+                {/* Title & Desc & Thumbnail */}
+                <View style={{ flexDirection: 'row-reverse', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+                  {p.image ? (
+                    <Image
+                      source={{ uri: p.image }}
+                      style={{ width: 64, height: 64, borderRadius: borderRadius.md, backgroundColor: '#1E1E1E' }}
+                      resizeMode="cover"
+                    />
+                  ) : null}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '900', color: colors.white, textAlign: 'right', marginBottom: 4 }}>
+                      {p.name}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.gray, textAlign: 'right', lineHeight: 18 }} numberOfLines={2}>
+                      {p.description}
+                    </Text>
+                  </View>
+                </View>
 
                 {/* Price & Stock info */}
                 <View
