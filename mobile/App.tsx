@@ -132,8 +132,8 @@ export default function App() {
 
   if (!appReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' }}>
-        <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" translucent />
+      <View style={{ flex: 1, backgroundColor: '#070A0F', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#070A0F" translucent />
 
         <Animated.View
           style={{
@@ -143,61 +143,57 @@ export default function App() {
             paddingHorizontal: 20,
           }}
         >
-          {/* Official TecnoRexa Sphere Graphic with Royal Gold Border */}
+          {/* Official TecnoRexa Large Blue Sphere Showcase Graphic */}
           <View
             style={{
-              width: circleSize,
-              height: circleSize,
-              borderRadius: circleSize / 2,
-              backgroundColor: '#0F0E0B',
-              borderWidth: 4,
-              borderColor: '#D4AF37',
+              width: 220,
+              height: 220,
+              borderRadius: 110,
+              backgroundColor: '#0A1118',
+              borderWidth: 3,
+              borderColor: '#00D2FF',
               overflow: 'hidden',
               justifyContent: 'center',
               alignItems: 'center',
-              shadowColor: '#D4AF37',
+              shadowColor: '#00D2FF',
               shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.75,
-              shadowRadius: 30,
-              elevation: 20,
+              shadowOpacity: 0.6,
+              shadowRadius: 26,
+              elevation: 16,
               marginBottom: 24,
             }}
           >
             <Image
               source={require('./assets/tecnorexa_sphere_showcase.jpg')}
-              style={{ width: '100%', height: '100%', borderRadius: circleSize / 2 }}
+              style={{ width: '100%', height: '100%', borderRadius: 110 }}
               resizeMode="cover"
             />
           </View>
 
-          {/* Brand Typography in Pure Gold */}
-          <Text style={{ color: '#D4AF37', fontSize: 34, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }}>
-            Tecno<Text style={{ color: '#F5DEB3' }}>Rexa</Text>
+          {/* Brand Typography */}
+          <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }}>
+            Tecno<Text style={{ color: '#00D2FF' }}>Rexa</Text>
           </Text>
-          <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 24, opacity: 0.9 }}>
+          <Text style={{ color: '#94A3B8', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 24 }}>
             منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
           </Text>
 
-          {/* Gold Loading Indicator and Text */}
+          {/* Blue Neon Loading Indicator */}
           <View
             style={{
               flexDirection: 'row-reverse',
               alignItems: 'center',
               gap: 10,
-              backgroundColor: 'rgba(212, 175, 55, 0.1)',
-              paddingHorizontal: 20,
+              backgroundColor: 'rgba(0, 210, 255, 0.08)',
+              paddingHorizontal: 18,
               paddingVertical: 10,
               borderRadius: 24,
-              borderWidth: 1.5,
-              borderColor: '#D4AF37',
-              shadowColor: '#D4AF37',
-              shadowOpacity: 0.35,
-              shadowRadius: 12,
-              elevation: 6,
+              borderWidth: 1,
+              borderColor: 'rgba(0, 210, 255, 0.25)',
             }}
           >
-            <ActivityIndicator size="small" color="#D4AF37" />
-            <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '900' }}>
+            <ActivityIndicator size="small" color="#00D2FF" />
+            <Text style={{ color: '#00D2FF', fontSize: 14, fontWeight: '900' }}>
               جاري التحميل...
             </Text>
           </View>
