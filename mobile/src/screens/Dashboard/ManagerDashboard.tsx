@@ -152,7 +152,7 @@ export default function ManagerDashboard({ navigation }: any) {
   };
 
   const managerSections = [
-    { label: 'طلبات الترقية وإيصالات الدفع 🧾', desc: 'مراجعة صور إيصالات التحويل وأرقام الهواتف واعتماد الفنيين والتجار', icon: FileCheck, screen: 'TradeRequests', color: colors.primary },
+    { label: 'مركز الفحص والمراجعة (Inspection Center) 🔍', desc: 'فحص طلبات الترقية، إيصالات السداد، صور المستندات، وأرقام الهواتف واعتماد الفنيين والتجار', icon: FileCheck, screen: 'TradeRequests', color: colors.primary },
     { label: 'إدارة وتوجيه الطلبات', desc: 'متابعة الطلبات وتعيين الفنيين', icon: ShoppingBag, screen: 'Orders', color: '#3B82F6' },
     { label: 'فحص واعتماد المنتجات', desc: 'مراجعة المنتجات والموافقة أو الحظر', icon: ShoppingBag, screen: 'Marketplace', color: '#8B5CF6' },
     { label: 'تذاكر الدعم والشكاوى', desc: 'حل الشكاوى وتوزيع التذاكر', icon: Ticket, screen: 'Tickets', color: '#EF4444' },

@@ -74,7 +74,7 @@ export const isDevLead = (user: any) => {
 export const isDevAssistant = (user: any) => {
   if (!user) return false;
   if (isDevLead(user)) return true;
-  return user.developerRank === 'assistant' || user.role === 'programmer_assistant';
+  return user.developerRank === 'assistant';
 };
 
 export const isDevJunior = (user: any) => {

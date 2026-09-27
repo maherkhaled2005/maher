@@ -13,7 +13,6 @@ export interface User {
   avatar?: string;
   bio?: string;
   skills?: string;
-  isPro?: boolean;
   canSell?: boolean;
   balance?: number;
   expertise?: string[];

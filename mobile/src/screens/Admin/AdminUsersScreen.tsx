@@ -25,6 +25,7 @@ import {
   ArrowLeft,
   X,
   Download,
+  FileText,
   ShieldAlert,
   CheckCircle2,
   Crown,
@@ -42,6 +43,7 @@ import { fetchApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { normalizeRole } from '../../roles';
 import OwnerHeader from '../../components/OwnerHeader';
+import { exportUsersToPDF } from '../../utils/pdfExport';
 
 interface UserRecord {
   id: string;
@@ -461,6 +463,20 @@ export default function AdminUsersScreen({ navigation }: any) {
     }
   };
 
+  const handleExportPDF = async () => {
+    try {
+      await exportUsersToPDF({
+        title: isOwner ? 'سجل وكوادر منصة TecnoRexa الرسمي' : 'سجل المستخدمين والكوادر المعتمدة',
+        subtitle: `كشف حسابات موحد لـ ${filteredUsers.length} عضو مسجل`,
+        creatorName: user?.name || 'إدارة المنصة',
+        creatorRole: user?.role || 'owner',
+        users: filteredUsers as any,
+      });
+    } catch (err: any) {
+      Alert.alert('خطأ في التصدير', err.message || 'تعذر استخراج ملف PDF');
+    }
+  };
+
   return (
     <SafeAreaView
       style={[
@@ -554,6 +570,25 @@ export default function AdminUsersScreen({ navigation }: any) {
             backgroundColor: colors.darkCard,
           }}
         >
+          <TouchableOpacity
+            onPress={handleExportPDF}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#1E1B18',
+              borderWidth: 1,
+              borderColor: colors.primary,
+              paddingVertical: 10,
+              borderRadius: borderRadius.md,
+              gap: 6,
+            }}
+          >
+            <FileText size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>تصدير PDF</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={handleExportCSV}
             style={{
