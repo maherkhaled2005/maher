@@ -1138,13 +1138,25 @@ async function runMigrations() {
   for (const cu of coreUsers) {
     const existing = await db.prepare("SELECT * FROM users WHERE id = ? OR phone = ? OR email = ?").get(cu.id, cu.phone, cu.email) as any;
     const hash = bcrypt.hashSync(cu.pass, 10);
+    const initialMustChange = cu.id === 'owner_master' ? 0 : 1;
     if (!existing) {
       db.prepare(`
-        INSERT INTO users (id, name, phone, email, role, developerRank, password, status, verified, phoneVerified, balance, specialty, isPro, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, 1, 0, ?, ?, datetime('now'))
-      `).run(cu.id, cu.name, cu.phone, cu.email, cu.role, cu.developerRank || 'none', hash, cu.specialty || '', cu.isPro ? 1 : 0);
+        INSERT INTO users (id, name, phone, email, role, developerRank, password, status, verified, phoneVerified, balance, specialty, isPro, mustChangePassword, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, 1, 0, ?, ?, ?, datetime('now'))
+      `).run(cu.id, cu.name, cu.phone, cu.email, cu.role, cu.developerRank || 'none', hash, cu.specialty || '', cu.isPro ? 1 : 0, initialMustChange);
     } else {
-      await db.prepare("UPDATE users SET phone = ?, email = ?, developerRank = ?, role = ?, name = ? WHERE id = ?").run(cu.phone, cu.email, cu.developerRank || 'none', cu.role, cu.name, existing.id);
+      let mustChange = existing.mustChangePassword;
+      if (cu.id !== 'owner_master') {
+        try {
+          const isDefaultPass = bcrypt.compareSync(cu.pass, existing.password);
+          if (isDefaultPass) {
+            mustChange = 1;
+          }
+        } catch {
+          // If hash compare fails, keep existing flag
+        }
+      }
+      await db.prepare("UPDATE users SET phone = ?, email = ?, developerRank = ?, role = ?, name = ?, mustChangePassword = ? WHERE id = ?").run(cu.phone, cu.email, cu.developerRank || 'none', cu.role, cu.name, mustChange ?? 0, existing.id);
     }
   }
 }
