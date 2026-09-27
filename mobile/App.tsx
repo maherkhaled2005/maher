@@ -6,6 +6,10 @@ import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import Logo from './src/components/Logo';
 import './global.css';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
+import { io } from 'socket.io-client';
+import { getActiveSocketURL } from './src/api/client';
+import { useAuthStore } from './src/store/authStore';
+import { Alert } from 'react-native';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -60,9 +64,39 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 export default function App() {
   const { expoPushToken, notification } = usePushNotifications();
+  const { user, logout } = useAuthStore();
   const [appReady, setAppReady] = React.useState(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const circleSize = Math.max(160, Math.min(Math.min(windowWidth * 0.55, windowHeight * 0.28), 200));
+
+  // Live Socket connection for instant account ban & live role sync
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const socket = io(getActiveSocketURL(), {
+        transports: ['websocket'],
+        autoConnect: true,
+      });
+
+      socket.emit('auth', user.id);
+
+      socket.on('force_logout', (data: any) => {
+        const reason = data?.reason || 'تم حظر حسابك من قبل إدارة المنظومة.';
+        Alert.alert('تنبيه أمني إداري ⚠️', reason);
+        logout();
+      });
+
+      socket.on('role_changed', () => {
+        useAuthStore.getState().checkAuth().catch(() => {});
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    } catch (e) {
+      console.warn('Socket connection error:', e);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -91,7 +125,7 @@ export default function App() {
 
   // 1. Splash Screen Animation State
   const splashOpacity = React.useRef(new Animated.Value(0)).current;
-  const splashScale = React.useRef(new Animated.Value(1.3)).current;
+  const splashScale = React.useRef(new Animated.Value(1.15)).current;
 
   useEffect(() => {
     if (notification) {
@@ -104,23 +138,23 @@ export default function App() {
     Animated.parallel([
       Animated.timing(splashOpacity, {
         toValue: 1,
-        duration: 400,
+        duration: 350,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(splashScale, {
         toValue: 1,
-        friction: 7,
-        tension: 40,
+        friction: 8,
+        tension: 50,
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
 
-    // Fast and smooth on Web (400ms), comfortable brand impression on Native (2200ms)
-    const splashDuration = Platform.OS === 'web' ? 400 : 2200;
+    // Fast, crisp splash: 350ms on Web, 1500ms on Native
+    const splashDuration = Platform.OS === 'web' ? 350 : 1500;
     const transitionTimer = setTimeout(() => {
       Animated.timing(splashOpacity, {
         toValue: 0,
-        duration: 250,
+        duration: 200,
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setAppReady(true);

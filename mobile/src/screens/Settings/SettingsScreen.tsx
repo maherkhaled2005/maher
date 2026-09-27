@@ -73,6 +73,7 @@ const SettingsScreen = ({ navigation }: any) => {
     fawry_security_key: '',
     vodafone_cash_enabled: true,
     vodafone_cash_number: '01064739664',
+    instapay_handle: 'adelelgohry412@instapay',
     cod_enabled: true,
 
     // Commissions & Limits
@@ -802,7 +803,7 @@ const SettingsScreen = ({ navigation }: any) => {
                 </View>
                 {settings.vodafone_cash_enabled && (
                   <View style={styles.inputsGroup}>
-                    <Text style={styles.inputLabel}>رقم المحفظة المعتمد لاستلام الأموال:</Text>
+                    <Text style={styles.inputLabel}>رقم المحفظة المعتمد لاستلام الأموال (فودافون كاش / اتصالات / أورنج):</Text>
                     <TextInput
                       style={styles.input}
                       value={settings.vodafone_cash_number}
@@ -810,6 +811,16 @@ const SettingsScreen = ({ navigation }: any) => {
                       placeholder="010XXXXXXXX"
                       placeholderTextColor={colors.gray}
                       keyboardType="phone-pad"
+                    />
+
+                    <Text style={[styles.inputLabel, { marginTop: 12 }]}>معرّف إنستاباي المعتمد (InstaPay Handle / Address):</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={settings.instapay_handle}
+                      onChangeText={v => updateField('instapay_handle', v)}
+                      placeholder="username@instapay"
+                      placeholderTextColor={colors.gray}
+                      autoCapitalize="none"
                     />
                   </View>
                 )}

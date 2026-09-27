@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -113,6 +113,23 @@ export default function SubscriptionScreen({ route, navigation }: any) {
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState({
+    instapayHandle: 'adelelgohry412@instapay',
+    vodafoneCashNumber: '01064739664',
+  });
+
+  useEffect(() => {
+    fetchApi('/system/payment-info')
+      .then((data: any) => {
+        if (data?.instapayHandle || data?.vodafoneCashNumber) {
+          setPaymentSettings({
+            instapayHandle: data.instapayHandle || 'adelelgohry412@instapay',
+            vodafoneCashNumber: data.vodafoneCashNumber || '01064739664',
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handlePickReceipt = async () => {
     try {
@@ -752,11 +769,11 @@ export default function SubscriptionScreen({ route, navigation }: any) {
                     </Text>
                     {selectedPayment === 'instapay' && (
                       <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '900', textAlign: 'right', marginBottom: 2 }}>
-                        معرّف إنستاباي: adelelgohry412@instapay
+                        معرّف إنستاباي: {paymentSettings.instapayHandle}
                       </Text>
                     )}
                     <Text style={{ color: colors.white, fontSize: 13, fontWeight: '900', textAlign: 'right' }}>
-                      رقم الهاتف: 01064739664
+                      رقم الهاتف: {paymentSettings.vodafoneCashNumber}
                     </Text>
                   </View>
 

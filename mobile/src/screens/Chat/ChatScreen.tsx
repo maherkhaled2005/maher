@@ -271,7 +271,7 @@ export default function ChatScreen({ route, navigation }: any) {
       {/* Chat Area & Input wrapped in KeyboardAvoidingView */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
         {/* Messages Scroll Area */}

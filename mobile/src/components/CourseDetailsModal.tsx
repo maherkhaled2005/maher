@@ -455,23 +455,10 @@ export default function CourseDetailsModal({
                       </TouchableOpacity>
                     ) : null}
 
-                    {les.pdfUrl ? (
-                      <TouchableOpacity
-                        onPress={() => Alert.alert('تحميل المرفق', `تحميل كتاب الدرس: ${les.pdfUrl}`)}
-                        style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}
-                      >
-                        <FileText size={14} color="#38BDF8" />
-                        <Text style={{ color: '#38BDF8', fontSize: 11, fontWeight: '800' }}>تحميل ملف PDF</Text>
-                      </TouchableOpacity>
-                    ) : null}
-
-                    <TouchableOpacity
-                      onPress={() => handleSaveOffline(les)}
-                      style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}
-                    >
-                      <Download size={14} color="#F59E0B" />
-                      <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '800' }}>تنزيل أوفلاين (48س)</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4, opacity: 0.85 }}>
+                      <Lock size={12} color="#D4AF37" />
+                      <Text style={{ color: '#D4AF37', fontSize: 10, fontWeight: '700' }}>محتوى محمي — يمنع التحميل والتسجيل 🔒</Text>
+                    </View>
                   </View>
                 )}
               </View>

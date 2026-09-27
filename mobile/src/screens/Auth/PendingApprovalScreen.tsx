@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,28 @@ import {
 import { Clock, RefreshCw, LogOut, PhoneCall } from 'lucide-react-native';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
+import { fetchApi } from '../../api/client';
 
 export default function PendingApprovalScreen() {
   const { user, checkAuth, logout } = useAuthStore();
   const [checking, setChecking] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState({
+    instapayHandle: 'adelelgohry412@instapay',
+    vodafoneCashNumber: '01064739664',
+  });
+
+  useEffect(() => {
+    fetchApi('/system/payment-info')
+      .then((data: any) => {
+        if (data?.vodafoneCashNumber) {
+          setPaymentSettings({
+            instapayHandle: data.instapayHandle || 'adelelgohry412@instapay',
+            vodafoneCashNumber: data.vodafoneCashNumber || '01064739664',
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
@@ -53,10 +71,11 @@ export default function PendingApprovalScreen() {
   };
 
   const handleContactAdmin = () => {
-    const phone = '01064739664';
+    const phone = paymentSettings.vodafoneCashNumber || '01064739664';
     Linking.openURL(`tel:${phone}`).catch(() => {
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.open(`https://wa.me/20${phone.slice(1)}?text=${encodeURIComponent('السلام عليكم، قمت بسداد اشتراك TecnoRexa وبرجاء تفعيل حسابي.')}`, '_blank');
+        const clean = phone.replace(/\D/g, '');
+        window.open(`https://wa.me/20${clean.slice(-10)}?text=${encodeURIComponent('السلام عليكم، قمت بسداد اشتراك TecnoRexa وبرجاء تفعيل حسابي.')}`, '_blank');
       }
     });
   };
@@ -164,7 +183,7 @@ export default function PendingApprovalScreen() {
           </View>
           <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
             <Text style={{ color: colors.gray, fontSize: 12 }}>فودافون كاش المنصة:</Text>
-            <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 13 }}>01064739664</Text>
+            <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 13 }}>{paymentSettings.vodafoneCashNumber}</Text>
           </View>
           <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
             <Text style={{ color: colors.gray, fontSize: 12 }}>حالة الطلب:</Text>

@@ -278,7 +278,7 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
                   lineHeight: 20,
                 }}
               >
-                {step === 'phone' && 'أدخل رقم هاتفك المسجل لاستلام رمز التحقق (OTP)'}
+                {step === 'phone' && 'أدخل رقم هاتفك المسجل لاستلام رمز التحقق والتأكيد'}
                 {step === 'otp' && `تم إرسال رمز التحقق إلى ${maskPhone(phone)}`}
                 {step === 'password' && 'أدخل كلمة المرور الجديدة وتأكيدها لإتمام الاستعادة'}
               </Text>

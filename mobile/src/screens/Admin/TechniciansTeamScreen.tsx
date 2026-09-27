@@ -69,12 +69,13 @@ interface UpgradeCandidate {
 }
 
 const SPECIALTY_FILTERS = [
-  { id: 'all', label: 'الكل', match: [] },
-  { id: 'washer', label: '🧺 غسالات ملابس وأطباق', match: ['washer', 'غسال'] },
-  { id: 'fridge', label: '🧊 ثلاجات وديب فريزر', match: ['fridge', 'ثلاج', 'فريزر'] },
-  { id: 'cooker', label: '🔥 بوتاجازات وأفران', match: ['cooker', 'بوتاجاز', 'فرن', 'أفران'] },
-  { id: 'microwave', label: '♨️ ميكروويف وأجهزة طهي', match: ['microwave', 'ميكروويف', 'طهي'] },
-  { id: 'ac', label: '❄️ تكييفات وتبريد', match: ['ac', 'تكييف', 'مكيف', 'تبريد'] },
+  { id: 'all', aliases: ['all', 'الكل'], label: 'الكل', match: [] },
+  { id: 'غسالات', aliases: ['washer', 'غسالات', 'غسالة'], label: '🧺 غسالات ملابس وأطباق', match: ['washer', 'غسال'] },
+  { id: 'ثلاجات', aliases: ['fridge', 'ثلاجات', 'ثلاجة'], label: '🧊 ثلاجات وديب فريزر', match: ['fridge', 'ثلاج', 'فريزر'] },
+  { id: 'بوتاجازات', aliases: ['cooker', 'بوتاجازات', 'بوتجاز', 'أفران'], label: '🔥 بوتاجازات وأفران', match: ['cooker', 'بوتاجاز', 'فرن', 'أفران'] },
+  { id: 'ميكروويف', aliases: ['microwave', 'ميكروويف'], label: '♨️ ميكروويف وأجهزة طهي', match: ['microwave', 'ميكروويف', 'طهي'] },
+  { id: 'سخانات', aliases: ['heater', 'سخانات', 'سخان'], label: '🚿 سخانات مياه', match: ['heater', 'سخان'] },
+  { id: 'تكييف', aliases: ['ac', 'تكييف', 'تكييفات'], label: '❄️ تكييفات وتبريد', match: ['ac', 'تكييف', 'مكيف', 'تبريد'] },
 ];
 
 const EGYPT_GOVERNORATES = EGYPTIAN_GOVERNORATES;
@@ -184,7 +185,7 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
         (t.phone || '').includes(search) ||
         (t.city || '').toLowerCase().includes(search.toLowerCase());
 
-      const filterObj = SPECIALTY_FILTERS.find(f => f.id === selectedSpecialty);
+      const filterObj = SPECIALTY_FILTERS.find(f => f.id === selectedSpecialty || (f.aliases && f.aliases.includes(selectedSpecialty)));
       const matchesSpecialty =
         selectedSpecialty === 'all' ||
         (filterObj && filterObj.match.length > 0
@@ -537,7 +538,7 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
           contentContainerStyle={{ gap: 6, paddingVertical: 4, flexDirection: 'row-reverse' }}
         >
           {SPECIALTY_FILTERS.map((s) => {
-            const isSelected = selectedSpecialty === s.id;
+            const isSelected = selectedSpecialty === s.id || (s.aliases && s.aliases.includes(selectedSpecialty));
             return (
               <TouchableOpacity
                 key={s.id}

@@ -118,11 +118,6 @@ export default function OwnerHeader({
               <RoleIcon size={10} color="#0A0A0A" />
             </View>
           </TouchableOpacity>
-          <Image
-            source={require('../../assets/icon.png')}
-            style={{ width: 28, height: 28, borderRadius: 8, borderWidth: 1, borderColor: activeColor + '44' }}
-            resizeMode="cover"
-          />
         </View>
 
         {/* Center: Title and Subtitle / Section Number */}
@@ -286,15 +281,15 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: colors.white,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 14.5,
+    fontWeight: '900',
     textAlign: 'center',
     flexShrink: 1,
   },
   subtitleText: {
     color: colors.gray,
-    fontSize: 9.5,
-    marginTop: 1,
+    fontSize: 11,
+    marginTop: 2,
     textAlign: 'center',
   },
   hamburgerBtn: {

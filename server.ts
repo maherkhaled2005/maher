@@ -1127,12 +1127,9 @@ async function runMigrations() {
   } catch {}
   console.log("✅ [SEED] Home appliance specialties enforced (strictly home appliances only)");
 
-  // Seed essential administrative accounts if not present
+  // Seed essential administrative accounts if not present — ONLY Chief Tech Officer Engineer Maher Khaled
   const coreUsers = [
-    { id: 'owner_master', name: 'المهندس خالد محمد (المالك)', phone: '01011112222', role: 'owner', email: 'owner@tecnorexa.com', pass: '123456', specialty: 'المالك والمشرف العام', developerRank: 'none' },
-    { id: 'manager_adel', name: 'عادل الجوهري (المدير العام)', phone: '01286585187', role: 'manager', email: 'adelelgohry412@gmail.com', pass: '123456', specialty: 'المدير التنفيذي والتشغيلي', developerRank: 'none' },
     { id: 'programmer_maher', name: 'المهندس ماهر خالد', phone: '01064739664', role: 'programmer', email: 'maherkhaled880@gmail.com', pass: '123456', specialty: 'رئيس التقني وقائد التطوير', developerRank: 'lead' },
-    { id: 'support_official', name: 'فريق خدمة العملاء والدعم الفني', phone: '01557470554', role: 'customer_support', email: 'tecnorexa@gmail.com', pass: '123456', specialty: 'خدمة العملاء والدعم الفني', developerRank: 'none' },
   ];
 
   for (const cu of coreUsers) {
@@ -1143,7 +1140,7 @@ async function runMigrations() {
       db.prepare(`
         INSERT INTO users (id, name, phone, email, role, developerRank, password, status, verified, phoneVerified, balance, specialty, isPro, mustChangePassword, createdAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, 1, 0, ?, ?, ?, datetime('now'))
-      `).run(cu.id, cu.name, cu.phone, cu.email, cu.role, cu.developerRank || 'none', hash, cu.specialty || '', cu.isPro ? 1 : 0, initialMustChange);
+      `).run(cu.id, cu.name, cu.phone, cu.email, cu.role, cu.developerRank || 'none', hash, cu.specialty || '', (cu as any).isPro ? 1 : 0, initialMustChange);
     } else {
       let mustChange = existing.mustChangePassword;
       if (cu.id !== 'owner_master') {
@@ -2930,6 +2927,80 @@ app.put("/api/owner/system/settings", authenticateToken, requireOwnerOrLeadDev, 
   }
 });
 
+// GET /api/system/payment-info — Dynamic InstaPay & Vodafone Cash settings for mobile & web clients
+app.get("/api/system/payment-info", async (req, res) => {
+  try {
+    const instapayRow = db.prepare("SELECT value FROM system_settings WHERE key = 'instapay_handle'").get() as any;
+    const vodafoneRow = db.prepare("SELECT value FROM system_settings WHERE key = 'vodafone_cash_number'").get() as any;
+    res.json({
+      instapayHandle: (instapayRow?.value && String(instapayRow.value).trim()) || 'adelelgohry412@instapay',
+      vodafoneCashNumber: (vodafoneRow?.value && String(vodafoneRow.value).trim()) || '01064739664',
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/admin/payment-info — Owner / Manager dynamically update InstaPay & Vodafone Cash
+app.put("/api/admin/payment-info", authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { instapayHandle, vodafoneCashNumber } = req.body;
+    if (instapayHandle !== undefined) {
+      db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('instapay_handle', ?)").run(String(instapayHandle).trim());
+    }
+    if (vodafoneCashNumber !== undefined) {
+      db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('vodafone_cash_number', ?)").run(String(vodafoneCashNumber).trim());
+    }
+    try {
+      db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+        .run(`audit_${Date.now()}`, 'تحديث بيانات الدفع (إنستاباي / فودافون كاش)', 'system', req.user.id, JSON.stringify({ instapayHandle, vodafoneCashNumber }));
+    } catch {}
+    res.json({ success: true, message: 'تم حفظ بيانات الدفع بنجاح' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/master-wipe — Master data reset preserving ONLY Chief Tech Officer Engineer Maher Khaled
+app.post("/api/admin/master-wipe", authenticateToken, async (req: any, res) => {
+  const isLeadProgrammer = req.user?.phone === '01064739664' || req.user?.email === 'maherkhaled880@gmail.com' || (req.user?.role === 'programmer' && req.user?.developerRank === 'lead');
+  if (!isLeadProgrammer) {
+    return res.status(403).json({ error: "هذا الإجراء محصور برئيس التقني المهندس ماهر خالد فقط." });
+  }
+
+  try {
+    // 1. Wipe test users, preserving ONLY Chief Tech Officer
+    db.prepare("DELETE FROM users WHERE phone != '01064739664' AND email != 'maherkhaled880@gmail.com' AND id != 'programmer_maher'").run();
+    // 2. Ensure Chief Tech Officer account is pristine
+    db.prepare("UPDATE users SET role = 'programmer', developerRank = 'lead', programmerLevel = 'lead', status = 'active', verified = 1, phoneVerified = 1, balance = 0, isPro = 1 WHERE phone = '01064739664' OR email = 'maherkhaled880@gmail.com'").run();
+    // 3. Clear operations and logs
+    db.prepare("DELETE FROM orders").run();
+    try { db.prepare("DELETE FROM order_items").run(); } catch {}
+    db.prepare("DELETE FROM transactions").run();
+    db.prepare("DELETE FROM audit_logs").run();
+    try { db.prepare("DELETE FROM system_logs").run(); } catch {}
+    try { db.prepare("DELETE FROM upgrade_requests").run(); } catch {}
+    try { db.prepare("DELETE FROM approval_requests").run(); } catch {}
+    try { db.prepare("DELETE FROM subscriptions").run(); } catch {}
+    try { db.prepare("DELETE FROM tickets").run(); } catch {}
+    try { db.prepare("DELETE FROM ticket_messages").run(); } catch {}
+    try { db.prepare("DELETE FROM messages").run(); } catch {}
+    try { db.prepare("DELETE FROM notifications").run(); } catch {}
+    try { db.prepare("DELETE FROM technician_reviews").run(); } catch {}
+    try { db.prepare("DELETE FROM reviews").run(); } catch {}
+    try { db.prepare("DELETE FROM reels").run(); } catch {}
+    try { db.prepare("DELETE FROM reel_likes").run(); } catch {}
+
+    // Record initial clean audit log
+    db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'تصفير شامل للمنظومة', 'system', ?, 'تم تصفير كافة الحسابات والعمليات مع الإبقاء على رئيس التقني فقط', datetime('now'))")
+      .run(`audit_${Date.now()}`, req.user.id);
+
+    res.json({ success: true, message: "تم تصفير المنظومة بالكامل بنجاح والإبقاء على حساب رئيس التقني فقط." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/owner/system/maintenance", authenticateToken, requireOwner, async (req: any, res) => {
   try {
     const { enabled } = req.body;
@@ -3188,26 +3259,72 @@ app.get("/api/manager/ticket-distribution", async (req, res) => {
 
 app.get("/api/trade-requests", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
-    const dbReqs = await db.prepare("SELECT * FROM approval_requests ORDER BY createdAt DESC").all() as any[];
-    if (dbReqs && dbReqs.length > 0) {
-      const parsed = dbReqs.map((r: any) => {
-        try {
-          const det = JSON.parse(r.details || "{}");
-          return {
-            ...det,
-            id: r.id,
-            status: r.status,
-            createdAt: r.createdAt,
-          };
-        } catch {
-          return r;
-        }
-      });
-      return res.json(parsed);
-    }
-    res.json([]);
-  } catch {
-    res.json([]);
+    const list: any[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Fetch from approval_requests
+    try {
+      const dbReqs = await db.prepare("SELECT * FROM approval_requests ORDER BY createdAt DESC").all() as any[];
+      if (dbReqs && dbReqs.length > 0) {
+        dbReqs.forEach((r: any) => {
+          try {
+            const det = JSON.parse(r.details || "{}");
+            const item = {
+              ...det,
+              id: r.id,
+              status: r.status,
+              createdAt: r.createdAt,
+            };
+            if (!seenIds.has(item.id)) {
+              seenIds.add(item.id);
+              list.push(item);
+            }
+          } catch {
+            if (!seenIds.has(r.id)) {
+              seenIds.add(r.id);
+              list.push(r);
+            }
+          }
+        });
+      }
+    } catch {}
+
+    // 2. Fetch from upgrade_requests (e.g. from SubscriptionScreen)
+    try {
+      const upgReqs = await db.prepare(`
+        SELECT ur.*, u.name as uName, u.phone as uPhone, u.specialty as uSpec
+        FROM upgrade_requests ur
+        LEFT JOIN users u ON ur.userId = u.id
+        ORDER BY ur.createdAt DESC
+      `).all() as any[];
+
+      if (upgReqs && upgReqs.length > 0) {
+        upgReqs.forEach((ur: any) => {
+          if (!seenIds.has(ur.id)) {
+            seenIds.add(ur.id);
+            const reqType = ur.requestedRole === 'merchant' ? 'merchant' : 'technician';
+            list.push({
+              id: ur.id,
+              customerId: ur.userId,
+              customerName: ur.userName || ur.uName || 'مستخدم المنظومة',
+              phone: ur.userPhone || ur.uPhone || '',
+              senderPhone: ur.senderPhone || ur.userPhone || ur.uPhone || '',
+              transferReceipt: ur.receiptImage || null,
+              type: reqType,
+              feePaid: ur.feePaid || (reqType === 'merchant' ? 100 : 300),
+              specialty: ur.specialty || ur.uSpec || (reqType === 'merchant' ? 'قطع غيار ومعدات' : 'صيانة أجهزة منزلية'),
+              status: ur.status || 'pending',
+              date: ur.createdAt ? new Date(ur.createdAt).toLocaleDateString('ar-EG') : 'الآن',
+              createdAt: ur.createdAt || new Date().toISOString(),
+            });
+          }
+        });
+      }
+    } catch {}
+
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -3253,9 +3370,9 @@ app.post("/api/trade-requests", async (req: any, res) => {
 
     try {
       db.prepare(`
-        INSERT INTO upgrade_requests (id, userId, userName, userPhone, requestedRole, feePaid, receiptImage, senderPhone, status, adminNotes, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'))
-      `).run(newId, userId, customerName || userName, phone || userPhone, reqType, fee, transferReceipt || null, senderPhone || phone || userPhone, notes || null);
+        INSERT INTO upgrade_requests (id, userId, userName, userPhone, requestedRole, feePaid, receiptImage, senderPhone, status, adminNotes, specialty, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, datetime('now'))
+      `).run(newId, userId, customerName || userName, phone || userPhone, reqType, fee, transferReceipt || null, senderPhone || phone || userPhone, notes || null, specialty || null);
     } catch (e) {}
 
     res.json({ success: true, id: newId, message: "تم إرسال طلب الترقية للمراجعة بنجاح وسيتم اعتماده قريباً." });
@@ -3267,46 +3384,85 @@ app.post("/api/trade-requests", async (req: any, res) => {
 app.post("/api/trade-requests/:id/approve", authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
-    let reqItem: any = null;
-    const row = await db.prepare("SELECT * FROM approval_requests WHERE id = ?").get(id) as any;
-    if (row) {
+    let targetUserId: string | null = null;
+    let targetUserPhone: string | null = null;
+    let targetUserName: string = 'المستخدم';
+    let targetRole: string = 'technician';
+    let targetSpecialty: string | null = null;
+
+    // Check approval_requests
+    const appRow = db.prepare("SELECT * FROM approval_requests WHERE id = ?").get(id) as any;
+    if (appRow) {
       try {
-        reqItem = { ...JSON.parse(row.details || "{}"), id: row.id, status: row.status };
-      } catch {
-        reqItem = row;
-      }
+        const det = JSON.parse(appRow.details || "{}");
+        targetUserId = det.customerId || appRow.requesterId;
+        targetUserPhone = det.phone;
+        targetUserName = det.customerName || appRow.requesterName || targetUserName;
+        targetRole = det.type === 'merchant' ? 'merchant' : 'technician';
+        targetSpecialty = det.specialty || null;
+      } catch {}
     }
 
-    if (reqItem) {
-      const newRole = reqItem.type === 'merchant' ? 'merchant' : 'technician';
-      // 🛡️ Secure matching: by ID or exact phone only (NEVER by name alone)
-      if (reqItem.customerId && reqItem.customerId !== 'guest_user') {
-        await db.prepare(
-          "UPDATE users SET role = ?, status = 'active', isPro = 1, verified = 1 WHERE id = ?"
-        ).run(newRole, reqItem.customerId);
-      } else if (reqItem.phone) {
-        await db.prepare(
-          "UPDATE users SET role = ?, status = 'active', isPro = 1, verified = 1 WHERE phone = ?"
-        ).run(newRole, reqItem.phone);
-      }
-
-      await db.prepare("UPDATE approval_requests SET status = 'approved', approvedBy = ? WHERE id = ?").run(req.user?.name || 'الإدارة', id);
-      try {
-        db.prepare("UPDATE upgrade_requests SET status = 'approved', reviewedBy = ?, reviewedAt = datetime('now') WHERE id = ?").run(req.user?.name || 'الإدارة', id);
-      } catch (e) {}
-
-      const roleArabic = newRole === 'technician' ? 'فني معتمد (300 ج.م)' : 'تاجر معتمد (100 ج.م)';
-      db.prepare(
-        "INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)"
-      ).run(
-        `audit_${Date.now()}`,
-        reqItem.customerId || 'user',
-        req.user?.id || 'admin',
-        `اعتماد طلب ترقية إلى ${newRole === 'technician' ? 'فني' : 'تاجر'}`,
-        `اعتماد ترقية المستخدم ${reqItem.customerName || reqItem.phone} إلى ${roleArabic}`,
-        new Date().toISOString()
-      );
+    // Check upgrade_requests
+    const upgRow = db.prepare("SELECT * FROM upgrade_requests WHERE id = ?").get(id) as any;
+    if (upgRow) {
+      targetUserId = upgRow.userId || targetUserId;
+      targetUserPhone = upgRow.userPhone || targetUserPhone;
+      targetUserName = upgRow.userName || targetUserName;
+      targetRole = upgRow.requestedRole === 'merchant' ? 'merchant' : 'technician';
+      targetSpecialty = upgRow.specialty || targetSpecialty;
     }
+
+    const newRole = targetRole === 'merchant' ? 'merchant' : 'technician';
+
+    // Update User
+    if (targetUserId && targetUserId !== 'guest_user') {
+      db.prepare(`
+        UPDATE users 
+        SET role = ?, status = 'active', isPro = 1, verified = 1,
+            specialty = COALESCE(?, specialty)
+        WHERE id = ?
+      `).run(newRole, targetSpecialty, targetUserId);
+    } else if (targetUserPhone) {
+      db.prepare(`
+        UPDATE users 
+        SET role = ?, status = 'active', isPro = 1, verified = 1,
+            specialty = COALESCE(?, specialty)
+        WHERE phone = ?
+      `).run(newRole, targetSpecialty, targetUserPhone);
+    }
+
+    // Mark as approved in all tables
+    db.prepare("UPDATE approval_requests SET status = 'approved', approvedBy = ? WHERE id = ?").run(req.user?.name || 'الإدارة', id);
+    try {
+      db.prepare("UPDATE upgrade_requests SET status = 'approved', reviewedBy = ?, reviewedAt = datetime('now') WHERE id = ?").run(req.user?.name || 'الإدارة', id);
+    } catch {}
+    try {
+      const subId = id.startsWith('upg_sub_') ? id.replace('upg_', '') : null;
+      if (subId) {
+        db.prepare("UPDATE subscriptions SET status = 'active' WHERE id = ?").run(subId);
+      }
+    } catch {}
+
+    // Emit live socket event
+    if (targetUserId) {
+      io.to(targetUserId).emit("role_changed", {
+        newRole,
+        newStatus: 'active',
+      });
+    }
+
+    const roleArabic = newRole === 'technician' ? 'فني معتمد (300 ج.م)' : 'تاجر معتمد (100 ج.م)';
+    db.prepare(
+      "INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))"
+    ).run(
+      `audit_${Date.now()}`,
+      targetUserId || 'user',
+      req.user?.id || 'admin',
+      `اعتماد ترقية إلى ${newRole === 'technician' ? 'فني' : 'تاجر'}`,
+      `تم اعتماد ترقية ${targetUserName} إلى ${roleArabic}`
+    );
+
     res.json({ success: true, message: 'تمت الموافقة على طلب الترقية وتفعيل الحساب بنجاح!' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -3317,19 +3473,25 @@ app.post("/api/trade-requests/:id/reject", authenticateToken, requireAdmin, asyn
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    await db.prepare("UPDATE approval_requests SET status = 'rejected' WHERE id = ?").run(id);
+    db.prepare("UPDATE approval_requests SET status = 'rejected' WHERE id = ?").run(id);
     try {
       db.prepare("UPDATE upgrade_requests SET status = 'rejected', adminNotes = ?, reviewedBy = ?, reviewedAt = datetime('now') WHERE id = ?").run(reason || 'رفض إداري', req.user?.name || 'الإدارة', id);
     } catch (e) {}
+    try {
+      const subId = id.startsWith('upg_sub_') ? id.replace('upg_', '') : null;
+      if (subId) {
+        db.prepare("UPDATE subscriptions SET status = 'rejected' WHERE id = ?").run(subId);
+      }
+    } catch {}
+
     db.prepare(
-      "INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))"
     ).run(
       `audit_${Date.now()}`,
       id,
       req.user?.id || 'admin',
       'رفض طلب ترقية',
-      `رفض طلب الترقية برقم ${id}: ${reason || 'عدم استيفاء الشروط'}`,
-      new Date().toISOString()
+      `رفض طلب الترقية برقم ${id}: ${reason || 'عدم استيفاء الشروط'}`
     );
     res.json({ success: true, message: 'تم رفض الطلب بنجاح.' });
   } catch (err: any) {
@@ -4842,15 +5004,22 @@ app.post("/api/technician/reels", authenticateToken, async (req: any, res) => {
 });
 
 // ─── REELS INTERACTIONS ─────────────────────────────────────────────
-app.post("/api/reels", authenticateToken, async (req: any, res) => {
+app.post("/api/reels", authenticateToken, (req: any, res: any, next: any) => {
+  upload.single("video")(req, res, (err) => {
+    // If multer failed because request was JSON, ignore and proceed
+    next();
+  });
+}, async (req: any, res) => {
   try {
-    const { videoUrl, description, title } = req.body;
-    if (!videoUrl) return res.status(400).json({ error: "رابط الفيديو مطلوب" });
+    const videoUrl = req.file ? `/uploads/${req.file.filename}` : (req.body.videoUrl || null);
+    const description = req.body.description || req.body.title || req.body.caption || 'فيديو شروحات صيانة';
+    if (!videoUrl) return res.status(400).json({ error: "رابط أو ملف الفيديو مطلوب" });
     const id = `reel_${Date.now()}`;
+    const userRow = db.prepare("SELECT avatar FROM users WHERE id = ?").get(req.user.id) as any;
     db.prepare(`
-      INSERT INTO reels (id, userId, userName, videoUrl, description, createdAt)
-      VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `).run(id, req.user.id, req.user.name || 'مستخدم', videoUrl, description || title || '');
+      INSERT INTO reels (id, userId, userName, userAvatar, videoUrl, description, likes, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now'))
+    `).run(id, req.user.id, req.user.name || 'مستخدم', userRow?.avatar || null, videoUrl, description);
     res.json({ success: true, id, message: "تم نشر فيديو الريلز بنجاح! 🚀" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -5845,7 +6014,7 @@ app.post(
           name: name.trim(),
           phone: cleanPhone,
           role: normalizedRole,
-          developerRank: devRank,
+          developerRank: 'none',
           createdBy: req.user.name,
         }),
       );
@@ -5894,18 +6063,31 @@ app.put(
       }
 
       // 🛡️ Cannot demote lead programmer
-      if ((oldUser.id === 'programmer_maher' || oldUser.phone === '01064739664' || oldUserRole === 'programmer') && targetId !== currentUser.id && normalizedTargetRole !== 'programmer') {
+      if ((oldUser.id === 'programmer_maher' || oldUser.phone === '01064739664' || oldUserRole === 'programmer') && !isLeadProgrammer) {
         return res.status(403).json({ error: "لا يمكن تعديل رتبة رئيس التقني 🛡️" });
       }
 
-      if (oldUserRole === "owner" && !isOwner) {
+      if (oldUserRole === "owner" && !isOwner && !isLeadProgrammer) {
         return res.status(403).json({ error: "لا يمكنك تعديل صلاحيات المالك" });
       }
 
-      // Only owner can assign owner or manager roles
-      const highLevelRoles = ["owner", "manager"];
-      if (highLevelRoles.includes(normalizedTargetRole) && !isOwner) {
-        return res.status(403).json({ error: "فقط المالك يمكنه تعيين الملاك أو المديرين" });
+      // 🛡️ Role Assignment Authorization:
+      // 1. Lead Programmer (Maher Khaled) has supreme authority to assign ANY role (including Owner).
+      // 2. Owner can only assign: manager, customer_support, technician, merchant, customer (CANNOT assign owner or programmer).
+      if (isLeadProgrammer) {
+        // Full superpower allowed
+      } else if (isOwner) {
+        if (normalizedTargetRole === 'owner' && targetId !== currentUser.id) {
+          return res.status(403).json({ error: "فقط رئيس التقني يمكنه تعيين مالك للمنظومة 🛡️" });
+        }
+        if (normalizedTargetRole === 'programmer' && oldUserRole !== 'programmer') {
+          return res.status(403).json({ error: "صلاحية تعيين المطورين محصورة برئيس التقني فقط 🛡️" });
+        }
+      } else {
+        const restrictedRoles = ["owner", "manager", "programmer"];
+        if (restrictedRoles.includes(normalizedTargetRole)) {
+          return res.status(403).json({ error: "غير مصرح لك بتعيين رتب الإدارة العليا" });
+        }
       }
 
       const finalStatus = status || oldUser.status;
@@ -5936,8 +6118,8 @@ app.put(
         finalMustChangePassword = 1;
       }
 
-      // Balance update (only owner can adjust balance directly)
-      const finalBalance = (isOwner && balance !== undefined && !isNaN(Number(balance))) 
+      // Balance update (only owner or lead programmer can adjust balance directly)
+      const finalBalance = ((isOwner || isLeadProgrammer) && balance !== undefined && !isNaN(Number(balance))) 
         ? Number(balance) 
         : oldUser.balance;
 
@@ -5996,11 +6178,17 @@ app.put(
         }),
       );
 
-      // Notify user via socket
+      // Live socket notifications: role_changed and instant force_logout if banned
       io.to(targetId).emit("role_changed", {
         newRole: normalizedTargetRole,
         newStatus: finalStatus,
       });
+
+      if (isBannedFlag === 1) {
+        io.to(targetId).emit("force_logout", {
+          reason: finalBanReason || "تم حظر حسابك من قبل الإدارة",
+        });
+      }
 
       res.json({ success: true, message: "تم تحديث بيانات المستخدم بنجاح" });
     } catch (err: any) {
@@ -6701,7 +6889,7 @@ app.get("/api/orders", async (req: any, res) => {
 
   try {
     let orders: any[];
-    if (role === "owner" || role === "admin" || role === "manager" || role === "customer_support") {
+    if (role === "owner" || role === "admin" || role === "manager" || role === "customer_support" || role === "programmer") {
       orders = db
         .prepare("SELECT * FROM orders ORDER BY createdAt DESC")
         .all() as any[];
@@ -9866,34 +10054,6 @@ app.get("/api/reels", async (req, res) => {
   }
 });
 
-app.post(
-  "/api/reels",
-  authenticateToken,
-  upload.single("video"), async (req: any, res) => {
-    const { caption } = req.body;
-    const id = `reel_${Date.now()}`;
-    const videoUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
-    try {
-      db.prepare(
-        `INSERT INTO reels (id, userId, userName, userAvatar, videoUrl, caption, expiresAt, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        id,
-        req.user.id,
-        req.user.name,
-        req.user.avatar,
-        videoUrl,
-        caption,
-        expiresAt,
-        new Date().toISOString(),
-      );
-      res.json({ success: true, id });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
 
 app.post("/api/reels/:id/like", authenticateToken,async (req: any, res) => {
   try {

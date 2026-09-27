@@ -477,11 +477,26 @@ export default function ProfileScreen({ navigation }: any) {
                 overflow: 'hidden',
               }}
             >
-              {user?.avatar && (user.avatar.startsWith('http') || user.avatar.startsWith('data:')) ? (
-                <Image source={{ uri: user.avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-              ) : (
-                <Text style={{ fontSize: 40 }}>{user?.avatar || roleInfo.emoji}</Text>
-              )}
+              {(() => {
+                const raw = user?.avatar;
+                if (raw) {
+                  let imgUrl = null;
+                  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+                    imgUrl = raw;
+                  } else if (raw.startsWith('/uploads/')) {
+                    imgUrl = `https://technorexa.com${raw}`;
+                  } else if (raw.startsWith('uploads/')) {
+                    imgUrl = `https://technorexa.com/${raw}`;
+                  }
+                  if (imgUrl) {
+                    return <Image source={{ uri: imgUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />;
+                  }
+                  if (raw.length <= 4) {
+                    return <Text style={{ fontSize: 40 }}>{raw}</Text>;
+                  }
+                }
+                return <Text style={{ fontSize: 40 }}>{roleInfo.emoji}</Text>;
+              })()}
               <View
                 style={{
                   position: 'absolute',
@@ -652,18 +667,18 @@ export default function ProfileScreen({ navigation }: any) {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: colors.darkCard,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  paddingHorizontal: 14,
+                  backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                  borderWidth: 1.5,
+                  borderColor: '#D4AF37',
+                  paddingHorizontal: 16,
                   paddingVertical: 8,
                   borderRadius: borderRadius.md,
                   gap: 6,
                 }}
               >
-                <Lock size={16} color={colors.primary} />
-                <Text style={{ color: colors.white, fontWeight: '800', fontSize: 13 }}>
-                  تغيير كلمة المرور
+                <Lock size={16} color="#D4AF37" />
+                <Text style={{ color: '#D4AF37', fontWeight: '900', fontSize: 13 }}>
+                  تغيير كلمة المرور 🔒
                 </Text>
               </TouchableOpacity>
 

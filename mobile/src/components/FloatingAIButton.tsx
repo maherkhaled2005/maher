@@ -100,7 +100,7 @@ export default function FloatingAIButton({ currentRoute, onNavigate }: FloatingA
 const styles = StyleSheet.create({
   floatingContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'web' ? 100 : 190,
+    bottom: Platform.OS === 'web' ? 75 : 90,
     right: 18,
     zIndex: 9999,
     alignItems: 'center',

@@ -194,26 +194,29 @@ export default function ClientDashboard({ navigation }: any) {
             </Text>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }}>
             {maintenanceServices.map((s) => (
               <TouchableOpacity
                 key={s.id}
                 onPress={() => navigation.navigate('TechniciansTeam', { specialty: s.id })}
                 style={{
-                  width: '31%',
+                  flexBasis: '31%',
+                  flexGrow: 1,
                   backgroundColor: colors.darkCard,
                   borderRadius: borderRadius.lg,
-                  padding: spacing.md,
+                  paddingVertical: 12,
+                  paddingHorizontal: 4,
                   alignItems: 'center',
+                  justifyContent: 'center',
                   borderWidth: 1,
                   borderColor: colors.border,
                 }}
               >
-                <Text style={{ fontSize: 32, marginBottom: spacing.xs }}>{s.icon}</Text>
-                <Text style={{ color: colors.white, fontWeight: '900', fontSize: typography.sizes.sm, marginBottom: 2 }}>
+                <Text style={{ fontSize: 28, marginBottom: 4 }}>{s.icon}</Text>
+                <Text style={{ color: colors.white, fontWeight: '900', fontSize: 13, marginBottom: 2, textAlign: 'center' }}>
                   {s.name}
                 </Text>
-                <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
+                <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '800', textAlign: 'center' }} numberOfLines={1}>
                   {s.tag}
                 </Text>
               </TouchableOpacity>

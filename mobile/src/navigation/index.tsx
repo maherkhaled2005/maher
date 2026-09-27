@@ -214,16 +214,16 @@ function BottomTabs() {
   return (
     <>
       <Tab.Navigator
-        sceneContainerStyle={{
-          flex: 1,
-          height: '100%',
-          overflow: 'hidden',
-        }}
         screenOptions={({ route }) => {
           const tab = tabs.find(t => t.name === route.name);
           const Icon = tab?.Icon;
           return {
             headerShown: false,
+            sceneStyle: {
+              flex: 1,
+              height: '100%',
+              overflow: 'hidden',
+            },
             tabBarStyle: {
               backgroundColor: '#121212',
               borderTopColor: activeColor + '44',

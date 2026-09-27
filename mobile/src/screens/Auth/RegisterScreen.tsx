@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -117,6 +117,23 @@ export default function RegisterScreen({ navigation }: any) {
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [senderPhone, setSenderPhone] = useState('');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [paymentSettings, setPaymentSettings] = useState({
+    instapayHandle: 'adelelgohry412@instapay',
+    vodafoneCashNumber: '01064739664',
+  });
+
+  useEffect(() => {
+    fetchApi('/system/payment-info')
+      .then((data: any) => {
+        if (data?.instapayHandle || data?.vodafoneCashNumber) {
+          setPaymentSettings({
+            instapayHandle: data.instapayHandle || 'adelelgohry412@instapay',
+            vodafoneCashNumber: data.vodafoneCashNumber || '01064739664',
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const toggleSpecialty = (item: string) => {
     triggerSelectionHaptic();
@@ -531,7 +548,7 @@ export default function RegisterScreen({ navigation }: any) {
                   </Text>
                 </View>
               </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
+              <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
                 {TECH_SPECIALTIES.map((spec) => {
                   const isChecked = selectedSpecialties.includes(spec);
                   return (
@@ -540,18 +557,23 @@ export default function RegisterScreen({ navigation }: any) {
                       onPress={() => toggleSpecialty(spec)}
                       style={{
                         paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        borderRadius: 20,
+                        paddingVertical: 7,
+                        borderRadius: 16,
                         backgroundColor: isChecked ? '#D4AF37' : '#18181B',
                         borderWidth: 1,
                         borderColor: isChecked ? '#D4AF37' : '#27272A',
+                        flexDirection: 'row-reverse',
+                        alignItems: 'center',
+                        gap: 4,
                       }}
                     >
+                      {isChecked && <CheckCircle2 size={12} color="#0A0A0A" />}
                       <Text
                         style={{
-                          color: isChecked ? '#0A0A0A' : '#A1A1AA',
+                          color: isChecked ? '#0A0A0A' : '#E4E4E7',
                           fontSize: 12,
-                          fontWeight: '700',
+                          fontWeight: isChecked ? '900' : '600',
+                          textAlign: 'center',
                         }}
                       >
                         {spec}
@@ -610,7 +632,7 @@ export default function RegisterScreen({ navigation }: any) {
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ color: '#C4B5FD', fontSize: 11, fontWeight: '700' }}>حساب إنستاباي (InstaPay):</Text>
                       <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', userSelect: 'all' as any }}>
-                        adelelgohry412@instapay
+                        {paymentSettings.instapayHandle}
                       </Text>
                     </View>
                   </View>
@@ -637,7 +659,7 @@ export default function RegisterScreen({ navigation }: any) {
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ color: '#FCA5A5', fontSize: 11, fontWeight: '700' }}>محفظة فودافون كاش:</Text>
                       <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', userSelect: 'all' as any }}>
-                        01064739664
+                        {paymentSettings.vodafoneCashNumber}
                       </Text>
                     </View>
                   </View>

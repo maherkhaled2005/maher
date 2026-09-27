@@ -229,8 +229,7 @@ export default function OnboardingModal({ user: propUser }: OnboardingModalProps
     if (!user || !user.id) return;
     const checkStatus = async () => {
       try {
-        const normRole = normalizeRole(user.role || 'customer');
-        const key = `tr_onboarded_${user.id}_${normRole}_v3`;
+        const key = `tr_rules_accepted_${user.id}`;
         const done = await AsyncStorage.getItem(key);
         if (!done) {
           setVisible(true);
@@ -238,7 +237,7 @@ export default function OnboardingModal({ user: propUser }: OnboardingModalProps
       } catch (e) {}
     };
     checkStatus();
-  }, [user?.id, user?.role]);
+  }, [user?.id]);
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('SHOW_ROLE_LAWS', (customRole?: string) => {
@@ -255,10 +254,12 @@ export default function OnboardingModal({ user: propUser }: OnboardingModalProps
   }, []);
 
   const handleDismiss = async () => {
+    if (!agreed) {
+      return;
+    }
     if (user?.id) {
       try {
-        const normRole = normalizeRole(activeRole || user.role || 'customer');
-        await AsyncStorage.setItem(`tr_onboarded_${user.id}_${normRole}_v3`, 'true');
+        await AsyncStorage.setItem(`tr_rules_accepted_${user.id}`, 'true');
       } catch (e) {}
     }
     setActiveRole(null);
@@ -401,7 +402,7 @@ export default function OnboardingModal({ user: propUser }: OnboardingModalProps
             ))}
 
             {/* Terms of Conduct / 10 Laws */}
-            <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '900', textAlign: 'right', marginTop: 4, marginBottom: 2 }}>
+            <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '900', textAlign: 'right', marginTop: 8, marginBottom: 4 }}>
               قوانين المنظومة العشرة وميثاق الشرف المهني 📜:
             </Text>
 
@@ -409,20 +410,21 @@ export default function OnboardingModal({ user: propUser }: OnboardingModalProps
               <View
                 key={i}
                 style={{
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
+                  flexDirection: 'row-reverse',
+                  alignItems: 'center',
                   backgroundColor: 'rgba(245, 158, 11, 0.08)',
                   borderRadius: 10,
-                  padding: 8,
+                  paddingVertical: 7,
+                  paddingHorizontal: 10,
                   borderWidth: 1,
                   borderColor: 'rgba(245, 158, 11, 0.25)',
                   gap: 8,
                 }}
               >
-                <Text style={{ flex: 1, color: '#F4F4F5', fontSize: 11, lineHeight: 16, textAlign: 'right' }}>
+                <ShieldCheck size={16} color="#F59E0B" />
+                <Text style={{ flex: 1, color: '#F4F4F5', fontSize: 12, lineHeight: 18, textAlign: 'right' }}>
                   {term}
                 </Text>
-                <ShieldCheck size={14} color="#F59E0B" style={{ marginTop: 2 }} />
               </View>
             ))}
 

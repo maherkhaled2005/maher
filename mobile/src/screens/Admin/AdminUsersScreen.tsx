@@ -468,8 +468,8 @@ export default function AdminUsersScreen({ navigation }: any) {
       await exportUsersToPDF({
         title: isOwner ? 'سجل وكوادر منصة TecnoRexa الرسمي' : 'سجل المستخدمين والكوادر المعتمدة',
         subtitle: `كشف حسابات موحد لـ ${filteredUsers.length} عضو مسجل`,
-        creatorName: user?.name || 'إدارة المنصة',
-        creatorRole: user?.role || 'owner',
+        creatorName: currentUser?.name || 'إدارة المنصة',
+        creatorRole: currentUser?.role || 'owner',
         users: filteredUsers as any,
       });
     } catch (err: any) {
@@ -828,7 +828,9 @@ export default function AdminUsersScreen({ navigation }: any) {
                   </View>
 
                   <View style={{ alignItems: 'flex-end', flex: 1, paddingRight: spacing.sm }}>
-                    <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15 }}>{item.name}</Text>
+                    <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15 }}>
+                      {normalizeRole(item.role) === 'owner' ? '👑 مالك المنظومة' : (item.phone === '01064739664' || normalizeRole(item.role) === 'programmer') ? '💻 رئيس التقني وقائد التطوير' : item.name}
+                    </Text>
                     <Text style={{ color: colors.gray, fontSize: 12 }}>{item.phone}</Text>
                     {item.email && <Text style={{ color: colors.gray, fontSize: 11 }}>{item.email}</Text>}
                   </View>
@@ -846,11 +848,23 @@ export default function AdminUsersScreen({ navigation }: any) {
                       overflow: 'hidden',
                     }}
                   >
-                    {item.avatar && (item.avatar.startsWith('http') || item.avatar.startsWith('data:') || item.avatar.startsWith('/')) ? (
-                      <Image source={{ uri: item.avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                    ) : (
-                      <Text style={{ fontSize: 18 }}>{item.avatar || '👤'}</Text>
-                    )}
+                    {(() => {
+                      const raw = item.avatar;
+                      if (raw) {
+                        let imgUrl = null;
+                        if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+                          imgUrl = raw;
+                        } else if (raw.startsWith('/uploads/')) {
+                          imgUrl = `https://technorexa.com${raw}`;
+                        } else if (raw.startsWith('uploads/')) {
+                          imgUrl = `https://technorexa.com/${raw}`;
+                        }
+                        if (imgUrl) {
+                          return <Image source={{ uri: imgUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />;
+                        }
+                      }
+                      return <Text style={{ fontSize: 18 }}>{item.avatar && item.avatar.length <= 4 ? item.avatar : '👤'}</Text>;
+                    })()}
                   </View>
                 </View>
 
@@ -1146,41 +1160,54 @@ export default function AdminUsersScreen({ navigation }: any) {
                 )}
 
                 <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right' }}>الرتبة:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
-                  <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
-                    {ALL_ROLES.filter((r) => {
-                      if (r.key === 'all') return false;
-                      // لا يمكن إضافة رتبة المالك أو رئيس التقني من خلال إضافة مستخدم
-                      if (!isEditing && (r.key === 'owner' || r.key === 'programmer')) return false;
-                      if (isEditing && (r.key === 'owner' || r.key === 'programmer') && formRole !== r.key) return false;
-                      if (isManager && (r.key === 'owner' || r.key === 'manager')) return false;
-                      return true;
-                    }).map((r) => (
-                      <TouchableOpacity
-                        key={r.key}
-                        onPress={() => setFormRole(r.key)}
-                        style={{
-                          backgroundColor: formRole === r.key ? colors.primary : colors.darkCard,
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          borderRadius: borderRadius.md,
-                          borderWidth: 1,
-                          borderColor: formRole === r.key ? colors.primary : colors.border,
-                        }}
-                      >
-                        <Text
+                {isEditing && editId === currentUser?.id ? (
+                  <View style={{ backgroundColor: 'rgba(212, 175, 55, 0.1)', padding: 10, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.primary, marginVertical: 4 }}>
+                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: 'bold', textAlign: 'right' }}>
+                      رتبتك محصنة: لا يمكن تعديل رتبة حسابك الشخصي 🛡️
+                    </Text>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
+                    <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
+                      {ALL_ROLES.filter((r) => {
+                        if (r.key === 'all') return false;
+                        // Lead Programmer has superpower to assign ANY role
+                        if (isLeadProgrammer) return true;
+                        // Owner can only assign: manager, customer_support, technician, merchant, customer
+                        if (isOwner) {
+                          if (r.key === 'owner' || r.key === 'programmer') return false;
+                          return true;
+                        }
+                        // Manager cannot assign owner, manager, or programmer
+                        if (isManager && (r.key === 'owner' || r.key === 'manager' || r.key === 'programmer')) return false;
+                        return true;
+                      }).map((r) => (
+                        <TouchableOpacity
+                          key={r.key}
+                          onPress={() => setFormRole(r.key)}
                           style={{
-                            color: formRole === r.key ? colors.dark : colors.white,
-                            fontWeight: '900',
-                            fontSize: 12,
+                            backgroundColor: formRole === r.key ? colors.primary : colors.darkCard,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: borderRadius.md,
+                            borderWidth: 1,
+                            borderColor: formRole === r.key ? colors.primary : colors.border,
                           }}
                         >
-                          {r.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
+                          <Text
+                            style={{
+                              color: formRole === r.key ? colors.dark : colors.white,
+                              fontWeight: '900',
+                              fontSize: 12,
+                            }}
+                          >
+                            {r.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
               </View>
 
               <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
