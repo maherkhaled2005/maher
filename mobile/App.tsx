@@ -143,22 +143,22 @@ export default function App() {
             paddingHorizontal: 20,
           }}
         >
-          {/* Official TecnoRexa Large Blue Sphere Showcase Graphic */}
+          {/* Official TecnoRexa Large Blue Sphere Showcase Graphic with Royal Gold Border */}
           <View
             style={{
               width: 220,
               height: 220,
               borderRadius: 110,
               backgroundColor: '#0A1118',
-              borderWidth: 3,
-              borderColor: '#00D2FF',
+              borderWidth: 3.5,
+              borderColor: '#D4AF37',
               overflow: 'hidden',
               justifyContent: 'center',
               alignItems: 'center',
-              shadowColor: '#00D2FF',
+              shadowColor: '#D4AF37',
               shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.6,
-              shadowRadius: 26,
+              shadowOpacity: 0.65,
+              shadowRadius: 28,
               elevation: 16,
               marginBottom: 24,
             }}
@@ -170,30 +170,35 @@ export default function App() {
             />
           </View>
 
-          {/* Brand Typography */}
-          <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }}>
-            Tecno<Text style={{ color: '#00D2FF' }}>Rexa</Text>
+          {/* Brand Typography in Royal Gold */}
+          <Text style={{ color: '#D4AF37', fontSize: 34, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }}>
+            Tecno<Text style={{ color: '#F3E5AB' }}>Rexa</Text>
           </Text>
-          <Text style={{ color: '#94A3B8', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 24 }}>
+          <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 24, opacity: 0.95 }}>
             منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
           </Text>
 
-          {/* Blue Neon Loading Indicator */}
+          {/* Luxury Gold Loading Indicator */}
           <View
             style={{
               flexDirection: 'row-reverse',
               alignItems: 'center',
               gap: 10,
-              backgroundColor: 'rgba(0, 210, 255, 0.08)',
-              paddingHorizontal: 18,
+              backgroundColor: 'rgba(212, 175, 55, 0.1)',
+              paddingHorizontal: 20,
               paddingVertical: 10,
               borderRadius: 24,
-              borderWidth: 1,
-              borderColor: 'rgba(0, 210, 255, 0.25)',
+              borderWidth: 1.5,
+              borderColor: '#D4AF37',
+              shadowColor: '#D4AF37',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.35,
+              shadowRadius: 10,
+              elevation: 6,
             }}
           >
-            <ActivityIndicator size="small" color="#00D2FF" />
-            <Text style={{ color: '#00D2FF', fontSize: 14, fontWeight: '900' }}>
+            <ActivityIndicator size="small" color="#D4AF37" />
+            <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '900' }}>
               جاري التحميل...
             </Text>
           </View>

@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DARK_BG = '#070A0F';
-const NEON_BLUE = '#00D2FF';
+const GOLD = '#D4AF37';
 
 const stylesContent = `<resources xmlns:tools="http://schemas.android.com/tools">
   <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
@@ -47,7 +47,7 @@ const stylesV31Content = `<?xml version="1.0" encoding="utf-8"?>
 const colorsContent = `<resources>
   <color name="splashscreen_background">${DARK_BG}</color>
   <color name="iconBackground">${DARK_BG}</color>
-  <color name="colorPrimary">${NEON_BLUE}</color>
+  <color name="colorPrimary">${GOLD}</color>
 </resources>
 `;
 
