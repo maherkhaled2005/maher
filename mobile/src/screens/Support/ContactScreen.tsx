@@ -1,18 +1,7 @@
 // src/screens/Support/ContactScreen.tsx
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  Linking,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Linking, TextInput, Alert, ActivityIndicator } from 'react-native';
 import {
   Mail,
   Phone,

@@ -93,6 +93,7 @@ import CodeSnippetsScreen from '../screens/Developer/CodeSnippetsScreen';
 
 // ===== المجتمع والذكاء الاصطناعي =====
 import WebCommunityScreen from '../screens/Community/WebCommunityScreen';
+import ReelsScreen from '../screens/Community/ReelsScreen';
 import AIChatScreen from '../screens/AI/AIChatScreen';
 import CoursesScreen from '../screens/Courses/CoursesScreen';
 import AnalyticsScreen from '../screens/Analytics/AnalyticsScreen';
@@ -372,6 +373,7 @@ export default function AppNavigator() {
             <Stack.Screen name="DevHub" component={DevHubScreen} />
             <Stack.Screen name="CodeSnippets" component={CodeSnippetsScreen} />
             <Stack.Screen name="WebCommunity" component={WebCommunityScreen} />
+            <Stack.Screen name="Reels" component={ReelsScreen} />
             <Stack.Screen name="AIChat" component={AIChatScreen} />
             <Stack.Screen name="Courses" component={CoursesScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />

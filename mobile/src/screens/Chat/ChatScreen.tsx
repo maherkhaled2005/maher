@@ -5,27 +5,37 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Linking,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronRight,
   Phone,
-  Video,
   Send,
   Lock,
   CheckCheck,
   User,
   RefreshCw,
 } from 'lucide-react-native';
-import { colors, spacing, typography, borderRadius } from '../../theme';
+import {
+  colors,
+  spacing,
+  borderRadius,
+  MAX_CHAT_WIDTH,
+  isPhone,
+  isDesktop,
+  inputBarPaddingBottom,
+} from '../../theme';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
 import useSocket from '../../hooks/useSocket';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { maskConversationName, maskPhoneNumbers } from '../../utils/conversationPrivacy';
 
 interface MessageItem {
   id: string;
@@ -41,14 +51,32 @@ interface MessageItem {
 
 export default function ChatScreen({ route, navigation }: any) {
   const { user } = useAuthStore();
-  const { chatId, userName, isOnline, phone } = route.params || {
-    chatId: 'default',
-    userName: 'محادثة',
-    isOnline: true,
-    phone: '',
-  };
+  const params = route?.params || {};
+  const chatId = params.chatId ?? 'default';
+  const phone = params.phone ?? '';
+  const isGroupParam = params.isGroup;
 
-  const [onlineState, setOnlineState] = useState<boolean>(isOnline !== false);
+  // Never render the caller's own name as the peer, and never expose a
+  // privileged staff identity (owner / manager / lead programmer) to regular users.
+  const peerName = maskConversationName({
+    otherUserName: params.userName,
+    otherUserRole: params.userRole,
+    viewerRole: user?.role,
+    isGroup: params.isGroup,
+  });
+  const userName = peerName;
+
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight(insets.bottom);
+  const phoneLayout = isPhone(width);
+  const desktopLayout = isDesktop(width);
+  const compact = width < 360;
+  const msgFont = compact ? 13 : phoneLayout ? 14 : 15;
+  const msgLineHeight = compact ? 19 : phoneLayout ? 21 : 23;
+  const bubbleMaxWidth = desktopLayout ? '70%' : phoneLayout ? '82%' : compact ? '88%' : '78%';
+
+  const [onlineState, setOnlineState] = useState<boolean>(params.isOnline !== false);
   const { socket } = useSocket(user?.id || null);
 
   useEffect(() => {
@@ -58,16 +86,17 @@ export default function ChatScreen({ route, navigation }: any) {
         setOnlineState(data.status === 'online');
       }
     };
-    socket.on('user_presence', handlePresence);
-    socket.emit('check_presence', chatId);
-    socket.on('presence_status', (data: { userId: string; status: string }) => {
+    const handleStatus = (data: { userId: string; status: string }) => {
       if (String(data.userId) === String(chatId)) {
         setOnlineState(data.status === 'online');
       }
-    });
+    };
+    socket.on('user_presence', handlePresence);
+    socket.on('presence_status', handleStatus);
+    socket.emit('check_presence', chatId);
     return () => {
       socket.off('user_presence', handlePresence);
-      socket.off('presence_status');
+      socket.off('presence_status', handleStatus);
     };
   }, [socket, chatId]);
 
@@ -80,7 +109,7 @@ export default function ChatScreen({ route, navigation }: any) {
     String(chatId || '').includes('dev') ||
     String(chatId || '').includes('group') ||
     String(chatId || '').includes('team') ||
-    route.params?.isGroup ||
+    isGroupParam ||
     userName?.includes('فريق') ||
     userName?.includes('مطورين') ||
     userName?.includes('برمجة')
@@ -96,16 +125,20 @@ export default function ChatScreen({ route, navigation }: any) {
       if (!silent) setLoading(true);
       const res = await api.get(`/messages/${chatId}`);
       if (Array.isArray(res.data)) {
+        const myId = user?.id;
         setMessages((prev) => {
-          const fetched = res.data.map((m: any) => ({
+          const fetched: MessageItem[] = res.data.map((m: any) => ({
             ...m,
-            isMe: m.senderId === user?.id,
+            isMe: String(m.senderId) === String(myId),
           }));
-          // Preserve any temp messages that haven't been resolved yet
-          const tempMsgs = prev.filter(m => String(m.id).startsWith('temp_'));
-          // Avoid duplicates if server already returned the newly inserted msg
-          const newFetchedIds = new Set(fetched.map((f: any) => f.id));
-          return [...fetched, ...tempMsgs.filter(t => !newFetchedIds.has(t.id))];
+          const fetchedKeys = new Set(
+            fetched.map((f) => `${f.senderId}|${f.content}|${f.createdAt}`)
+          );
+          const pending = prev.filter(
+            (m) =>
+              String(m.id).startsWith('temp_') && !fetchedKeys.has(`${m.senderId}|${m.content}|${m.createdAt}`)
+          );
+          return [...fetched, ...pending];
         });
       }
     } catch (err: any) {
@@ -124,9 +157,10 @@ export default function ChatScreen({ route, navigation }: any) {
   }, [loadMessages]);
 
   useEffect(() => {
-    setTimeout(() => {
+    const t = setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 150);
+    }, 120);
+    return () => clearTimeout(t);
   }, [messages.length]);
 
   const handleSend = async () => {
@@ -148,6 +182,7 @@ export default function ChatScreen({ route, navigation }: any) {
 
     setMessages((prev) => [...prev, optimisticMsg]);
     setMessage('');
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 60);
 
     try {
       const res = await api.post('/messages', {
@@ -161,10 +196,11 @@ export default function ChatScreen({ route, navigation }: any) {
         );
       }
     } catch (err: any) {
-      console.warn('Failed to send message:', err.message);
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      Alert.alert('تعذر الإرسال', 'لم يتم إرسال الرسالة. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.');
     } finally {
       setSending(false);
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
     }
   };
 
@@ -181,11 +217,14 @@ export default function ChatScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView
-      style={[
-        { flex: 1, backgroundColor: colors.dark },
-        
-      ]}
+      style={{ flex: 1, backgroundColor: colors.dark }}
+      edges={['top', 'bottom']}
     >
+      <KeyboardAvoidingView
+        style={{ flex: 1, width: '100%', maxWidth: '100%' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      >
       {/* Header */}
       <View
         style={{
@@ -193,14 +232,16 @@ export default function ChatScreen({ route, navigation }: any) {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
+          paddingVertical: compact ? 6 : spacing.sm,
+          minHeight: 52,
           backgroundColor: '#111111',
           borderBottomWidth: 1,
           borderColor: '#222222',
+          width: '100%',
         }}
       >
         {/* Right side: Back button & Contact Info */}
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
           <TouchableOpacity
             onPress={() => {
               if (navigation?.canGoBack && navigation.canGoBack()) {
@@ -225,9 +266,9 @@ export default function ChatScreen({ route, navigation }: any) {
 
           <View
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
+              width: 38,
+              height: 38,
+              borderRadius: 19,
               backgroundColor: 'rgba(212, 175, 55, 0.15)',
               alignItems: 'center',
               justifyContent: 'center',
@@ -235,11 +276,14 @@ export default function ChatScreen({ route, navigation }: any) {
               borderColor: colors.primary,
             }}
           >
-            <User color={colors.primary} size={22} />
+            <User color={colors.primary} size={20} />
           </View>
 
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ color: colors.white, fontSize: 15, fontWeight: '800' }}>
+          <View style={{ alignItems: 'flex-end', flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.white, fontSize: compact ? 13 : 15, fontWeight: '800', maxWidth: '100%' }}
+            >
               {userName}
             </Text>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
@@ -251,7 +295,7 @@ export default function ChatScreen({ route, navigation }: any) {
                   backgroundColor: onlineState ? colors.success : colors.gray,
                 }}
               />
-              <Text style={{ color: onlineState ? colors.success : colors.gray, fontSize: 11, fontWeight: '700' }}>
+              <Text style={{ color: onlineState ? colors.success : colors.gray, fontSize: 10, fontWeight: '700' }}>
                 {onlineState ? 'متصل الآن 🟢' : 'غير متصل ⚪'}
               </Text>
             </View>
@@ -259,7 +303,7 @@ export default function ChatScreen({ route, navigation }: any) {
         </View>
 
         {/* Left side: Action icons */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 8 }}>
           <TouchableOpacity
             onPress={() => loadMessages(false)}
             style={{
@@ -292,23 +336,22 @@ export default function ChatScreen({ route, navigation }: any) {
         </View>
       </View>
 
-      {/* Chat Area & Input wrapped in KeyboardAvoidingView */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        {/* Messages Scroll Area */}
+      {/* Messages Scroll Area */}
         <ScrollView
           ref={scrollViewRef}
-          style={{ flex: 1 }}
+          style={{ flex: 1, width: '100%' }}
           contentContainerStyle={{
+            width: '100%',
+            maxWidth: MAX_CHAT_WIDTH,
+            alignSelf: 'center',
             padding: spacing.md,
-            paddingBottom: spacing.md,
+            paddingTop: spacing.sm,
+            paddingBottom: spacing.lg,
             flexGrow: 1,
           }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {/* Security Encryption Badge */}
           <View
@@ -319,34 +362,35 @@ export default function ChatScreen({ route, navigation }: any) {
               alignSelf: 'center',
               backgroundColor: 'rgba(212, 175, 55, 0.08)',
               paddingHorizontal: spacing.md,
-              paddingVertical: 4,
+              paddingVertical: 5,
               borderRadius: borderRadius.full,
               borderWidth: 1,
               borderColor: 'rgba(212, 175, 55, 0.2)',
               marginBottom: spacing.md,
               gap: 6,
+              maxWidth: '100%',
             }}
           >
             <Lock color={colors.primary} size={12} />
-            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>
+            <Text numberOfLines={2} style={{ color: colors.primary, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>
               محادثة آمنة ومشفرة عبر خوادم TecnoRexa
             </Text>
           </View>
 
           {loading ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 }}>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 }}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={{ color: colors.gray, fontSize: 13, marginTop: 8 }}>
+              <Text style={{ color: colors.gray, fontSize: 12, marginTop: 8 }}>
                 جاري مزامنة الرسائل...
               </Text>
             </View>
           ) : messages.length === 0 ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, paddingHorizontal: spacing.lg }}>
-              <Text style={{ fontSize: 36, marginBottom: 8 }}>💬</Text>
-              <Text style={{ color: colors.white, fontSize: 16, fontWeight: 'bold' }}>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40, paddingHorizontal: spacing.lg }}>
+              <Text style={{ fontSize: 32, marginBottom: 8 }}>💬</Text>
+              <Text style={{ color: colors.white, fontSize: 15, fontWeight: 'bold' }}>
                 لا توجد رسائل سابقة
               </Text>
-              <Text style={{ color: colors.gray, fontSize: 13, textAlign: 'center', marginTop: 4 }}>
+              <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
                 ابدأ المحادثة الآن، رسائلك مشفرة ومحفوظة بأمان تام في سجل حسابك.
               </Text>
             </View>
@@ -365,9 +409,9 @@ export default function ChatScreen({ route, navigation }: any) {
                   style={{
                     alignSelf: msg.isMe ? 'flex-start' : 'flex-end',
                     backgroundColor: msg.isMe ? colors.primary : '#181818',
-                    maxWidth: '82%',
+                    maxWidth: bubbleMaxWidth as any,
                     paddingHorizontal: 14,
-                    paddingVertical: 10,
+                    paddingVertical: 9,
                     borderRadius: borderRadius.lg,
                     borderBottomLeftRadius: msg.isMe ? 2 : borderRadius.lg,
                     borderBottomRightRadius: !msg.isMe ? 2 : borderRadius.lg,
@@ -379,13 +423,13 @@ export default function ChatScreen({ route, navigation }: any) {
                   <Text
                     style={{
                       color: msg.isMe ? '#000000' : colors.white,
-                      fontSize: 14,
-                      lineHeight: 20,
+                      fontSize: msgFont,
+                      lineHeight: msgLineHeight,
                       textAlign: 'right',
                       fontWeight: msg.isMe ? '700' : '500',
                     }}
                   >
-                    {msg.content}
+                    {maskPhoneNumbers(msg.content)}
                   </Text>
 
                   <View
@@ -420,14 +464,19 @@ export default function ChatScreen({ route, navigation }: any) {
         <View
           style={{
             flexDirection: 'row-reverse',
-            alignItems: 'center',
+            alignItems: 'flex-end',
             paddingHorizontal: spacing.md,
             paddingTop: spacing.sm,
-            paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+            paddingBottom: keyboardHeight > 0 ? spacing.sm : Math.max(insets.bottom, inputBarPaddingBottom()),
             backgroundColor: '#121212',
             borderTopWidth: 1,
             borderColor: '#222222',
             gap: 8,
+            width: '100%',
+            maxWidth: '100%',
+            // Lift the whole bar above the keyboard on every platform
+            marginBottom: keyboardHeight,
+            zIndex: 20,
           }}
         >
           {/* Send Button */}
@@ -457,22 +506,25 @@ export default function ChatScreen({ route, navigation }: any) {
             style={{
               flex: 1,
               flexDirection: 'row-reverse',
-              alignItems: 'center',
+              alignItems: 'flex-end',
               backgroundColor: '#1A1A1A',
               borderRadius: 22,
               paddingHorizontal: spacing.md,
+              paddingVertical: Platform.OS === 'ios' ? 8 : 6,
               borderWidth: 1,
               borderColor: '#2A2A2A',
+              minWidth: 0,
             }}
           >
             <TextInput
               style={{
                 flex: 1,
-                paddingVertical: Platform.OS === 'ios' ? 10 : 8,
+                paddingVertical: Platform.OS === 'ios' ? 6 : 5,
                 color: colors.white,
                 textAlign: 'right',
-                fontSize: 14,
-                maxHeight: 100,
+                fontSize: compact ? 13 : 14,
+                maxHeight: 96,
+                minWidth: 0,
               }}
               placeholder="اكتب رسالتك هنا..."
               placeholderTextColor={colors.gray}

@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, FlatList, TouchableOpacity, TextInput,
-  SafeAreaView, Alert, Platform, RefreshControl, Modal,
-  ScrollView, ActivityIndicator, KeyboardAvoidingView,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, TextInput, Alert, Platform, RefreshControl, Modal, ScrollView, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import { 
   Search, ChevronRight, Copy, Headphones, Plus, X, Send, AlertCircle
 } from 'lucide-react-native';

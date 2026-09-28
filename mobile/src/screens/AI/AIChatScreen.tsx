@@ -1,18 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  Platform,
-  ActivityIndicator,
-  Alert,
-  SafeAreaView,
-  ScrollView,
-  Modal,
-  KeyboardAvoidingView,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TextInput, TouchableOpacity, FlatList, Platform, ActivityIndicator, Alert, ScrollView, Modal, KeyboardAvoidingView } from 'react-native';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import {
   Sparkles,
   Trash2,
@@ -61,6 +50,7 @@ const QUICK_PROMPTS = [
 ];
 
 export default function AIChatScreen({ navigation }: any) {
+  const keyboardHeight = useKeyboardHeight();
   const { user } = useAuthStore();
   const currentRole = normalizeRole(user?.role || '');
   const isOwner = currentRole === 'owner';
@@ -187,7 +177,7 @@ export default function AIChatScreen({ navigation }: any) {
     setIsTyping(true);
 
     try {
-      const res = await fetchApi('/api/ai/chat', {
+      const res = await fetchApi('/ai/chat', {
         method: 'POST',
         data: { message: text },
       });
@@ -220,8 +210,11 @@ export default function AIChatScreen({ navigation }: any) {
         },
       ]);
 
-      if (res?.dailyRemaining !== undefined) {
-        setQuestionsLeft(res.dailyRemaining);
+      // The API reports the remaining quota as `remainingQuestions`; the
+      // client used to look for `dailyRemaining` and always showed "3" left.
+      const remaining = res?.remainingQuestions ?? res?.dailyRemaining;
+      if (remaining !== undefined) {
+        setQuestionsLeft(Number(remaining));
       }
       loadSubscriptionStatus();
     } catch (err: any) {
@@ -261,7 +254,7 @@ export default function AIChatScreen({ navigation }: any) {
     <SafeAreaView
       style={[
         { flex: 1, backgroundColor: colors.dark },
-        
+
       ]}
     >
       {/* 1. Header Logic */}
@@ -498,7 +491,7 @@ export default function AIChatScreen({ navigation }: any) {
 
       {/* 3. Main Chat View */}
       {activeTab === 'chat' ? (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} style={{ flex: 1 }}>
           {/* Quick Prompt Chips */}
           <View style={{ backgroundColor: '#111111', paddingVertical: 6, borderBottomWidth: 1, borderColor: '#222' }}>
             <ScrollView
@@ -724,7 +717,7 @@ export default function AIChatScreen({ navigation }: any) {
                 borderColor: colors.primary,
                 gap: spacing.sm,
                 marginHorizontal: spacing.md,
-                marginBottom: Platform.OS === 'ios' ? 14 : 8,
+                marginBottom: keyboardHeight > 0 ? spacing.sm : (Platform.OS === 'ios' ? 14 : 8),
                 marginTop: 4,
               }}
             >

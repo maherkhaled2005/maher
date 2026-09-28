@@ -1,17 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  SafeAreaView,
-  Text,
-  TouchableOpacity,
-  View,
-  Modal,
-  TextInput,
-  Alert,
-  Platform,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, FlatList, RefreshControl, Text, TouchableOpacity, View, Modal, TextInput, Alert, Platform } from 'react-native';
 import { BookOpen, ChevronRight, Plus, Star, Users, CheckCircle2, X } from 'lucide-react-native';
 import { fetchApi } from '../../api/client';
 import { colors, spacing, typography, borderRadius } from '../../theme';

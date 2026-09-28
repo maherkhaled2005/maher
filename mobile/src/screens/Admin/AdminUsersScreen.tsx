@@ -1,21 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  Alert,
-  Modal,
-  ScrollView,
-  Platform,
-  ActivityIndicator,
-  RefreshControl,
-  Linking,
-  Share,
-  Image,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, TextInput, Alert, Modal, ScrollView, Platform, ActivityIndicator, RefreshControl, Linking, Share, Image } from 'react-native';
 import {
   Search,
   UserPlus,
@@ -41,6 +26,7 @@ import {
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { fetchApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
+import { AvatarView } from '../../components/common/AvatarView';
 import { normalizeRole } from '../../roles';
 import OwnerHeader from '../../components/OwnerHeader';
 import { exportUsersToPDF } from '../../utils/pdfExport';
@@ -480,7 +466,7 @@ export default function AdminUsersScreen({ navigation }: any) {
     <SafeAreaView
       style={[
         { flex: 1, backgroundColor: colors.dark },
-        
+
       ]}
     >
       {/* 1. Header Logic */}
@@ -834,37 +820,7 @@ export default function AdminUsersScreen({ navigation }: any) {
                     {item.email && <Text style={{ color: colors.gray, fontSize: 11 }}>{item.email}</Text>}
                   </View>
 
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: '#1E1E1E',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1.5,
-                      borderColor: colors.border,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {(() => {
-                      const raw = item.avatar;
-                      if (raw) {
-                        let imgUrl = null;
-                        if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
-                          imgUrl = raw;
-                        } else if (raw.startsWith('/uploads/')) {
-                          imgUrl = `https://technorexa.com${raw}`;
-                        } else if (raw.startsWith('uploads/')) {
-                          imgUrl = `https://technorexa.com/${raw}`;
-                        }
-                        if (imgUrl) {
-                          return <Image source={{ uri: imgUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />;
-                        }
-                      }
-                      return <Text style={{ fontSize: 18 }}>{item.avatar && item.avatar.length <= 4 ? item.avatar : '👤'}</Text>;
-                    })()}
-                  </View>
+                    <AvatarView uri={item.avatar} size={44} />
                 </View>
 
                 {/* Sub info: Balance & Join Date */}
@@ -1159,7 +1115,7 @@ export default function AdminUsersScreen({ navigation }: any) {
                 )}
 
                 <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right' }}>الرتبة:</Text>
-                {isEditing && editId === currentUser?.id ? (
+                {isEditing && editId === currentUser?.id && !isLeadProgrammer ? (
                   <View style={{ backgroundColor: 'rgba(212, 175, 55, 0.1)', padding: 10, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.primary, marginVertical: 4 }}>
                     <Text style={{ color: colors.primary, fontSize: 12, fontWeight: 'bold', textAlign: 'right' }}>
                       رتبتك محصنة: لا يمكن تعديل رتبة حسابك الشخصي 🛡️

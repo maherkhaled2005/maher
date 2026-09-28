@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  SafeAreaView,
-  ScrollView,
-  Platform,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { MapPin, ChevronRight, Save, Plus, Check } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { fetchApi } from '../../api/client';

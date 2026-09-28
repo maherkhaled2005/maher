@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, SafeAreaView, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import { Edit3, ArrowRightLeft } from 'lucide-react-native';
 import { fetchApi } from '../../api/client';
 import OwnerHeader from '../../components/OwnerHeader';

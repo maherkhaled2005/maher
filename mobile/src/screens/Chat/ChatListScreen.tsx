@@ -1,18 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  SafeAreaView,
-  ScrollView,
-  Modal,
-  Alert,
-  Platform,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, TextInput, ScrollView, Modal, Alert, Platform, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
 import {
   Search,
   MessageCircle,
@@ -28,9 +16,10 @@ import {
   Plus,
 } from 'lucide-react-native';
 import { fetchApi } from '../../api/client';
-import { colors, spacing, typography, borderRadius } from '../../theme';
+import { colors, spacing, borderRadius, MAX_CHAT_WIDTH } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
 import { useAuthStore } from '../../store/authStore';
+import { maskConversationName, maskPhoneNumbers } from '../../utils/conversationPrivacy';
 
 interface ConvItem {
   id: string;
@@ -45,6 +34,8 @@ interface ConvItem {
 
 export default function ChatListScreen({ navigation }: any) {
   const { user } = useAuthStore();
+  const { width } = useWindowDimensions();
+  const compact = width < 360;
   const isObserver = user?.role === 'owner' || user?.role === 'manager';
   const [conversations, setConversations] = useState<ConvItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,10 +153,8 @@ export default function ChatListScreen({ navigation }: any) {
 
   return (
     <SafeAreaView
-      style={[
-        { flex: 1, backgroundColor: colors.dark },
-        
-      ]}
+      style={{ flex: 1, backgroundColor: colors.dark }}
+      edges={['top', 'bottom', 'left', 'right']}
     >
       {/* ☰ Owner Header with Drawer navigation */}
       <OwnerHeader
@@ -179,7 +168,7 @@ export default function ChatListScreen({ navigation }: any) {
       />
 
       {/* Top Search Bar & New Chat Button */}
-      <View style={{ backgroundColor: '#111111', padding: spacing.md, borderBottomWidth: 1, borderColor: '#222' }}>
+      <View style={{ width: '100%', maxWidth: MAX_CHAT_WIDTH, alignSelf: 'center', backgroundColor: '#111111', padding: spacing.md, borderBottomWidth: 1, borderColor: '#222' }}>
         <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
           <TouchableOpacity
             onPress={() => navigation.navigate('NewChat')}
@@ -194,12 +183,13 @@ export default function ChatListScreen({ navigation }: any) {
             }}
           >
             <Plus size={18} color="#0A0A0A" />
-            <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: 13 }}>محادثة جديدة</Text>
+            <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: compact ? 12 : 13 }}>محادثة جديدة</Text>
           </TouchableOpacity>
 
           <View
             style={{
               flex: 1,
+              minWidth: 0,
               flexDirection: 'row',
               alignItems: 'center',
               backgroundColor: '#1A1A1A',
@@ -211,7 +201,7 @@ export default function ChatListScreen({ navigation }: any) {
           >
             <Search size={16} color={colors.primary} />
             <TextInput
-              style={{ flex: 1, paddingVertical: 8, paddingHorizontal: 6, textAlign: 'right', color: colors.white, fontSize: 13 }}
+              style={{ flex: 1, minWidth: 0, paddingVertical: 8, paddingHorizontal: 6, textAlign: 'right', color: colors.white, fontSize: 13 }}
               placeholder="ابحث في أطراف المحادثات..."
               placeholderTextColor={colors.gray}
               value={search}
@@ -247,7 +237,8 @@ export default function ChatListScreen({ navigation }: any) {
           data={filteredConversations}
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          contentContainerStyle={{ padding: spacing.md, gap: spacing.sm, paddingBottom: 150 }}
+          style={{ width: '100%', alignSelf: 'center', maxWidth: MAX_CHAT_WIDTH }}
+          contentContainerStyle={{ padding: spacing.md, gap: spacing.sm, paddingBottom: 40, flexGrow: 1 }}
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => {
@@ -257,7 +248,9 @@ export default function ChatListScreen({ navigation }: any) {
                   navigation.navigate('ChatScreen', {
                     chatId: item.id,
                     userName: item.name,
+                    userRole: (item as any).otherUserRole,
                     isOnline: Boolean(item.isOnline),
+                    isGroup: item.type === 'group',
                   });
                 }
               }}
@@ -304,28 +297,36 @@ export default function ChatListScreen({ navigation }: any) {
                   )}
                 </View>
 
-                <View style={{ alignItems: 'flex-end', flex: 1 }}>
-                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: 'bold' }}>{item.name}</Text>
+                <View style={{ alignItems: 'flex-end', flex: 1, minWidth: 0 }}>
+                  <Text numberOfLines={1} style={{ color: colors.white, fontSize: compact ? 13 : 14, fontWeight: 'bold', maxWidth: '100%' }}>
+                    {maskConversationName({
+                      otherUserName: item.name,
+                      otherUserRole: (item as any).otherUserRole,
+                      viewerRole: user?.role,
+                      isGroup: item.type === 'group' || (item as any).isGroup,
+                    })}
+                  </Text>
                   <Text style={{ color: colors.gray, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
-                    {item.lastMessage || 'بدء المحادثة'}
+                    {maskPhoneNumbers(item.lastMessage) || 'بدء المحادثة'}
                   </Text>
                 </View>
               </View>
 
               {/* Observer / Chat badge */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                  backgroundColor: 'rgba(212, 175, 55, 0.12)',
-                  borderWidth: 1,
-                  borderColor: colors.primary,
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: borderRadius.md,
-                }}
-              >
+                  <View
+                    style={{
+                      flexDirection: 'row-reverse',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: 'rgba(212, 175, 55, 0.12)',
+                      borderWidth: 1,
+                      borderColor: colors.primary,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: borderRadius.md,
+                      flexShrink: 0,
+                    }}
+                  >
                 {isObserver ? (
                   <>
                     <Eye size={12} color={colors.primary} />
@@ -334,11 +335,11 @@ export default function ChatListScreen({ navigation }: any) {
                 ) : (
                   <>
                     <MessageCircle size={12} color={colors.primary} />
-                    <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>محادثة</Text>
-                  </>
-                )}
-              </View>
-            </TouchableOpacity>
+                          <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>محادثة</Text>
+                        </>
+                      )}
+                      </View>
+                    </TouchableOpacity>
           )}
         />
       )}
@@ -368,7 +369,7 @@ export default function ChatListScreen({ navigation }: any) {
                 </Text>
 
                 {/* Owner Control Actions */}
-                <View style={{ flexDirection: 'row-reverse', gap: spacing.xs, marginBottom: spacing.sm }}>
+                <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm }}>
                   {/* Send Warning */}
                   <TouchableOpacity
                     onPress={handleSendWarning}
@@ -458,7 +459,10 @@ export default function ChatListScreen({ navigation }: any) {
                 </View>
 
                 {/* Messages Box */}
-                <ScrollView style={{ maxHeight: 320, backgroundColor: '#1A1A1A', borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.md }}>
+                <ScrollView
+                  style={{ maxHeight: 320, backgroundColor: '#1A1A1A', borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.md }}
+                  contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+                >
                   {loadingMessages ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (

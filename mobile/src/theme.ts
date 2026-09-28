@@ -88,6 +88,77 @@ export const shadows = {
   lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 },
 } as const;
 
+/* ==========================================================================
+   RESPONSIVE HELPERS — كمبيوتر / تابلت / تلفون
+   ========================================================================== */
+import { Dimensions, PixelRatio, Platform } from 'react-native';
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+/** أقصى عرض للمحتوى على الشاشات الكبيرة (كمبيوتر/تابلت) لتجنب Strech الغريب */
+export const MAX_CONTENT_WIDTH = 820;
+
+/** أقصى عرض لصندوق الشات نفسه */
+export const MAX_CHAT_WIDTH = 900;
+
+export const breakpoints = {
+  phone: 0,
+  largePhone: 411,
+  tablet: 768,
+  desktop: 1100,
+} as const;
+
+export const isSmallPhone = (w: number = SCREEN_W) => w < 360;
+export const isPhone = (w: number = SCREEN_W) => w < breakpoints.tablet;
+export const isTablet = (w: number = SCREEN_W) =>
+  w >= breakpoints.tablet && w < breakpoints.desktop;
+export const isDesktop = (w: number = SCREEN_W) => w >= breakpoints.desktop;
+
+/** تكبير خفيف جداً على التابلت عشان يبقى مقروء */
+export const fontScaleFor = (w: number = SCREEN_W) => {
+  if (w >= breakpoints.desktop) return 1;
+  if (w >= breakpoints.tablet) return 1.05;
+  if (w < 360) return 0.95;
+  return 1;
+};
+
+/** معامل المسافات حسب حجم الشاشة */
+export const spaceScale = (w: number = SCREEN_W) => {
+  if (w >= breakpoints.desktop) return 1.15;
+  if (w >= breakpoints.tablet) return 1.08;
+  if (w < 360) return 0.9;
+  return 1;
+};
+
+/** حاوية مركزية بعرض أقصى على الكمبيوتر/التابلت */
+export const contentContainer = (maxWidth: number = MAX_CONTENT_WIDTH) => ({
+  width: '100%',
+  maxWidth,
+  alignSelf: 'center' as const,
+});
+
+/** يمنع أي تمدد أفقي (يمين/شمال) على كل الشاشات */
+export const noHorizontalOverflow = {
+  width: '100%' as const,
+  maxWidth: '100%' as const,
+  alignSelf: 'stretch' as const,
+  overflow: 'hidden' as const,
+};
+
+/** يمنع تكبير الخط بشكل مجنون حسب إعدادات المستخدم */
+export const fixedText = {
+  allowFontScaling: false,
+} as const;
+
+/** ارتفاع شريط الإدخال متجاوب مع الكيبورد */
+export const inputBarPaddingBottom = () => {
+  if (Platform.OS === 'ios') return 26;
+  if (SCREEN_H < 700) return 6;
+  return 12;
+};
+
+export const screen = { width: SCREEN_W, height: SCREEN_H, pixelRatio: PixelRatio.get() };
+
 // Backward compat
 export const COLORS = {
   gold: '#D4AF37', bg: '#09090b', surface: '#18181b',
@@ -99,4 +170,22 @@ export const COLORS = {
 
 export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 40 } as const;
 
-export default { colors, spacing, typography, borderRadius, shadows };
+export default {
+  colors,
+  spacing,
+  typography,
+  borderRadius,
+  shadows,
+  MAX_CONTENT_WIDTH,
+  MAX_CHAT_WIDTH,
+  contentContainer,
+  noHorizontalOverflow,
+  fixedText,
+  fontScaleFor,
+  spaceScale,
+  isPhone,
+  isTablet,
+  isDesktop,
+  isSmallPhone,
+  inputBarPaddingBottom,
+};

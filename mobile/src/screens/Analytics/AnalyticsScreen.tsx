@@ -1,16 +1,7 @@
 // src/screens/Analytics/AnalyticsScreen.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  RefreshControl,
-  Platform,
-  Alert,
-  Share,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Platform, Alert, Share } from 'react-native';
 import {
   ShoppingBag,
   DollarSign,

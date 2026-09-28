@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Alert,
-  RefreshControl,
-  Platform,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, Alert, RefreshControl, Platform } from 'react-native';
 import OwnerHeader from '../../components/OwnerHeader';
 import {
   Activity,

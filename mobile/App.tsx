@@ -3,6 +3,7 @@ import { StatusBar, View, Text, TouchableOpacity, Platform, Animated, Image, Act
 import { StripeProvider } from './src/components/StripeWrapper';
 import RootNavigation from './src/navigation/index';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Logo from './src/components/Logo';
 import './global.css';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
@@ -91,6 +92,20 @@ export default function App() {
         logout();
       });
 
+      // A ban must take effect on this device right away, without the user
+      // having to log out and back in.
+      socket.on('account_banned', (data: any) => {
+        Alert.alert(
+          'تم حظر الحساب ⛔',
+          data?.reason || 'تم حظر حسابك من قبل إدارة TecnoRexa.'
+        );
+        logout();
+      });
+
+      socket.on('account_unbanned', () => {
+        useAuthStore.getState().checkAuth().catch(() => {});
+      });
+
       socket.on('role_changed', () => {
         useAuthStore.getState().checkAuth().catch(() => {});
       });
@@ -159,7 +174,7 @@ export default function App() {
       }),
     ]).start();
 
-    // 300ms: Start typing 'TecnoRexa' letter by letter
+    // 300ms: typing 'TecnoRexa' letter by letter
     let typeIndex = 0;
     let typeInterval: ReturnType<typeof setInterval>;
     const typingDelay = setTimeout(() => {
@@ -169,37 +184,37 @@ export default function App() {
         if (typeIndex >= fullText.length) {
           clearInterval(typeInterval);
         }
-      }, 100);
-    }, 300);
+      }, 70);
+    }, 200);
 
-    // 1300ms: Subtitle text fades in
+    // 800ms: Subtitle text fades in
     const subtitleTimer = setTimeout(() => {
       Animated.timing(subtitleOpacity, {
         toValue: 1,
-        duration: 500,
+        duration: 400,
         useNativeDriver: Platform.OS !== 'web',
       }).start();
-    }, 1300);
+    }, 800);
 
-    // 1800ms: 'جاري التحميل...' fades in
+    // 1100ms: 'جاري التحميل...' fades in
     const loadingTimer = setTimeout(() => {
       Animated.timing(loadingOpacity, {
         toValue: 1,
-        duration: 500,
+        duration: 400,
         useNativeDriver: Platform.OS !== 'web',
       }).start();
-    }, 1800);
+    }, 1100);
 
-    // 2800ms: Splash fades out, app starts
+    // 1900ms: Splash fades out, app starts
     const transitionTimer = setTimeout(() => {
       Animated.timing(splashContainerOpacity, {
         toValue: 0,
-        duration: 300,
+        duration: 250,
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setAppReady(true);
       });
-    }, 2800);
+    }, 1900);
 
     return () => {
       clearTimeout(typingDelay);
@@ -212,31 +227,49 @@ export default function App() {
 
   if (!appReady) {
     return (
-      <Animated.View style={{ flex: 1, backgroundColor: '#070A0F', justifyContent: 'center', alignItems: 'center', opacity: splashContainerOpacity }}>
+      <Animated.View
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: '100%',
+          backgroundColor: '#070A0F',
+          justifyContent: 'center',
+          alignItems: 'center',
+          opacity: splashContainerOpacity,
+        }}
+      >
         <StatusBar barStyle="light-content" backgroundColor="#070A0F" translucent />
 
-        <View style={{ alignItems: 'center', paddingHorizontal: 20 }}>
-          {/* Logo Image */}
+        <View style={{ alignItems: 'center', width: '100%', paddingHorizontal: 16 }}>
+          {/* Official TR Logo (gold) — no blue sphere */}
           <Animated.Image
-            source={require('./assets/tr_logo.jpg')}
+            source={require('./assets/tecnorexa_official_logo.jpg')}
+            resizeMode="contain"
             style={{
-              width: 120,
-              height: 120,
-              borderRadius: 20,
-              marginBottom: 24,
+              width: 128,
+              height: 128,
+              borderRadius: 28,
+              marginBottom: 20,
               opacity: logoOpacity,
               transform: [{ scale: logoScale }],
             }}
           />
 
           {/* Brand Typography in Royal Gold with Typing Effect */}
-          <Text style={{ color: '#D4AF37', fontSize: 36, fontWeight: '900', letterSpacing: 1, marginBottom: 8, textAlign: 'center', minHeight: 45 }}>
+          <Text
+            maxFontSizeMultiplier={1.15}
+            style={{ color: '#D4AF37', fontSize: 32, fontWeight: '900', letterSpacing: 1, marginBottom: 6, textAlign: 'center', minHeight: 40 }}
+          >
             {typedText.substring(0, 5)}
             <Text style={{ color: '#F3E5AB' }}>{typedText.substring(5)}</Text>
           </Text>
 
           {/* Subtitle */}
-          <Animated.Text style={{ opacity: subtitleOpacity, color: '#D4AF37', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 28 }}>
+          <Animated.Text
+            maxFontSizeMultiplier={1.15}
+            numberOfLines={2}
+            style={{ opacity: subtitleOpacity, color: '#D4AF37', fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 20, paddingHorizontal: 8 }}
+          >
             منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
           </Animated.Text>
 
@@ -246,10 +279,10 @@ export default function App() {
               opacity: loadingOpacity,
               flexDirection: 'row-reverse',
               alignItems: 'center',
-              gap: 10,
-              backgroundColor: '#070A0F',
-              paddingHorizontal: 20,
-              paddingVertical: 10,
+              gap: 8,
+              backgroundColor: '#0B0E14',
+              paddingHorizontal: 18,
+              paddingVertical: 9,
               borderRadius: 24,
               borderWidth: 1.5,
               borderColor: '#D4AF37',
@@ -261,7 +294,7 @@ export default function App() {
             }}
           >
             <ActivityIndicator size="small" color="#D4AF37" />
-            <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '900' }}>
+            <Text maxFontSizeMultiplier={1.15} style={{ color: '#D4AF37', fontSize: 13, fontWeight: '900' }}>
               جاري التحميل...
             </Text>
           </Animated.View>
@@ -272,12 +305,14 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <View style={[{ flex: 1 }, Platform.OS === 'web' && { height: '100%', maxHeight: '100%', overflow: 'hidden' } as any]}>
-        <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
-        <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_KEY || ''}>
-          <RootNavigation />
-        </StripeProvider>
-      </View>
+      <SafeAreaProvider>
+        <View style={[{ flex: 1 }, Platform.OS === 'web' && { height: '100%', maxHeight: '100%', overflow: 'hidden' } as any]}>
+          <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
+          <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_KEY || ''}>
+            <RootNavigation />
+          </StripeProvider>
+        </View>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

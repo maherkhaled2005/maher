@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  SafeAreaView,
-  TouchableOpacity,
-  Linking,
-  Platform,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, Linking, Platform, ActivityIndicator, Alert } from 'react-native';
 import { Clock, RefreshCw, LogOut, PhoneCall } from 'lucide-react-native';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';

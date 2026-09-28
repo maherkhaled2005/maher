@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, TextInput, FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, RefreshControl, Linking, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import {
-  View, Text, SafeAreaView, TouchableOpacity, TextInput,
-  FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, RefreshControl,
-  Linking,
-} from 'react-native';
-import { 
   Send, User, ArrowLeft, ChevronRight, Shield, Wrench, Code, Phone, Mail
 } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
@@ -34,6 +33,8 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight(insets.bottom);
 
   const loadTicketDetails = async () => {
     if (!ticketData?.id) return;
@@ -108,7 +109,7 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
     <SafeAreaView
       style={[
         { flex: 1, backgroundColor: colors.dark },
-        
+
       ]}
     >
       {/* Header */}
@@ -295,40 +296,49 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }}
         renderItem={({ item }) => {
           const isStaffMsg = item.senderType === 'staff' || item.isFromSupport === 1 || item.sender === 'agent';
-          const isCustomer = !isStaffMsg;
           const msgText = item.message || item.text || '';
-          const senderLabel = item.senderName || (isStaffMsg ? 'فريق الدعم الفني' : 'العميل');
+
+          // Alignment must follow WHO actually sent the row, not who is reading.
+          // Using "not staff => mine" made support replies render as if the
+          // support agent had sent them to themselves.
+          const sentByMe = item.senderId ? String(item.senderId) === String(user?.id) : !isStaffMsg;
+          const senderLabel = sentByMe
+            ? 'أنت'
+            : isStaffMsg
+            ? 'فريق الدعم الفني'
+            : 'العميل';
           const timeLabel = item.createdAt
             ? new Date(item.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
             : (item.time || '');
 
           return (
             <View style={{
-              alignSelf: isCustomer ? 'flex-end' : 'flex-start',
-              backgroundColor: isCustomer ? colors.primary : colors.darkCard,
+              alignSelf: sentByMe ? 'flex-end' : 'flex-start',
+              backgroundColor: sentByMe ? colors.primary : colors.darkCard,
               maxWidth: '85%',
+              width: '100%',
               padding: spacing.md,
               borderRadius: borderRadius.lg,
               marginBottom: spacing.md,
-              borderBottomRightRadius: isCustomer ? 0 : borderRadius.lg,
-              borderBottomLeftRadius: !isCustomer ? 0 : borderRadius.lg,
+              borderBottomRightRadius: sentByMe ? 0 : borderRadius.lg,
+              borderBottomLeftRadius: !sentByMe ? 0 : borderRadius.lg,
             }}>
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 {isStaffMsg ? (
-                  <Shield color={isCustomer ? colors.dark : colors.support} size={14} />
+                  <Shield color={sentByMe ? colors.dark : colors.support} size={14} />
                 ) : (
-                  <User color={isCustomer ? colors.dark : colors.white} size={14} />
+                  <User color={sentByMe ? colors.dark : colors.white} size={14} />
                 )}
-                <Text style={{ color: isCustomer ? colors.dark : colors.white, fontSize: typography.sizes.xs, fontWeight: '900' }}>
+                <Text style={{ color: sentByMe ? colors.dark : colors.white, fontSize: typography.sizes.xs, fontWeight: '900' }}>
                   {senderLabel}
                 </Text>
               </View>
-              <Text style={{ color: isCustomer ? colors.dark : colors.white, fontSize: typography.sizes.md, textAlign: 'right', lineHeight: 22 }}>
+              <Text style={{ color: sentByMe ? colors.dark : colors.white, fontSize: typography.sizes.md, textAlign: 'right', lineHeight: 22 }}>
                 {msgText}
               </Text>
               {timeLabel ? (
-                <View style={{ flexDirection: 'row', justifyContent: isCustomer ? 'flex-start' : 'flex-end', marginTop: 4 }}>
-                  <Text style={{ color: isCustomer ? 'rgba(0,0,0,0.6)' : colors.gray, fontSize: 10 }}>{timeLabel}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: sentByMe ? 'flex-start' : 'flex-end', marginTop: 4 }}>
+                  <Text style={{ color: sentByMe ? 'rgba(0,0,0,0.6)' : colors.gray, fontSize: 10 }}>{timeLabel}</Text>
                 </View>
               ) : null}
             </View>
@@ -373,7 +383,7 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
 
       {/* Input */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: Platform.OS === 'ios' ? 24 : 12, backgroundColor: colors.darkCard, borderTopWidth: 1, borderColor: colors.border }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: keyboardHeight > 0 ? spacing.sm : (Platform.OS === 'ios' ? 24 : 12), marginBottom: keyboardHeight, backgroundColor: colors.darkCard, borderTopWidth: 1, borderColor: colors.border }}>
           <TouchableOpacity 
             onPress={handleSendReply}
             style={{ backgroundColor: colors.primary, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}

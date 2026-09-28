@@ -1,19 +1,6 @@
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Pressable,
-  ActivityIndicator,
-  ScrollView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  StatusBar,
-  Image,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TextInput, TouchableOpacity, Pressable, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform, StatusBar, Image } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
 import { Phone, Lock, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';

@@ -1,16 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator,
-  Platform,
-  Modal,
-  Alert,
- StatusBar,  SafeAreaView, } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Platform, Modal, Alert, StatusBar } from 'react-native';
 import {
   Code2,
   Bug,
@@ -31,6 +21,7 @@ import { colors, spacing, borderRadius } from '../../theme';
 import { api } from '../../api/client';
 import OwnerHeader from '../../components/OwnerHeader';
 import { generateTechnicalReportHTML, exportTechnicalCSV } from '../../utils/executiveReport';
+import { shareTextAsFile } from '../../utils/shareExport';
 
 export default function ProgrammerDashboard({ navigation }: any) {
   const { user } = useAuthStore();
@@ -94,7 +85,7 @@ export default function ProgrammerDashboard({ navigation }: any) {
     { label: 'سجل العمليات والتدقيق', desc: 'سجل عمليات وتفاعل مستخدمي النظام', icon: Terminal, screen: 'AuditLogs', color: '#F59E0B' },
   ];
 
-  const handleExport = (type: 'pdf' | 'excel' | 'csv') => {
+  const handleExport = async (type: 'pdf' | 'excel' | 'csv') => {
     setExportModalVisible(false);
     const reportData = {
       programmerName: user?.name || 'الدعم التقني والبرمجي',
@@ -129,7 +120,19 @@ export default function ProgrammerDashboard({ navigation }: any) {
       }
       Alert.alert('✅ تم بنجاح', `تم تجهيز وتصدير التقرير التقني بصيغة ${type.toUpperCase()}`);
     } else {
-      Alert.alert('✅ تم التصدير', `تم إعداد وتصدير التقرير التقني الشامل بصيغة ${type.toUpperCase()}`);
+      // Real export on phone/tablet: render the report and share it as a file.
+      try {
+        const html = generateTechnicalReportHTML(reportData);
+        const fileName = `TecnoRexa_Technical_Report_${new Date().toISOString().slice(0, 10)}.html`;
+        if (type === 'csv') {
+          await shareTextAsFile(exportTechnicalCSV(reportData), fileName.replace('.html', '.csv'), 'text/csv');
+        } else {
+          await shareTextAsFile(html, fileName, 'text/html');
+        }
+        Alert.alert('✅ تم التصدير', 'تم إنشاء الملف وفتح قائمة المشاركة بنجاح.');
+      } catch (err: any) {
+        Alert.alert('❌ فشل التصدير', err?.message || 'تعذر إنشاء ملف التقرير. حاول مرة أخرى.');
+      }
     }
   };
 

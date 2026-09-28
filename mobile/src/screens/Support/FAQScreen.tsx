@@ -1,14 +1,7 @@
 // src/screens/FAQ/FAQScreen.tsx
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  Platform,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, TextInput, Platform } from 'react-native';
 import {
   HelpCircle,
   Search,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Dimensions, Alert, Linking, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, Dimensions, Alert, Linking, Platform } from 'react-native';
 import { ArrowLeft, ChevronRight, Phone, ShieldCheck, MapPin, Navigation } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuthStore } from '../../store/authStore';

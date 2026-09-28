@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  SafeAreaView,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Platform,
-  Alert,
-  RefreshControl,
- StatusBar, } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Alert, RefreshControl, StatusBar, useWindowDimensions } from 'react-native';
 import {
   Search,
   ShoppingBag,
@@ -36,6 +27,9 @@ export default function ClientDashboard({ navigation }: any) {
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const { width } = useWindowDimensions();
+  // 3 columns on a phone, more columns as the screen grows.
+  const gridCols = width >= 1280 ? 6 : width >= 1024 ? 5 : width >= 768 ? 4 : 3;
 
   // 6 Quick Maintenance Services (3x2 Grid - complete without empty gaps)
   const maintenanceServices = [
@@ -193,28 +187,40 @@ export default function ClientDashboard({ navigation }: any) {
             </Text>
           </View>
 
-          <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 }}>
+          <View
+            style={{
+              flexDirection: 'row-reverse',
+              flexWrap: 'wrap',
+              gap: 8,
+              justifyContent: 'flex-start',
+            }}
+          >
             {maintenanceServices.map((s) => (
               <TouchableOpacity
                 key={s.id}
                 onPress={() => navigation.navigate('TechniciansTeam', { specialty: s.id })}
                 style={{
-                  width: '31.5%',
+                  // Responsive grid: 3 columns on phones, 4+ on tablets/desktop
+                  width: `${100 / (gridCols) - 0.8}%`,
+                  minWidth: 96,
                   backgroundColor: colors.darkCard,
                   borderRadius: borderRadius.lg,
                   paddingVertical: 12,
-                  paddingHorizontal: 4,
+                  paddingHorizontal: 6,
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1,
                   borderColor: colors.border,
                 }}
               >
-                <Text style={{ fontSize: 26, marginBottom: 4 }}>{s.icon}</Text>
-                <Text style={{ color: colors.white, fontWeight: '900', fontSize: 13, marginBottom: 2, textAlign: 'center' }}>
+                <Text style={{ fontSize: 24, marginBottom: 4 }}>{s.icon}</Text>
+                <Text
+                  numberOfLines={2}
+                  style={{ color: colors.white, fontWeight: '800', fontSize: 12, lineHeight: 17, marginBottom: 2, textAlign: 'center' }}
+                >
                   {s.name}
                 </Text>
-                <Text style={{ color: colors.primary, fontSize: 10.5, fontWeight: '800', textAlign: 'center' }}>
+                <Text numberOfLines={1} style={{ color: colors.primary, fontSize: 10, fontWeight: '800', textAlign: 'center' }}>
                   {s.tag}
                 </Text>
               </TouchableOpacity>
@@ -288,13 +294,13 @@ export default function ClientDashboard({ navigation }: any) {
           }}
         >
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
               <Headphones color={colors.primary} size={24} />
-              <View>
-                <Text style={{ color: colors.white, fontSize: 15, fontWeight: '900', textAlign: 'right' }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ color: colors.white, fontSize: 14, fontWeight: '900', textAlign: 'right' }}>
                   خدمة العملاء والدعم الفني 🎧
                 </Text>
-                <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right', marginTop: 2 }}>
+                <Text numberOfLines={2} style={{ color: colors.gray, fontSize: 10.5, lineHeight: 15, textAlign: 'right', marginTop: 2 }}>
                   واجهت مشكلة؟ فريق الدعم وخدمة العملاء جاهز للرد عليك وحلها فوراً
                 </Text>
               </View>

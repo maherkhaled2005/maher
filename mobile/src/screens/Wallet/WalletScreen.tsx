@@ -1,18 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  Modal,
-  Alert,
-  Platform,
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, TextInput, Modal, Alert, Platform, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 import {
   Wallet,
   CheckCircle2,

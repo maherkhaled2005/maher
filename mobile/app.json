@@ -61,7 +61,8 @@
         }
       ],
       "expo-sharing",
-      "./plugins/withDarkSplash"
+      "./plugins/withDarkSplash",
+      "expo-video"
     ]
   }
 }

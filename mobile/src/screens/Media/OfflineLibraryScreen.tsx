@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  RefreshControl,
-  Alert,
-  ActivityIndicator,
-  Modal,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Modal } from 'react-native';
 import { Download, Trash2, Play, Clock, HardDrive, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import { colors, spacing, borderRadius, typography } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';

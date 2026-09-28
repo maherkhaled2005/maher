@@ -209,7 +209,7 @@ export function normalizeRole(role: string): ValidRole {
 }
 
 /** الحصول على الاسم العربي للرتبة */
-export function getRoleLabel(role: string, developerRank?: string, phone?: string): string {
+export function getRoleLabel(role: string, _developerRank?: string): string {
   const norm = normalizeRole(role);
   if (norm === "programmer") {
     return "رئيس التقني 💻";

@@ -1,16 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  SafeAreaView,
-  TextInput,
-  Platform,
-  Alert,
-  Share,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Platform, Alert, Share } from 'react-native';
 import {
   ChevronRight,
   Star,

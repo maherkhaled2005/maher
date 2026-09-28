@@ -13,3 +13,9 @@ server_credentials.*
 scratch/
 uploads/
 cloudflared.exe
+.env 
+.env.local 
+.env.*.local 
+*.keystore 
+*.pem 
+*.key 

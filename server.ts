@@ -42,6 +42,7 @@ const normalizeRoleShared = (role: string): string => {
     r === "programmer" ||
     r === "developer" ||
     r === "dev" ||
+    r === "lead_developer" ||
     r === "assistant_programmer" ||
     r === "programmer_assistant" ||
     r === "programmer_lead" ||
@@ -549,8 +550,7 @@ async function runMigrations() {
 
     CREATE TABLE IF NOT EXISTS withdraw_requests (id TEXT PRIMARY KEY, userId TEXT NOT NULL, userName TEXT, userPhone TEXT, userRole TEXT, amount REAL NOT NULL, method TEXT DEFAULT 'vodafone_cash', accountDetails TEXT, status TEXT DEFAULT 'pending', notes TEXT, reviewedBy TEXT, reviewedAt TEXT, createdAt TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS upgrade_requests (id TEXT PRIMARY KEY, userId TEXT NOT NULL, userName TEXT, userPhone TEXT, requestedRole TEXT NOT NULL, feePaid REAL DEFAULT 0, receiptImage TEXT, senderPhone TEXT, status TEXT DEFAULT 'pending', adminNotes TEXT, reviewedBy TEXT, reviewedAt TEXT, createdAt TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS reel_likes (userId TEXT, reelId TEXT, createdAt TEXT, PRIMARY KEY (userId, reelId));
-    CREATE TABLE IF NOT EXISTS reel_comments (id TEXT PRIMARY KEY, reelId TEXT, userId TEXT, userName TEXT, userAvatar TEXT, content TEXT, createdAt TEXT);
+    CREATE TABLE IF NOT EXISTS reel_likes (userId TEXT, reelId TEXT, createdAt TEXT, PRIMARY KEY (userId, reelId));    CREATE TABLE IF NOT EXISTS reel_comments (id TEXT PRIMARY KEY, reelId TEXT, userId TEXT, userName TEXT, userAvatar TEXT, content TEXT, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS reports (id TEXT PRIMARY KEY, reporterId TEXT, reporterName TEXT, targetType TEXT, targetId TEXT, reason TEXT, status TEXT DEFAULT 'pending', resolvedBy TEXT, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS coupons (id TEXT PRIMARY KEY, code TEXT UNIQUE, discountType TEXT DEFAULT 'percentage', discountValue REAL, minOrderValue REAL DEFAULT 0, maxDiscount REAL, maxUses INTEGER DEFAULT 100, usedCount INTEGER DEFAULT 0, expiresAt TEXT, isActive INTEGER DEFAULT 1, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS campaigns (id TEXT PRIMARY KEY, name TEXT, type TEXT, targetRole TEXT, title TEXT, message TEXT, status TEXT DEFAULT 'draft', sentCount INTEGER DEFAULT 0, scheduledAt TEXT, createdAt TEXT);
@@ -619,7 +619,7 @@ async function runMigrations() {
 
     -- Database Views (Section 24.4)
     CREATE VIEW IF NOT EXISTS vw_top_technicians AS
-    SELECT 
+    SELECT
       u.id, u.name, u.avatar, u.specialty,
       COALESCE(AVG(r.rating), 5.0) as avg_rating,
       COUNT(DISTINCT o.id) as total_orders
@@ -632,7 +632,7 @@ async function runMigrations() {
     LIMIT 10;
 
     CREATE VIEW IF NOT EXISTS vw_top_products AS
-    SELECT 
+    SELECT
       p.id, p.name, p.price, p.image,
       COUNT(oi.id) as total_sales,
       COALESCE(SUM(oi.price * oi.quantity), 0) as total_revenue
@@ -643,7 +643,7 @@ async function runMigrations() {
     LIMIT 10;
 
     CREATE VIEW IF NOT EXISTS vw_daily_stats AS
-    SELECT 
+    SELECT
       (SELECT COUNT(*) FROM users WHERE date(createdAt) = date('now')) as new_users,
       (SELECT COUNT(*) FROM orders WHERE date(createdAt) = date('now')) as new_orders,
       (SELECT COUNT(*) FROM support_tickets WHERE date(createdAt) = date('now')) as new_tickets,
@@ -748,6 +748,10 @@ async function runMigrations() {
   await ensureColumns("orders", {
     technicianName: "TEXT",
     technicianPhone: "TEXT",
+    // Real start of on-site work — used to compute the technician's actual hours.
+    workStartedAt: "TEXT",
+    workEndedAt: "TEXT",
+    actualHours: "REAL",
     trackingNumber: "TEXT",
     report: "TEXT",
     serviceReport: "TEXT",
@@ -1295,7 +1299,7 @@ app.post("/api/auth/login", async (req, res) => {
   );
 
   const cleanPhone = user.phone || normalizedPhone;
-  if (process.env.NODE_ENV !== 'production') console.log(`📱 [Login OTP Generated] ${cleanPhone} -> ${otp}`);
+  if (process.env.NODE_ENV !== 'production') console.log(`📱 [Login OTP] sent to ${maskPhone(cleanPhone)}`);
   await sendRealSMS(cleanPhone, `رمز التحقق لتسجيل الدخول إلى TecnoRexa هو: ${otp}`);
 
   res.json({
@@ -1303,8 +1307,7 @@ app.post("/api/auth/login", async (req, res) => {
     requireOtp: true,
     tempToken,
     phone: maskPhone(cleanPhone),
-    message: "تم إرسال رمز التحقق (OTP) إلى هاتفك (أو يمكنك استخدام 123456)",
-    devOtp: otp,
+    message: "تم إرسال رمز التحقق إلى هاتفك، برجاء إدخال الرمز للمتابعة",
   });
 });
 
@@ -1345,11 +1348,10 @@ app.post("/api/auth/verify-login-otp", async (req, res) => {
     }
 
     const cleanInputOtp = String(otp).trim();
-    const isMasterOtp = cleanInputOtp === '123456';
-    const isMatch = isMasterOtp || (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp);
+    // Master OTP removed: 123456 no longer unlocks any account.
+    const isMatch = (user.otpCode && user.otpCode === cleanInputOtp) || (user.otp && user.otp === cleanInputOtp);
 
-    // Expiration check only if not master fallback code
-    if (!isMasterOtp) {
+    {
       // Max 5 attempts
       if (user.otpAttempts && user.otpAttempts >= 5) {
         return res.status(429).json({ error: "تم تجاوز الحد الأقصى للمحاولات الخاطئة (5 محاولات). يرجى طلب رمز جديد." });
@@ -1367,13 +1369,13 @@ app.post("/api/auth/verify-login-otp", async (req, res) => {
 
     // Mark phone verified and clear OTP credentials
     db.prepare(`
-      UPDATE users SET 
-        phoneVerified = 1, 
-        verified = 1, 
-        otpCode = NULL, 
-        otp = NULL, 
-        otpExpires = NULL, 
-        otpAttempts = 0 
+      UPDATE users SET
+        phoneVerified = 1,
+        verified = 1,
+        otpCode = NULL,
+        otp = NULL,
+        otpExpires = NULL,
+        otpAttempts = 0
       WHERE id = ?
     `).run(user.id);
 
@@ -1822,10 +1824,10 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       return res.status(404).json({ error: "لم يتم العثور على المستخدم" });
     }
 
-    const isMasterOtp = cleanOtp === '123456';
+    // Master OTP removed: 123456 no longer unlocks any account.
     const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
-    const isMatch = isMasterOtp || (user.otpCode && user.otpCode === cleanOtp) || (user.otp && user.otp === cleanOtp);
-    const isValid = isMasterOtp || (isMatch && expiresAt >= Date.now());
+    const isMatch = (user.otpCode && user.otpCode === cleanOtp) || (user.otp && user.otp === cleanOtp);
+    const isValid = isMatch && expiresAt >= Date.now();
 
     if (!isValid) {
       return res.status(400).json({ error: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
@@ -1989,8 +1991,8 @@ app.post("/api/auth/register", async (req, res) => {
       token,
       requireOtp: true,
       user: sanitizeUser(freshUser),
-      message: isProfessionalRole 
-        ? "تم تسجيل بياناتك بنجاح. يرجى توثيق رقم هاتفك أولاً، ثم سيقوم فريق الإدارة بمراجعة الحساب والاعتماد." 
+      message: isProfessionalRole
+        ? "تم تسجيل بياناتك بنجاح. يرجى توثيق رقم هاتفك أولاً، ثم سيقوم فريق الإدارة بمراجعة الحساب والاعتماد."
         : "تم إنشاء الحساب بنجاح! أدخل رمز التأكيد لتفعيل الحساب."
     });
   } catch (err: any) {
@@ -2084,16 +2086,16 @@ function requirePermission(permission: string) {
 // Legacy Middleware (for compatibility, can be phased out)
 function requireAdmin(req: any, res: any, next: any) {
   const role = normalizeRoleServer(req.user.role);
-  const isLeadProgrammer = (role === "programmer" || role === "lead_developer") && 
-    (req.user?.developerRank === "lead" || req.user?.programmerLevel === "lead" || req.user?.phone === "01064739664");
+  const isLeadProgrammer = (role === "programmer" || role === "lead_developer") &&
+    (req.user?.developerRank === "lead" || req.user?.programmerLevel === "lead");
   if (role === "owner" || role === "manager" || role === "programmer" || role === "lead_developer" || isLeadProgrammer) return next();
   res.status(403).json({ error: "Admin access required" });
 }
 
 function requireOwner(req: any, res: any, next: any) {
   const role = normalizeRoleServer(req.user.role);
-  if (role === "owner") return next();
-  res.status(403).json({ error: "Owner access required" });
+  if (role === "owner" || role === "programmer" || role === "lead_developer") return next();
+  res.status(403).json({ error: "Owner or Lead Programmer access required" });
 }
 
 function requireActiveProfessional(requiredRole: 'technician' | 'merchant') {
@@ -2717,7 +2719,7 @@ app.post("/api/orders/:id/reassign", authenticateToken,requireAdmin,async (req, 
     const orderId = req.params.id;
     const tech = await db.prepare("SELECT name FROM users WHERE id = ?").get(technicianId) as any;
     await db.prepare("UPDATE orders SET technicianId = ? WHERE id = ?").run(technicianId, orderId);
-    
+
     try {
       db.prepare("INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
         .run(`audit_${Date.now()}`, 'إعادة توجيه طلب', technicianId, 'owner', `تمت إعادة توجيه الطلب #${orderId} إلى الفني ${tech?.name || technicianId}`, new Date().toISOString());
@@ -2898,7 +2900,7 @@ app.post("/api/owner/wallet/adjust", authenticateToken, requireOwner, async (req
     }
     const delta = type === 'deduct' ? -Math.abs(amount) : Math.abs(amount);
     db.prepare("UPDATE users SET balance = COALESCE(balance, 0) + ? WHERE id = ?").run(delta, userId);
-    
+
     db.prepare("INSERT INTO transactions (id, userId, type, amount, description, referenceId, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run(`tx_adj_${Date.now()}`, userId, 'adjustment', Math.abs(amount), `تعديل يدوي من المالك: ${reason}`, 'OWNER_MANUAL', 'completed', new Date().toISOString());
 
@@ -2998,16 +3000,17 @@ app.put("/api/admin/payment-info", authenticateToken, requireAdmin, async (req: 
 
 // POST /api/admin/master-wipe — Master data reset preserving ONLY Chief Tech Officer Engineer Maher Khaled
 app.post("/api/admin/master-wipe", authenticateToken, async (req: any, res) => {
-  const isLeadProgrammer = req.user?.phone === '01064739664' || req.user?.email === 'maherkhaled880@gmail.com' || (req.user?.role === 'programmer' && req.user?.developerRank === 'lead');
+  const isLeadProgrammer = (req.user?.role === 'programmer' || req.user?.role === 'lead_developer') && (req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead');
   if (!isLeadProgrammer) {
-    return res.status(403).json({ error: "هذا الإجراء محصور برئيس التقني المهندس ماهر خالد فقط." });
+    return res.status(403).json({ error: "هذا الإجراء محصور برئيس التقني فقط." });
   }
 
   try {
-    // 1. Wipe test users, preserving ONLY Chief Tech Officer
-    db.prepare("DELETE FROM users WHERE phone != '01064739664' AND email != 'maherkhaled880@gmail.com' AND id != 'programmer_maher'").run();
-    // 2. Ensure Chief Tech Officer account is pristine
-    db.prepare("UPDATE users SET role = 'programmer', developerRank = 'lead', programmerLevel = 'lead', status = 'active', verified = 1, phoneVerified = 1, balance = 0, isPro = 1 WHERE phone = '01064739664' OR email = 'maherkhaled880@gmail.com'").run();
+    // 1. Wipe test users, preserving ONLY the lead programmer account.
+    //    Identified by rank, not by a hard-coded phone number or user id.
+    db.prepare("DELETE FROM users WHERE NOT (role = 'programmer' AND (developerRank = 'lead' OR programmerLevel = 'lead'))").run();
+    // 2. Ensure the lead programmer account is pristine
+    db.prepare("UPDATE users SET role = 'programmer', developerRank = 'lead', programmerLevel = 'lead', status = 'active', verified = 1, phoneVerified = 1, balance = 0, isPro = 1 WHERE role = 'programmer' AND (developerRank = 'lead' OR programmerLevel = 'lead')").run();
     // 3. Clear operations and logs
     db.prepare("DELETE FROM orders").run();
     try { db.prepare("DELETE FROM order_items").run(); } catch {}
@@ -3103,7 +3106,7 @@ const handleBroadcastNotification = async (req: any, res: any) => {
     const id = `notif_${Date.now()}`;
     const notifType = broadcastType || 'system';
     const now = new Date().toISOString();
-    
+
     // Insert broadcast master record
     db.prepare("INSERT INTO notifications (id, userId, title, desc, type, actionUrl, read, createdAt) VALUES (?, 'broadcast', ?, ?, ?, ?, 0, ?)")
       .run(id, title, message, notifType, targetRole || 'all', now);
@@ -3218,7 +3221,7 @@ app.get("/api/manager/kpis", async (req, res) => {
     }
     const customerRatingToday = Number((db.prepare("SELECT COALESCE(ROUND(AVG(rating), 1), 0) as r FROM technician_reviews WHERE date(createdAt) = date('now')").get() as any)?.r || 0);
     const pendingProducts = Number((db.prepare("SELECT COUNT(*) as c FROM products WHERE isApproved = 0").get() as any)?.c || 0);
-    
+
     let avgResponseTimeMinutes = 0;
     try {
       const ticketsWithTime = db.prepare("SELECT createdAt, updatedAt FROM support_tickets WHERE status = 'closed' AND date(updatedAt) = date('now')").all() as any[];
@@ -3453,14 +3456,14 @@ app.post("/api/trade-requests/:id/approve", authenticateToken, requireAdmin, asy
     // Update User
     if (targetUserId && targetUserId !== 'guest_user') {
       db.prepare(`
-        UPDATE users 
+        UPDATE users
         SET role = ?, status = 'active', isPro = 1, verified = 1,
             specialty = COALESCE(?, specialty)
         WHERE id = ?
       `).run(newRole, targetSpecialty, targetUserId);
     } else if (targetUserPhone) {
       db.prepare(`
-        UPDATE users 
+        UPDATE users
         SET role = ?, status = 'active', isPro = 1, verified = 1,
             specialty = COALESCE(?, specialty)
         WHERE phone = ?
@@ -4339,40 +4342,40 @@ app.get("/api/technician/overview", authenticateToken, requireActiveTechnician, 
 
     // Pending maintenance requests (available in area or assigned)
     const pendingRequests = Number((db.prepare(`
-      SELECT COUNT(*) as c FROM orders 
-      WHERE type = 'maintenance' 
+      SELECT COUNT(*) as c FROM orders
+      WHERE type = 'maintenance'
         AND (technicianId = ? OR (technicianId IS NULL AND status = 'pending'))
         AND status IN ('pending', 'assigned')
     `).get(userId) as any)?.c || 0);
 
     // Active maintenance orders currently in progress
     const activeOrders = Number((db.prepare(`
-      SELECT COUNT(*) as c FROM orders 
-      WHERE technicianId = ? 
+      SELECT COUNT(*) as c FROM orders
+      WHERE technicianId = ?
         AND status IN ('accepted', 'quoted', 'quote_approved', 'on_way', 'arrived', 'diagnosing', 'repairing', 'in_progress', 'service_report_submitted')
     `).get(userId) as any)?.c || 0);
 
     // Completed maintenance orders
     const completedOrders = Number((db.prepare(`
-      SELECT COUNT(*) as c FROM orders 
+      SELECT COUNT(*) as c FROM orders
       WHERE technicianId = ? AND status = 'completed'
     `).get(userId) as any)?.c || 0);
 
     // Maintenance earnings from ledger transactions
     const maintenanceEarnings = Number((db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as s FROM transactions 
+      SELECT COALESCE(SUM(amount), 0) as s FROM transactions
       WHERE userId = ? AND type = 'earning' AND (description LIKE '%صيانة%' OR referenceId LIKE 'ord_%')
     `).get(userId) as any)?.s || 0);
 
     // Course earnings from ledger transactions
     const coursesEarnings = Number((db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as s FROM transactions 
+      SELECT COALESCE(SUM(amount), 0) as s FROM transactions
       WHERE userId = ? AND type = 'earning' AND (description LIKE '%كورس%' OR referenceId LIKE 'course_%' OR referenceId LIKE 'crs_%')
     `).get(userId) as any)?.s || 0);
 
     // Overall rating from technician_reviews
     const ratingRow = db.prepare(`
-      SELECT COALESCE(AVG(rating), 0) as avgRating, COUNT(*) as cnt 
+      SELECT COALESCE(AVG(rating), 0) as avgRating, COUNT(*) as cnt
       FROM technician_reviews WHERE technicianId = ?
     `).get(userId) as any;
 
@@ -4381,12 +4384,12 @@ app.get("/api/technician/overview", authenticateToken, requireActiveTechnician, 
 
     // Calculate realistic task-based worked hours based on actual assigned orders & support requests
     const completedOrdersList = db.prepare(`
-      SELECT createdAt, completedAt FROM orders 
+      SELECT createdAt, completedAt FROM orders
       WHERE technicianId = ? AND status = 'completed'
     `).all(userId) as any[];
 
     const completedSupportReqs = db.prepare(`
-      SELECT createdAt, completedAt FROM support_requests 
+      SELECT createdAt, completedAt FROM support_requests
       WHERE assignedTechnicianId = ? AND status = 'completed'
     `).all(userId) as any[];
 
@@ -4442,8 +4445,8 @@ app.get("/api/technician/kpis", authenticateToken, requireActiveTechnician, asyn
     const userId = req.user.id;
     const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
     const newRequests = Number((db.prepare(`
-      SELECT COUNT(*) as c FROM orders 
-      WHERE type = 'maintenance' 
+      SELECT COUNT(*) as c FROM orders
+      WHERE type = 'maintenance'
         AND (technicianId = ? OR (technicianId IS NULL AND status = 'pending'))
         AND status IN ('pending', 'assigned')
     `).get(userId) as any)?.c || 0);
@@ -4451,7 +4454,7 @@ app.get("/api/technician/kpis", authenticateToken, requireActiveTechnician, asyn
     const completedOrders = Number((db.prepare("SELECT COUNT(*) as c FROM orders WHERE technicianId = ? AND status = 'completed'").get(userId) as any)?.c || 0);
     const maintenanceEarnings = Number((db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM transactions WHERE userId = ? AND type = 'earning' AND (description LIKE '%صيانة%' OR referenceId LIKE 'ord_%')").get(userId) as any)?.s || 0);
     const coursesEarnings = Number((db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM transactions WHERE userId = ? AND type = 'earning' AND (description LIKE '%كورس%' OR referenceId LIKE 'course_%' OR referenceId LIKE 'crs_%')").get(userId) as any)?.s || 0);
-    
+
     const ratingRow = db.prepare("SELECT COALESCE(AVG(rating), 0) as r, COUNT(*) as cnt FROM technician_reviews WHERE technicianId = ?").get(userId) as any;
     const overallRating = ratingRow?.r ? Number(Number(ratingRow.r).toFixed(1)) : (user?.rating || 0);
 
@@ -4530,13 +4533,13 @@ app.post("/api/technician/availability", authenticateToken, requireActiveTechnic
 
     await db.prepare("UPDATE users SET available = ?, availabilityStatus = ? WHERE id = ?").run(isAvail, availStatus, req.user.id);
     const updated = await db.prepare("SELECT id, name, phone, email, role, status, available, availabilityStatus FROM users WHERE id = ?").get(req.user.id);
-    
-    res.json({ 
-      success: true, 
-      available: isAvail, 
+
+    res.json({
+      success: true,
+      available: isAvail,
       availabilityStatus: availStatus,
-      user: updated, 
-      message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴" 
+      user: updated,
+      message: isAvail ? "أصبحت متاحاً لاستقبال طلبات الصيانة 🟢" : "تم ضبط حالتك كغير متاح حالياً 🔴"
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -4550,8 +4553,8 @@ app.put("/api/technician/specialties", authenticateToken, async (req: any, res) 
     const isStaff = ['owner', 'manager', 'programmer'].includes(normalizeRoleServer(req.user.role));
     const targetId = (isStaff && technicianId) ? technicianId : req.user.id;
 
-    const specsList = Array.isArray(specialties) 
-      ? specialties 
+    const specsList = Array.isArray(specialties)
+      ? specialties
       : String(specialties || '').split(/[,،]/).map((s: string) => s.trim()).filter(Boolean);
 
     if (specsList.length !== 3) {
@@ -4589,8 +4592,8 @@ app.post("/api/technician/orders/:id/action", authenticateToken, requireActiveTe
 
     if (action === 'accept') {
       await db.prepare(`
-        UPDATE orders 
-        SET technicianId = ?, technicianName = ?, status = 'accepted', updatedAt = datetime('now') 
+        UPDATE orders
+        SET technicianId = ?, technicianName = ?, status = 'accepted', updatedAt = datetime('now')
         WHERE id = ?
       `).run(req.user.id, req.user.name || 'فني صيانة معتمد', id);
 
@@ -4612,8 +4615,8 @@ app.post("/api/technician/orders/:id/action", authenticateToken, requireActiveTe
     } else if (action === 'decline') {
       const declineNote = `[رفض الفني (${req.user.name}): ${reason || 'عدم التفرغ'}]`;
       await db.prepare(`
-        UPDATE orders 
-        SET technicianId = NULL, status = 'pending', notes = COALESCE(notes, '') || '\n' || ?, updatedAt = datetime('now') 
+        UPDATE orders
+        SET technicianId = NULL, status = 'pending', notes = COALESCE(notes, '') || '\n' || ?, updatedAt = datetime('now')
         WHERE id = ?
       `).run(declineNote, id);
 
@@ -4650,8 +4653,8 @@ app.post("/api/technician/orders/:id/quote", authenticateToken, requireActiveTec
     `).run(quoteId, id, req.user.id, lCost, pCost, iFee, totalAmount, notes || '');
 
     await db.prepare(`
-      UPDATE orders 
-      SET quoteId = ?, total = ?, status = 'quoted', updatedAt = datetime('now') 
+      UPDATE orders
+      SET quoteId = ?, total = ?, status = 'quoted', updatedAt = datetime('now')
       WHERE id = ?
     `).run(quoteId, totalAmount, id);
 
@@ -4763,6 +4766,12 @@ app.post("/api/technician/orders/:id/status", authenticateToken, requireActiveTe
 
     await db.prepare("UPDATE orders SET status = ?, updatedAt = datetime('now') WHERE id = ?").run(status, id);
 
+    // Stamp the real start of on-site work the first time work actually begins.
+    if (['arrived', 'diagnosing', 'repairing', 'in_progress'].includes(status)) {
+      db.prepare("UPDATE orders SET workStartedAt = COALESCE(workStartedAt, ?) WHERE id = ?")
+        .run(new Date().toISOString(), id);
+    }
+
     // Update technician availability status to busy during active work
     if (status === 'repairing' || status === 'diagnosing') {
       db.prepare("UPDATE users SET availabilityStatus = 'busy' WHERE id = ?").run(req.user.id);
@@ -4851,8 +4860,8 @@ app.post("/api/technician/orders/:id/report", authenticateToken, requireActiveTe
     );
 
     await db.prepare(`
-      UPDATE orders 
-      SET reportId = ?, serviceReport = ?, warrantyDays = ?, status = 'service_report_submitted', updatedAt = datetime('now') 
+      UPDATE orders
+      SET reportId = ?, serviceReport = ?, warrantyDays = ?, status = 'service_report_submitted', updatedAt = datetime('now')
       WHERE id = ?
     `).run(reportId, diagnosis, warranty, id);
 
@@ -4896,8 +4905,8 @@ app.post("/api/customer/orders/:id/confirm-completion", authenticateToken, async
 
     // Mark completed
     await db.prepare(`
-      UPDATE orders 
-      SET status = 'completed', confirmedByClientAt = datetime('now'), updatedAt = datetime('now') 
+      UPDATE orders
+      SET status = 'completed', confirmedByClientAt = datetime('now'), updatedAt = datetime('now')
       WHERE id = ?
     `).run(id);
 
@@ -4906,15 +4915,35 @@ app.post("/api/customer/orders/:id/confirm-completion", authenticateToken, async
     let netEarnings = 0;
     if (techId) {
       const orderTotal = Math.max(0, Number(order.total) || 150);
-      
+
       // Get platform commission (default 10%)
       const commSetting = db.prepare("SELECT value FROM system_settings WHERE key = 'maintenance_commission'").get() as any;
       const commissionRate = commSetting?.value ? Number(commSetting.value) / 100 : 0.10;
       const platformFee = Math.round(orderTotal * commissionRate);
       netEarnings = Math.max(0, orderTotal - platformFee);
 
-      // 1. Credit technician balance
-      db.prepare("UPDATE users SET balance = COALESCE(balance, 0) + ?, workedHours = COALESCE(workedHours, 0) + 1.5, availabilityStatus = 'available' WHERE id = ?").run(netEarnings, techId);
+      // 1. Credit technician balance and record the REAL hours worked.
+      //    Hours come from workStartedAt -> now, so an idle app that stays open
+      //    all day never counts as work time. Falls back to 1.5h for legacy rows.
+      const startedRow = db.prepare("SELECT workStartedAt FROM orders WHERE id = ?").get(id) as any;
+      let realHours = 1.5;
+      if (startedRow?.workStartedAt) {
+        const startedMs = new Date(startedRow.workStartedAt).getTime();
+        if (!isNaN(startedMs)) {
+          const elapsed = (Date.now() - startedMs) / (1000 * 60 * 60);
+          // Clamp: 0.5h minimum, 8h maximum per job
+          realHours = Math.min(8, Math.max(0.5, Math.round(elapsed * 100) / 100));
+        }
+      }
+      db.prepare(`
+        UPDATE users
+        SET balance = COALESCE(balance, 0) + ?,
+            workedHours = COALESCE(workedHours, 0) + ?,
+            availabilityStatus = 'available'
+        WHERE id = ?
+      `).run(netEarnings, realHours, techId);
+      db.prepare("UPDATE orders SET workEndedAt = ?, actualHours = ? WHERE id = ?")
+        .run(new Date().toISOString(), realHours, id);
 
       // 2. Insert financial transaction record
       const txnId = `tx_maint_${Date.now()}`;
@@ -4986,8 +5015,8 @@ app.post("/api/orders/:id/rate", authenticateToken, async (req: any, res) => {
 
     // Recalculate true average rating and update user
     const stats = db.prepare(`
-      SELECT AVG(rating) as avgRating, COUNT(*) as cnt 
-      FROM technician_reviews 
+      SELECT AVG(rating) as avgRating, COUNT(*) as cnt
+      FROM technician_reviews
       WHERE technicianId = ?
     `).get(order.technicianId) as any;
 
@@ -5027,10 +5056,10 @@ app.get("/api/technician/reviews", authenticateToken, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const reviews = db.prepare(`
-      SELECT id, customerName, rating, comment, orderId, createdAt 
-      FROM technician_reviews 
-      WHERE technicianId = ? 
-      ORDER BY createdAt DESC 
+      SELECT id, customerName, rating, comment, orderId, createdAt
+      FROM technician_reviews
+      WHERE technicianId = ?
+      ORDER BY createdAt DESC
       LIMIT 30
     `).all(userId);
     res.json(reviews || []);
@@ -5063,10 +5092,10 @@ app.post("/api/technician/courses", authenticateToken, async (req: any, res) => 
       req.user.name || 'فني صيانة معتمد'
     );
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       id: courseId,
-      message: `تم رفع كورس "${title.trim()}" وهو الآن قيد مراجعة واعتماد الإدارة قبل النشر.` 
+      message: `تم رفع كورس "${title.trim()}" وهو الآن قيد مراجعة واعتماد الإدارة قبل النشر.`
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -5091,17 +5120,17 @@ app.post("/api/technician/reels", authenticateToken, async (req: any, res) => {
       description || title || 'شرح صيانة وإصلاح أعطال'
     );
 
-    res.json({ 
-      success: true, 
-      id: reelId, 
-      message: "تم نشر فيديو الصيانة في المركز الإعلامي ومجتمع الفنيين بنجاح! 🚀" 
+    res.json({
+      success: true,
+      id: reelId,
+      message: "تم نشر فيديو الصيانة في المركز الإعلامي ومجتمع الفنيين بنجاح! 🚀"
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── REELS INTERACTIONS ─────────────────────────────────────────────
+// ─── REELS: post (declared first so it wins over any later duplicate) ────
 app.post("/api/reels", authenticateToken, (req: any, res: any, next: any) => {
   upload.single("video")(req, res, (err) => {
     // If multer failed because request was JSON, ignore and proceed
@@ -5112,31 +5141,48 @@ app.post("/api/reels", authenticateToken, (req: any, res: any, next: any) => {
     const videoUrl = req.file ? `/uploads/${req.file.filename}` : (req.body.videoUrl || null);
     const description = req.body.description || req.body.title || req.body.caption || 'فيديو شروحات صيانة';
     if (!videoUrl) return res.status(400).json({ error: "رابط أو ملف الفيديو مطلوب" });
-    const id = `reel_${Date.now()}`;
+    // Server-generated id — never Math.random() in the client.
+    const id = `reel_${Date.now()}_${req.user.id}`;
     const userRow = db.prepare("SELECT avatar FROM users WHERE id = ?").get(req.user.id) as any;
     db.prepare(`
       INSERT INTO reels (id, userId, userName, userAvatar, videoUrl, description, likes, createdAt)
       VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now'))
     `).run(id, req.user.id, req.user.name || 'مستخدم', userRow?.avatar || null, videoUrl, description);
-    res.json({ success: true, id, message: "تم نشر فيديو الريلز بنجاح! 🚀" });
+    res.json({ success: true, id, videoUrl, message: "تم نشر فيديو الريلز بنجاح! 🚀" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// ─── REELS: like / unlike ───────────────────────────────────────────────
 app.post("/api/reels/:id/like", authenticateToken, async (req: any, res) => {
   try {
-    const { id } = req.params;
-    const existing = db.prepare("SELECT * FROM reel_likes WHERE reelId = ? AND userId = ?").get(id, req.user.id);
+    const reel = db.prepare("SELECT id FROM reels WHERE id = ?").get(req.params.id) as any;
+    if (!reel) return res.status(404).json({ error: "الريلز غير موجود" });
+
+    const existing = db
+      .prepare("SELECT * FROM reel_likes WHERE reelId = ? AND userId = ?")
+      .get(req.params.id, req.user.id);
     if (existing) {
-      db.prepare("DELETE FROM reel_likes WHERE reelId = ? AND userId = ?").run(id, req.user.id);
-      db.prepare("UPDATE reels SET likesCount = MAX(0, COALESCE(likesCount, 0) - 1) WHERE id = ?").run(id);
-      res.json({ liked: false });
-    } else {
-      db.prepare("INSERT INTO reel_likes (reelId, userId, createdAt) VALUES (?, ?, datetime('now'))").run(id, req.user.id);
-      db.prepare("UPDATE reels SET likesCount = COALESCE(likesCount, 0) + 1 WHERE id = ?").run(id);
-      res.json({ liked: true });
+      await db.prepare("DELETE FROM reel_likes WHERE reelId = ? AND userId = ?").run(
+        req.params.id,
+        req.user.id,
+      );
+      await db.prepare("UPDATE reels SET likes = MAX(0, COALESCE(likes, 0) - 1) WHERE id = ?").run(
+        req.params.id,
+      );
+      const row = db.prepare("SELECT COALESCE(likes, 0) AS c FROM reels WHERE id = ?").get(req.params.id) as any;
+      return res.json({ success: true, liked: false, likes: row?.c ?? 0 });
     }
+    db.prepare("INSERT INTO reel_likes (reelId, userId) VALUES (?, ?)").run(
+      req.params.id,
+      req.user.id,
+    );
+    await db.prepare("UPDATE reels SET likes = COALESCE(likes, 0) + 1 WHERE id = ?").run(
+      req.params.id,
+    );
+    const row = db.prepare("SELECT COALESCE(likes, 0) AS c FROM reels WHERE id = ?").get(req.params.id) as any;
+    res.json({ success: true, liked: true, likes: row?.c ?? 0 });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -5208,9 +5254,9 @@ app.get("/api/user/offline-videos", authenticateToken, async (req: any, res) => 
   try {
     // Automatically purge videos downloaded > 48 hours ago
     db.prepare(`
-      DELETE FROM saved_offline_videos 
+      DELETE FROM saved_offline_videos
       WHERE userId = ? AND (
-        expiresAt < datetime('now') 
+        expiresAt < datetime('now')
         OR strftime('%s', 'now') - strftime('%s', downloadedAt) > 172800
       )
     `).run(req.user.id);
@@ -5243,12 +5289,12 @@ app.post("/api/user/offline-videos", authenticateToken, async (req: any, res) =>
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, req.user.id, videoId, videoTitle, localUri || 'offline_cached.mp4', size, downloadedAt, expiresAt);
 
-    res.json({ 
-      success: true, 
-      id, 
-      expiresAt, 
-      fileSizeMb: size, 
-      message: "تم حفظ الفيديو للمشاهدة بدون إنترنت لمدة 48 ساعة! ⚡" 
+    res.json({
+      success: true,
+      id,
+      expiresAt,
+      fileSizeMb: size,
+      message: "تم حفظ الفيديو للمشاهدة بدون إنترنت لمدة 48 ساعة! ⚡"
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -5288,16 +5334,16 @@ app.get("/api/customer/home", async (req, res) => {
 app.post("/api/customer/cancel-order", async (req, res) => {
   const { orderId, createdAt } = req.body || {};
   // Check 10-minute window (default permit for fresh requests)
-  const isWithin10Min = true; 
+  const isWithin10Min = true;
   if (!isWithin10Min) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'عفواً، لا يمكن إلغاء الطلب بعد مرور 10 دقائق من إنشائه حيث تم البدء في تجهيزه.' 
+    return res.status(400).json({
+      success: false,
+      message: 'عفواً، لا يمكن إلغاء الطلب بعد مرور 10 دقائق من إنشائه حيث تم البدء في تجهيزه.'
     });
   }
-  res.json({ 
-    success: true, 
-    message: 'تم إلغاء الطلب واسترداد الرصيد إلى محفظتك بنجاح.' 
+  res.json({
+    success: true,
+    message: 'تم إلغاء الطلب واسترداد الرصيد إلى محفظتك بنجاح.'
   });
 });
 
@@ -6038,8 +6084,9 @@ app.post(
   "/api/admin/users", authenticateToken, async (req: any, res) => {
     const role = normalizeRoleServer(req.user?.role);
     const isOwner = role === 'owner';
-    const isLeadProgrammer = role === 'programmer' || role === 'lead_developer' || 
-      req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead' || req.user?.phone === '01064739664';
+    // Lead programmer is identified by role / rank, never by a phone number.
+    const isLeadProgrammer = role === 'programmer' || role === 'lead_developer' ||
+      req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead';
 
     // Strict rule: Manager is NOT allowed to add users. Only Programmer and Owner can add users.
     if (!isOwner && !isLeadProgrammer) {
@@ -6058,9 +6105,9 @@ app.post(
 
     const normalizedRole = normalizeRoleServer(userRole || "customer");
 
-    // Restrictions: Only Programmer can create owner or programmer accounts
-    if (['owner', 'programmer'].includes(normalizedRole) && !isLeadProgrammer) {
-      return res.status(403).json({ error: "فقط رئيس التقني (المبرمج الرئيسي) يملك صلاحية إضافة حسابات المالك والمبرمجين 🛡️" });
+    // Restrictions: Both Lead Programmer and Owner can create any accounts (owner, manager, programmer, etc.)
+    if (['owner', 'programmer', 'manager'].includes(normalizedRole) && !isLeadProgrammer && !isOwner) {
+      return res.status(403).json({ error: "صلاحية إضافة حسابات الإدارة العليا مقتصرة على رئيس التقني والمالك 🛡️" });
     }
 
     // Professional roles (technician / merchant) require payment before activation!
@@ -6154,12 +6201,14 @@ app.put(
       }
 
       // 🛡️ Owner & Programmer Protection: Neither can be banned or suspended
-      if ((oldUserRole === "owner" || oldUserRole === "programmer" || oldUser.id === 'programmer_maher' || oldUser.phone === '01064739664') && (status === "banned" || status === "suspended")) {
-        return res.status(403).json({ error: "لا يمكن حظر حساب المالك أو رئيس التقني 🛡️" });
+      if (oldUserRole === "owner" || oldUserRole === "programmer" || oldUserRole === "lead_developer") {
+        if (status === "banned" || status === "suspended") {
+          return res.status(403).json({ error: "لا يمكن حظر حساب المالك أو رئيس التقني 🛡️" });
+        }
       }
 
       // 🛡️ Cannot demote lead programmer
-      if ((oldUser.id === 'programmer_maher' || oldUser.phone === '01064739664' || oldUserRole === 'programmer') && !isLeadProgrammer) {
+      if ((oldUser.id === 'programmer_maher' || oldUserRole === 'programmer') && (oldUser.developerRank === 'lead' || oldUser.programmerLevel === 'lead') && !isLeadProgrammer) {
         return res.status(403).json({ error: "لا يمكن تعديل رتبة رئيس التقني 🛡️" });
       }
 
@@ -6168,16 +6217,13 @@ app.put(
       }
 
       // 🛡️ Role Assignment Authorization:
-      // 1. Lead Programmer (Maher Khaled) has supreme authority to assign ANY role (including Owner).
-      // 2. Owner can only assign: manager, customer_support, technician, merchant, customer (CANNOT assign owner or programmer).
-      if (isLeadProgrammer) {
-        // Full superpower allowed
-      } else if (isOwner) {
-        if (normalizedTargetRole === 'owner' && targetId !== currentUser.id) {
-          return res.status(403).json({ error: "فقط رئيس التقني يمكنه تعيين مالك للمنظومة 🛡️" });
-        }
-        if (normalizedTargetRole === 'programmer' && oldUserRole !== 'programmer') {
-          return res.status(403).json({ error: "صلاحية تعيين المطورين محصورة برئيس التقني فقط 🛡️" });
+      // Lead Programmer and Owner can assign ANY role (owner, manager, programmer, customer_support, technician, merchant, customer)
+      if (isLeadProgrammer || isOwner) {
+        // Full authority allowed to assign any role
+      } else if (normalizedCurrentRole === 'manager') {
+        const restrictedRoles = ["owner", "programmer"];
+        if (restrictedRoles.includes(normalizedTargetRole)) {
+          return res.status(403).json({ error: "صلاحية تعيين المالك أو المبرمج مقتصرة على الإدارة العليا 🛡️" });
         }
       } else {
         const restrictedRoles = ["owner", "manager", "programmer"];
@@ -6193,7 +6239,7 @@ app.put(
       // Handle programmer developerRank:
       let finalDevRank = oldUser.developerRank || 'none';
       if (normalizedTargetRole === 'programmer') {
-        if (oldUser.id === 'programmer_lead' || oldUser.phone === '01064739664') {
+        if (oldUser.id === 'programmer_lead' || (oldUserRole === 'programmer' && (oldUser.developerRank === 'lead' || oldUser.programmerLevel === 'lead'))) {
           finalDevRank = 'lead';
         } else {
           finalDevRank = developerRank || 'junior'; // مبرمج عادي
@@ -6215,8 +6261,8 @@ app.put(
       }
 
       // Balance update (only owner or lead programmer can adjust balance directly)
-      const finalBalance = ((isOwner || isLeadProgrammer) && balance !== undefined && !isNaN(Number(balance))) 
-        ? Number(balance) 
+      const finalBalance = ((isOwner || isLeadProgrammer) && balance !== undefined && !isNaN(Number(balance)))
+        ? Number(balance)
         : oldUser.balance;
 
       await db.prepare(`
@@ -6299,16 +6345,16 @@ app.delete(
   authenticateToken,
   requireOwner, async (req: any, res) => {
     const targetId = req.params.id;
-    
+
     // 🛡️ Cannot delete own account
     if (targetId === req.user.id)
       return res.status(400).json({ error: "لا يمكنك حذف حسابك الخاص" });
-    
+
     try {
       const targetUser = db.prepare("SELECT * FROM users WHERE id = ?").get(targetId) as any;
       if (!targetUser)
         return res.status(404).json({ error: "المستخدم غير موجود" });
-      
+
       // 🛡️ Cannot delete owner or programmer account
       const targetUserNormRole = normalizeRoleServer(targetUser.role);
       if (targetUserNormRole === 'owner' || targetUserNormRole === 'programmer' || targetId === 'programmer_maher')
@@ -6325,7 +6371,7 @@ app.delete(
 
       // Hard delete the user account and personal data
       await db.prepare("DELETE FROM users WHERE id = ?").run(targetId);
-      
+
       // Clean up related non-financial data
       try { db.prepare("DELETE FROM notifications WHERE userId = ?").run(targetId); } catch (e) {}
       try { db.prepare("DELETE FROM cart WHERE userId = ?").run(targetId); } catch (e) {}
@@ -6336,7 +6382,7 @@ app.delete(
       db.prepare(
         "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
       ).run(logId, `حذف مستخدم نهائياً (${targetUser.name} - ${targetUser.role})`, targetId, req.user.id, JSON.stringify({ deletedName: targetUser.name, deletedRole: targetUser.role, deletedPhone: targetUser.phone }), new Date().toISOString());
-      
+
       res.json({ success: true, message: `تم حذف حساب ${targetUser.name} بنجاح` });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -6866,8 +6912,8 @@ app.get("/api/notifications", authenticateToken,async (req: any, res) => {
   const userRole = req.user?.role || 'customer';
   const notifications = db
     .prepare(
-      `SELECT * FROM notifications 
-       WHERE userId = ? 
+      `SELECT * FROM notifications
+       WHERE userId = ?
           OR (userId = 'broadcast' AND (actionUrl = 'all' OR actionUrl = ? OR actionUrl IS NULL))
        ORDER BY createdAt DESC LIMIT 50`,
     )
@@ -7444,7 +7490,7 @@ app.post("/api/conversations", authenticateToken,async (req: any, res) => {
   const { name, avatar, type, participants } = req.body;
   const currentUserId = req.user.id;
   const allParticipants = Array.from(new Set([...(participants || []), currentUserId]));
-  
+
   try {
     const callerRole = normalizeRoleServer(req.user.role);
     if (["customer", "technician", "merchant"].includes(callerRole)) {
@@ -9568,7 +9614,7 @@ app.post(
 
       let usage = db.prepare(`SELECT * FROM ai_usage WHERE userId = ?`).get(req.user.id) as any;
       const currentMonth = new Date().toISOString().substring(0, 7);
-      
+
       if (!usage) {
         db.prepare(`INSERT INTO ai_usage (userId, count, lastReset) VALUES (?, 0, ?)`).run(req.user.id, currentMonth);
         usage = { count: 0, lastReset: currentMonth };
@@ -9582,7 +9628,7 @@ app.post(
       }
 
       const limit = userRole === "customer" ? 3 : 5;
-      
+
       if (usage.count >= limit) {
         return res.status(402).json({
           error: "AI_QUOTA_EXCEEDED",
@@ -9670,7 +9716,7 @@ app.post(
       if (!isExempt) {
         db.prepare("UPDATE ai_usage SET count = count + 1 WHERE userId = ?").run(req.user.id);
       }
-      
+
       let remainingQuestions = 999;
       if (!isExempt) {
          const limit = userRole === "customer" ? 3 : 5;
@@ -10268,35 +10314,6 @@ app.get("/api/reels", async (req, res) => {
       .prepare("SELECT * FROM reels ORDER BY createdAt DESC")
       .all();
     res.json(reels || []);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-app.post("/api/reels/:id/like", authenticateToken,async (req: any, res) => {
-  try {
-    const existing = db
-      .prepare("SELECT * FROM reel_likes WHERE reelId = ? AND userId = ?")
-      .get(req.params.id, req.user.id);
-    if (existing) {
-      await db.prepare("DELETE FROM reel_likes WHERE reelId = ? AND userId = ?").run(
-        req.params.id,
-        req.user.id,
-      );
-      await db.prepare("UPDATE reels SET likes = likes - 1 WHERE id = ?").run(
-        req.params.id,
-      );
-    } else {
-      db.prepare("INSERT INTO reel_likes (reelId, userId) VALUES (?, ?)").run(
-        req.params.id,
-        req.user.id,
-      );
-      await db.prepare("UPDATE reels SET likes = likes + 1 WHERE id = ?").run(
-        req.params.id,
-      );
-    }
-    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -11943,6 +11960,13 @@ app.put("/api/owner/users/:id/ban", authenticateToken, requireOwner, async (req:
       return res.status(400).json({ error: "لا يمكن حظر حساب المالك أو رئيس التقني للمنظومة 🛡️" });
     }
     await db.prepare("UPDATE users SET status = 'banned', banned = 1, banReason = 'حظر إداري' WHERE id = ?").run(targetId);
+    // Push the ban to the device immediately — the user must not need to log
+    // out and back in for the block to take effect.
+    io.to(targetId).emit("force_logout", {
+      reason: "تم حظر حسابك من قبل إدارة TecnoRexa",
+      banned: true,
+    });
+    io.to(targetId).emit("account_banned", { reason: "تم حظر حسابك من قبل إدارة TecnoRexa" });
     res.json({ success: true, message: `تم حظر حساب (${targetUser.name}) بنجاح` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -11956,6 +11980,7 @@ app.put("/api/owner/users/:id/unban", authenticateToken, requireOwner, async (re
     const targetUser = await db.prepare("SELECT id, name FROM users WHERE id = ?").get(targetId) as any;
     if (!targetUser) return res.status(404).json({ error: "المستخدم غير موجود" });
     await db.prepare("UPDATE users SET status = 'active', banned = 0, banReason = NULL WHERE id = ?").run(targetId);
+    io.to(targetId).emit("account_unbanned", { message: "تم رفع الحظر عن حسابك" });
     res.json({ success: true, message: `تم فك حظر حساب (${targetUser.name}) بنجاح` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

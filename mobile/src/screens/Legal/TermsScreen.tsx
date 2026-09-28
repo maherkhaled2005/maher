@@ -1,14 +1,6 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  Platform,
-  StatusBar,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
 import { FileText, ArrowRight, CheckSquare, Clock, Award, ShieldAlert } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 

@@ -1,17 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  Modal,
-  Alert,
-  ScrollView,
-  Platform,
-  RefreshControl,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, TextInput, Modal, Alert, ScrollView, Platform, RefreshControl } from 'react-native';
 import {
   Code,
   Plus,

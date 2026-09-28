@@ -1,20 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Modal,
-  Alert,
-  Platform,
-  ActivityIndicator,
-  Image,
-  Share,
-  SafeAreaView,
-  StatusBar,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Modal, Alert, Platform, ActivityIndicator, Image, Share, StatusBar } from 'react-native';
 import {
   Crown,
   Menu,

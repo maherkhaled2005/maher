@@ -1,18 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  Image,
-  Alert,
-  Modal,
-  Platform,
-  ActivityIndicator,
-  RefreshControl,
- StatusBar, } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Image, Alert, Modal, Platform, ActivityIndicator, RefreshControl, StatusBar } from 'react-native';
 import {
   Crown,
   Edit3,
@@ -43,6 +31,7 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, typography, borderRadius } from '../../theme';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { useAuthStore } from '../../store/authStore';
 import { normalizeRole } from '../../utils/permissions';
 import { fetchApi } from '../../api/client';
@@ -485,21 +474,12 @@ export default function ProfileScreen({ navigation }: any) {
             >
               {(() => {
                 const raw = user?.avatar;
-                if (raw) {
-                  let imgUrl = null;
-                  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
-                    imgUrl = raw;
-                  } else if (raw.startsWith('/uploads/')) {
-                    imgUrl = `https://technorexa.com${raw}`;
-                  } else if (raw.startsWith('uploads/')) {
-                    imgUrl = `https://technorexa.com/${raw}`;
-                  }
-                  if (imgUrl) {
-                    return <Image source={{ uri: imgUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />;
-                  }
-                  if (raw.length <= 4) {
-                    return <Text style={{ fontSize: 40 }}>{raw}</Text>;
-                  }
+                const imgUrl = resolveMediaUrl(raw);
+                if (imgUrl) {
+                  return <Image source={{ uri: imgUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />;
+                }
+                if (raw && raw.length <= 4) {
+                  return <Text style={{ fontSize: 40 }}>{raw}</Text>;
                 }
                 return <Text style={{ fontSize: 40 }}>{roleInfo.emoji}</Text>;
               })()}

@@ -1,22 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  Modal,
-  Alert,
-  Dimensions,
-  ActivityIndicator,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  Platform,
-  Share,
-  RefreshControl,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, FlatList, Modal, Alert, Dimensions, ActivityIndicator, StyleSheet, StatusBar, Platform, Share, RefreshControl } from 'react-native';
 import {
   Heart,
   MessageCircle,
@@ -43,6 +27,7 @@ import {
   Upload,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { colors, borderRadius } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
 import { api, fetchApi, uploadFile } from '../../api/client';
@@ -72,6 +57,7 @@ interface Post {
 interface Reel {
   id: string;
   userName: string;
+  videoUrl?: string;
   description: string;
   likes: number;
   liked: boolean;
@@ -106,6 +92,39 @@ const INITIAL_REELS: Reel[] = [];
 const REPAIR_VIDEOS: RepairVideo[] = [];
 
 const COURSES: Course[] = [];
+
+/** Real, playable reel video (expo-video). Renders nothing on its own. */
+function ReelVideo({
+  uri,
+  paused,
+  style,
+}: {
+  uri: string;
+  paused: boolean;
+  style?: any;
+}) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.muted = true;
+  });
+  useEffect(() => {
+    try {
+      if (paused) player.pause();
+      else player.play();
+    } catch {
+      /* not ready */
+    }
+  }, [paused, player]);
+  return <VideoView style={style} contentFit="cover" nativeControls={false} player={player} />;
+}
+
+/** Turn a server-relative media path (/uploads/x.mp4) into a full URL. */
+function resolveMediaUrl(raw?: string | null): string {
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base = (api as any).defaults?.baseURL || '';
+  return `${String(base).replace(/\/api\/?$/, '')}${raw.startsWith('/') ? raw : `/${raw}`}`;
+}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -148,8 +167,7 @@ const WebCommunityScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
       {/* Tab Content */}
       {activeTab === 0 && <PostsTab />}
-      {activeTab === 1 && <ReelsTab />}
-      {activeTab === 2 && <VideosTab />}
+      {activeTab === 1 && <ReelsTab />}      {activeTab === 2 && <VideosTab />}
       {activeTab === 3 && <CoursesTab />}
     </SafeAreaView>
   );
@@ -505,9 +523,12 @@ const ReelsTab: React.FC = () => {
       if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
         const mapped: Reel[] = res.data.map((r: any) => ({
           id: r.id,
-          userName: r.userName || 'فني TecnoRexa 🎬',
+          userName: r.userName || 'مستخدم TecnoRexa',
+          // The video URL must come from the server, otherwise the reel has
+          // nothing to play and looks like a broken empty card.
+          videoUrl: resolveMediaUrl(r.videoUrl),
           description: r.caption || r.description || r.title || 'شروحات صيانة احترافية',
-          likes: r.likesCount || r.likes || 0,
+          likes: r.likes || r.likesCount || 0,
           liked: false,
           comments: r.comments || 0,
           shares: 0,
@@ -516,7 +537,7 @@ const ReelsTab: React.FC = () => {
         setReels(mapped);
       }
     } catch {}
-  }, []);
+  }, [resolveMediaUrl]);
 
   useEffect(() => {
     loadReels();
@@ -576,29 +597,33 @@ const ReelsTab: React.FC = () => {
       let finalVideoUrl = reelVideoUrl.trim();
 
       if (selectedMedia?.uri) {
-        try {
-          const fileToUpload = {
-            uri: selectedMedia.uri,
-            type: selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg'),
-            name: selectedMedia.fileName || (selectedMedia.type === 'video' ? `reel_${Date.now()}.mp4` : `photo_${Date.now()}.jpg`),
-          };
-          const uploadRes = await uploadFile('/upload', fileToUpload);
-          if (uploadRes?.url) {
-            finalVideoUrl = uploadRes.url;
-          }
-        } catch {
-          finalVideoUrl = selectedMedia.uri;
+        // Real upload — a failed upload must NOT silently fall back to a local
+        // path, otherwise the reel is published with a broken video.
+        const fileToUpload = {
+          uri: selectedMedia.uri,
+          type: selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg'),
+          name: selectedMedia.fileName || (selectedMedia.type === 'video' ? `reel_${Date.now()}.mp4` : `photo_${Date.now()}.jpg`),
+        };
+        const uploadRes = await uploadFile('/upload', fileToUpload);
+        if (!uploadRes?.url) {
+          throw new Error('تعذر رفع الفيديو إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.');
         }
+        finalVideoUrl = uploadRes.url;
+      }
+
+      if (!finalVideoUrl) {
+        throw new Error('لا يوجد فيديو للرفع. اختر فيديو أولاً.');
       }
 
       const res = await api.post('/reels', {
-        videoUrl: finalVideoUrl || '/uploads/sample_reel.mp4',
+        videoUrl: finalVideoUrl,
         description: reelCaption.trim() || 'فيديو شروحات صيانة جديد',
       });
       if (res.data?.success) {
         const newReelItem: Reel = {
-          id: res.data.id || `reel_${Date.now()}`,
-          userName: user?.name || 'فني معتمد 🎬',
+          id: res.data.id,
+          userName: user?.name || 'مستخدم TecnoRexa',
+          videoUrl: res.data.videoUrl || finalVideoUrl,
           description: reelCaption.trim() || 'فيديو ريلز جديد',
           likes: 0,
           liked: false,
@@ -612,9 +637,11 @@ const ReelsTab: React.FC = () => {
         setReelVideoUrl('');
         setReelCaption('');
         Alert.alert('🎉 مبروك!', 'تم نشر فيديو الريلز بنجاح وهو متاح للمشاهدة الآن.');
+      } else {
+        throw new Error(res.data?.error || 'تعذر نشر الفيديو');
       }
     } catch (err: any) {
-      Alert.alert('خطأ', err.response?.data?.error || 'تعذر نشر الفيديو القصيرة');
+      Alert.alert('❌ فشل النشر', err?.message || 'تعذر نشر الفيديو. حاول مرة أخرى.');
     } finally {
       setPublishingReel(false);
     }
@@ -658,48 +685,45 @@ const ReelsTab: React.FC = () => {
 
   const renderReel = ({ item }: { item: Reel }) => {
     const isPlaying = playingId === item.id;
+    const hasVideo = Boolean(item.videoUrl);
     return (
       <View style={[styles.reelContainer, { height: REEL_HEIGHT }]}>
-        {/* Background */}
-        <View style={[styles.reelBg, isPlaying && styles.reelBgActive]}>
-          <View style={styles.reelVideoSimContainer}>
-            <Text style={{ color: '#444', fontSize: 13, marginBottom: 8 }}>TecnoRexa Reels 🎬</Text>
-            {isPlaying ? (
-              <View style={styles.playingIndicatorBadge}>
-                <Volume2 size={16} color={colors.primary} />
-                <Text style={styles.playingIndicatorText}>جارٍ التشغيل الآن</Text>
-              </View>
-            ) : (
-              <Text style={{ color: colors.gray, fontSize: 12 }}>اضغط للتشغيل</Text>
-            )}
-          </View>
+        {/* Real video, or a clear "not available" state — never a fake player */}
+        <View style={[styles.reelBg, isPlaying && hasVideo && styles.reelBgActive]}>
+          {hasVideo ? (
+            <ReelVideo
+              uri={item.videoUrl as string}
+              paused={!isPlaying}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : (
+            <View style={styles.reelVideoSimContainer}>
+              <Text style={{ color: '#666', fontSize: 13, marginBottom: 8 }}>لا يوجد فيديو متاح</Text>
+              <Text style={{ color: colors.gray, fontSize: 12 }}>لم يتم رفع مقطع مع هذا المنشور</Text>
+            </View>
+          )}
         </View>
 
         {/* Center Play/Pause Icon */}
-        <TouchableOpacity
-          style={styles.reelPlayBtn}
-          activeOpacity={0.8}
-          onPress={() => setPlayingId(isPlaying ? null : item.id)}
-        >
-          {isPlaying ? (
-            <View style={styles.pauseBtnCircle}>
-              <Pause color={colors.primary} size={36} />
-            </View>
-          ) : (
-            <PlayCircle color={colors.primary} size={72} />
-          )}
-        </TouchableOpacity>
-
-        {/* Bottom Playback Progress Bar */}
-        {isPlaying && (
-          <View style={styles.reelProgressBarContainer}>
-            <View style={styles.reelProgressBarFill} />
-          </View>
+        {hasVideo && (
+          <TouchableOpacity
+            style={styles.reelPlayBtn}
+            activeOpacity={0.8}
+            onPress={() => setPlayingId(isPlaying ? null : item.id)}
+          >
+            {isPlaying ? (
+              <View style={styles.pauseBtnCircle}>
+                <Pause color={colors.primary} size={36} />
+              </View>
+            ) : (
+              <PlayCircle color={colors.primary} size={72} />
+            )}
+          </TouchableOpacity>
         )}
 
-        {/* Bottom Overlay */}
+        {/* Bottom overlay */}
         <View style={styles.reelBottomOverlay}>
-          <Text style={styles.reelUserName}>{item.userName}</Text>
+          <Text style={styles.reelUserName} numberOfLines={1}>{item.userName}</Text>
           <Text style={styles.reelDescription} numberOfLines={2}>{item.description}</Text>
         </View>
 

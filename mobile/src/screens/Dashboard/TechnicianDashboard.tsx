@@ -1,18 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Platform,
-  Alert,
-  Switch,
-  RefreshControl,
-  ActivityIndicator,
-  AppState,
-  Modal,
- StatusBar, } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Alert, Switch, RefreshControl, ActivityIndicator, AppState, Modal, StatusBar, useWindowDimensions } from 'react-native';
 import {
   Wrench,
   CheckCircle2,
@@ -69,7 +57,9 @@ const ALL_TECH_SPECIALTIES = [
 ];
 
 export default function TechnicianDashboard({ navigation }: any) {
-  const { user, updateUser } = useAuthStore();
+const { user, updateUser } = useAuthStore();
+const { width } = useWindowDimensions();
+const kpiCols = width >= 1280 ? 4 : width >= 768 ? 3 : 2;
   const [isAvailable, setIsAvailable] = useState(Boolean(user?.available));
   const [refreshing, setRefreshing] = useState(false);
   const [overview, setOverview] = useState<any>(null);
@@ -346,13 +336,14 @@ export default function TechnicianDashboard({ navigation }: any) {
         <Text style={{ color: colors.white, fontSize: 16, fontWeight: '900', textAlign: 'right', marginBottom: spacing.xs }}>
           أدائي وأرباحي هذا الشهر 💰
         </Text>
-        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: spacing.xs }}>
+        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs }}>
           {technicianKpis.map((k, idx) => (
             <View
               key={idx}
               style={{
-                width: '48%',
-                marginBottom: spacing.sm,
+                // Responsive grid: 2 cols on phone, 3 on tablet, 4+ on desktop
+                width: `${100 / kpiCols - 1}%`,
+                minWidth: 140,
                 backgroundColor: colors.darkCard,
                 borderRadius: borderRadius.lg,
                 padding: spacing.md,
@@ -366,8 +357,8 @@ export default function TechnicianDashboard({ navigation }: any) {
                   <k.icon size={18} color={k.color} />
                 </View>
               </View>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.white, marginBottom: 2, textAlign: 'right' }}>{k.value}</Text>
-              <Text style={{ fontSize: 11, color: colors.gray, fontWeight: '600', textAlign: 'right', marginBottom: 2 }}>{k.label}</Text>
+              <Text style={{ fontSize: 17, fontWeight: '900', color: colors.white, marginBottom: 2, textAlign: 'right' }} numberOfLines={1}>{k.value}</Text>
+              <Text style={{ fontSize: 11, color: colors.gray, fontWeight: '600', textAlign: 'right', marginBottom: 2 }} numberOfLines={1}>{k.label}</Text>
               <Text style={{ fontSize: 10, color: k.color, fontWeight: '700', textAlign: 'right' }} numberOfLines={2}>{k.note}</Text>
             </View>
           ))}

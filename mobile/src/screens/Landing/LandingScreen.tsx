@@ -1,17 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Dimensions,
-  StatusBar,
-  Platform,
-  Image,
-  Animated,
-  Easing,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, StatusBar, Platform, Image, Animated, Easing } from 'react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import {
   Wrench,

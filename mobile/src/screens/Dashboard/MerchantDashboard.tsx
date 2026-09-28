@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Platform,
-  Alert,
-  RefreshControl,
-  ActivityIndicator,
- StatusBar, } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Alert, RefreshControl, ActivityIndicator, StatusBar, useWindowDimensions } from 'react-native';
 import {
   Package,
   Plus,
@@ -33,6 +24,8 @@ import { api } from '../../api/client';
 import OwnerHeader from '../../components/OwnerHeader';
 
 export default function MerchantDashboard({ navigation }: any) {
+  const { width } = useWindowDimensions();
+  const kpiCols = width >= 1280 ? 4 : width >= 768 ? 3 : 2;
   const { user, updateUser } = useAuthStore();
   const [showSubscription, setShowSubscription] = useState(user?.role !== 'merchant' || user?.status !== 'active');
   const [refreshing, setRefreshing] = useState(false);
@@ -295,7 +288,8 @@ export default function MerchantDashboard({ navigation }: any) {
             <View
               key={idx}
               style={{
-                width: '48%',
+                width: `${100 / kpiCols - 1}%`,
+                minWidth: 140,
                 backgroundColor: colors.darkCard,
                 borderRadius: borderRadius.lg,
                 padding: spacing.md,
@@ -310,7 +304,7 @@ export default function MerchantDashboard({ navigation }: any) {
                 </View>
                 <Text style={{ fontSize: 10, color: k.color, fontWeight: '700' }}>{k.note}</Text>
               </View>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.white, marginBottom: 2 }}>{k.value}</Text>
+              <Text style={{ fontSize: 17, fontWeight: '900', color: colors.white, marginBottom: 2 }} numberOfLines={1}>{k.value}</Text>
               <Text style={{ fontSize: 11, color: colors.gray, fontWeight: '600' }}>{k.label}</Text>
             </View>
           ))}

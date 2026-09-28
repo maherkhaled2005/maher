@@ -1,13 +1,7 @@
 // mobile/src/components/common/Toast.tsx
 import React, { useEffect, useRef } from 'react';
-import {
-  Animated,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  View,
-} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Animated, Text, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react-native';
 import { colors, borderRadius, typography, spacing, shadows } from '../../theme';
 

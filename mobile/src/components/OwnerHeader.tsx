@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar, Image, SafeAreaView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar, Image } from 'react-native';
 import {
   Menu,
   ChevronRight,
@@ -129,12 +130,12 @@ export default function OwnerHeader({
                   <Text style={[styles.numText, { color: activeColor }]}>#{sectionNumber}</Text>
                 </View>
               ) : null}
-              <Text style={styles.titleText} numberOfLines={1}>
+              <Text style={styles.titleText} numberOfLines={1} ellipsizeMode="tail">
                 {title}
               </Text>
             </View>
             {subtitle ? (
-              <Text style={styles.subtitleText} numberOfLines={1}>
+              <Text style={styles.subtitleText} numberOfLines={1} ellipsizeMode="tail">
                 {subtitle}
               </Text>
             ) : null}
@@ -286,16 +287,19 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: colors.white,
-    fontSize: 14.5,
+    fontSize: 14,
     fontWeight: '900',
     textAlign: 'center',
     flexShrink: 1,
+    maxWidth: '100%',
   },
   subtitleText: {
     color: colors.gray,
-    fontSize: 11,
+    fontSize: 10.5,
+    lineHeight: 14,
     marginTop: 2,
     textAlign: 'center',
+    maxWidth: '100%',
   },
   hamburgerBtn: {
     width: 34,
