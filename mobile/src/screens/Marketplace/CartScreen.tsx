@@ -697,9 +697,11 @@ export default function CartScreen({ navigation }: any) {
             <Text style={{ color: colors.gray }}>مصاريف الشحن والتوصيل (24-48 ساعة)</Text>
           </View>
           {total < 1000 && (
-            <Text style={{ color: colors.primary, fontSize: 11, textAlign: 'right', marginBottom: 4 }}>
-              💡 أضف منتجات بقيمة {(1000 - total).toLocaleString()} ج.م إضافية للحصول على شحن مجاني
-            </Text>
+            <View style={{ backgroundColor: 'rgba(212,175,55,0.1)', padding: 8, borderRadius: 6, marginTop: 4 }}>
+              <Text style={{ color: colors.primary, fontSize: 12, textAlign: 'right', fontWeight: 'bold' }}>
+                💡 أضف منتجات بقيمة {(1000 - total).toLocaleString()} ج.م إضافية للحصول على شحن مجاني
+              </Text>
+            </View>
           )}
 
           <View

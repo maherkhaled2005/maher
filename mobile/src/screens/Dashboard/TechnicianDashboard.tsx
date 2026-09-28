@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   AppState,
   Modal,
-} from 'react-native';
+ StatusBar, } from 'react-native';
 import {
   Wrench,
   CheckCircle2,
@@ -304,9 +304,8 @@ export default function TechnicianDashboard({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.dark }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
       {/* Role Header with ☰ Drawer & Availability Toggle */}
       <OwnerHeader
         title="حقيبة الفني والعمليات"
@@ -315,14 +314,15 @@ export default function TechnicianDashboard({ navigation }: any) {
         navigation={navigation}
         currentScreen="Home"
         rightAction={
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.darkCard, paddingHorizontal: 8, paddingVertical: 4, borderRadius: borderRadius.full, borderWidth: 1, borderColor: isAvailable ? '#10B981' : colors.border }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.darkCard, paddingHorizontal: 10, paddingVertical: 6, borderRadius: borderRadius.full, borderWidth: 1, borderColor: isAvailable ? '#10B981' : colors.border }}>
             <Switch
               value={isAvailable}
               onValueChange={handleToggleAvailability}
               trackColor={{ true: '#10B981', false: colors.dark }}
               thumbColor={colors.white}
+              ios_backgroundColor={colors.dark}
             />
-            <Text style={{ color: isAvailable ? '#10B981' : colors.gray, fontWeight: '800', fontSize: 10 }}>
+            <Text style={{ color: isAvailable ? '#10B981' : colors.gray, fontWeight: '800', fontSize: 12 }}>
               {isAvailable ? 'متاح' : 'مشغول'}
             </Text>
           </View>
@@ -330,7 +330,7 @@ export default function TechnicianDashboard({ navigation }: any) {
       />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }}
+        contentContainerStyle={{ padding: spacing.lg, paddingBottom: Platform.OS === 'ios' ? 120 : 100 }}
         showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
@@ -346,12 +346,13 @@ export default function TechnicianDashboard({ navigation }: any) {
         <Text style={{ color: colors.white, fontSize: 16, fontWeight: '900', textAlign: 'right', marginBottom: spacing.xs }}>
           أدائي وأرباحي هذا الشهر 💰
         </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs }}>
+        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: spacing.xs }}>
           {technicianKpis.map((k, idx) => (
             <View
               key={idx}
               style={{
                 width: '48%',
+                marginBottom: spacing.sm,
                 backgroundColor: colors.darkCard,
                 borderRadius: borderRadius.lg,
                 padding: spacing.md,
@@ -673,8 +674,9 @@ export default function TechnicianDashboard({ navigation }: any) {
               </View>
             ) : (
               incomingRequests.map((req) => (
-                <View
+                <TouchableOpacity
                   key={req.id}
+                  onPress={() => navigation.navigate('OrderDetails', { orderId: req.id })}
                   style={{
                     backgroundColor: colors.darkCard,
                     borderRadius: borderRadius.lg,
@@ -685,9 +687,9 @@ export default function TechnicianDashboard({ navigation }: any) {
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 13 }}>{req.price}</Text>
-                    <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>{req.device}</Text>
+                    <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }} numberOfLines={1}>{req.device}</Text>
                   </View>
-                  <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: spacing.sm }}>
+                  <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', marginBottom: spacing.sm }} numberOfLines={2}>
                     {req.problem}
                   </Text>
 
@@ -712,7 +714,7 @@ export default function TechnicianDashboard({ navigation }: any) {
                       <Text style={{ color: colors.gray, fontSize: 10, marginTop: 2 }}>{req.time}</Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </View>

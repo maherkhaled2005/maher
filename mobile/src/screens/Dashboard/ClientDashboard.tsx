@@ -9,7 +9,7 @@ import {
   Platform,
   Alert,
   RefreshControl,
-} from 'react-native';
+ StatusBar, } from 'react-native';
 import {
   Search,
   ShoppingBag,
@@ -110,9 +110,8 @@ export default function ClientDashboard({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.dark }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
       {/* Role Header with ☰ Drawer & Cart Button */}
       <OwnerHeader
         title="الرئيسية واستكشاف المنصة"
@@ -141,7 +140,7 @@ export default function ClientDashboard({ navigation }: any) {
       />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }}
+        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
         showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
@@ -323,7 +322,7 @@ export default function ClientDashboard({ navigation }: any) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => navigation.navigate('Support')}
+              onPress={() => navigation.navigate('TechniciansTeam')}
               style={{
                 flex: 1,
                 backgroundColor: colors.dark,
@@ -466,7 +465,7 @@ export default function ClientDashboard({ navigation }: any) {
                   </TouchableOpacity>
 
                   <View style={{ flex: 1, alignItems: 'flex-end', paddingRight: spacing.md }}>
-                    <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13, textAlign: 'right' }}>
+                    <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13, textAlign: 'right' }} numberOfLines={1}>
                       {p.name}
                     </Text>
                     <Text style={{ color: colors.gray, fontSize: 11 }}>المورد: {p.seller}</Text>
@@ -528,7 +527,7 @@ export default function ClientDashboard({ navigation }: any) {
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 14 }}>{c.price}</Text>
-                    <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14, flex: 1, textAlign: 'right', paddingLeft: spacing.sm }}>
+                    <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14, flex: 1, textAlign: 'right', paddingLeft: spacing.sm }} numberOfLines={1}>
                       {c.title}
                     </Text>
                   </View>

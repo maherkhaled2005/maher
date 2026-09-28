@@ -276,22 +276,14 @@ export default function RegisterScreen({ navigation }: any) {
   const statusBarHeight = Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 36) : 0;
 
   return (
-    <SafeAreaView
-      style={[
-        {
-          flex: 1,
-          backgroundColor: '#0A0A0A',
-          height: '100%',
-          paddingTop: statusBarHeight,
-        },
-      ]}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
         <ScrollView
           style={[{ flex: 1, width: '100%' }, Platform.OS === 'web' && ({ overflowY: 'auto' } as any)]}
           contentContainerStyle={{
             paddingHorizontal: spacing.md,
             paddingTop: Platform.OS === 'web' ? 40 : spacing.sm,
-            paddingBottom: 160,
+            paddingBottom: 100,
             flexGrow: 1,
             alignItems: 'center',
           }}

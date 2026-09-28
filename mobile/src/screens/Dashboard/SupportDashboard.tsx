@@ -11,7 +11,7 @@ import {
   Platform,
   Modal,
   TextInput,
-} from 'react-native';
+ StatusBar,  SafeAreaView, } from 'react-native';
 import {
   Headphones,
   Clock,
@@ -149,7 +149,8 @@ export default function SupportDashboard({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
       {/* Role Header with ☰ Drawer */}
       <OwnerHeader
         title="مركز خدمة العملاء والدعم"
@@ -168,7 +169,7 @@ export default function SupportDashboard({ navigation }: any) {
       ) : (
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -194,20 +195,20 @@ export default function SupportDashboard({ navigation }: any) {
           </View>
 
           {/* Real Tickets Feed */}
-          {tickets.length > 0 && (
-            <View style={styles.ticketsBlock}>
-              <View style={styles.ticketsHeader}>
-                <Ticket size={18} color="#0D9488" />
-                <Text style={styles.ticketsTitle}>التذاكر الحالية المسجلة في النظام ({tickets.length})</Text>
-              </View>
-              {tickets.slice(0, 3).map((t: any) => (
+          <View style={styles.ticketsBlock}>
+            <View style={styles.ticketsHeader}>
+              <Ticket size={18} color="#0D9488" />
+              <Text style={styles.ticketsTitle}>التذاكر الحالية المسجلة في النظام ({tickets.length})</Text>
+            </View>
+            {tickets.length > 0 ? (
+              tickets.slice(0, 3).map((t: any) => (
                 <TouchableOpacity
                   key={t.id}
                   style={styles.ticketItem}
                   onPress={() => navigation.navigate('Tickets')}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.ticketItemTitle}>{t.title || t.subject || 'استفسار عميل'}</Text>
+                    <Text style={styles.ticketItemTitle} numberOfLines={1}>{t.title || t.subject || 'استفسار عميل'}</Text>
                     <Text style={styles.ticketItemSub}>
                       رقم التذكرة: #{t.id} | الحالة: {t.status === 'open' ? 'مفتوحة' : t.status === 'in_progress' ? 'قيد المعالجة' : 'مغلقة'}
                     </Text>
@@ -218,9 +219,13 @@ export default function SupportDashboard({ navigation }: any) {
                     </Text>
                   </View>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
+              ))
+            ) : (
+              <View style={{ padding: spacing.md, alignItems: 'center' }}>
+                <Text style={{ color: colors.gray, fontSize: 13, fontWeight: '700' }}>لا توجد تذاكر حالياً 🎧</Text>
+              </View>
+            )}
+          </View>
 
           {/* Quick Canned Replies */}
           <View style={styles.cannedBlock}>
@@ -427,7 +432,7 @@ export default function SupportDashboard({ navigation }: any) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -501,7 +506,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing.md,
     gap: 14,
-    paddingBottom: 150,
+    paddingBottom: 100,
   },
   sectionHeader: {
     color: colors.white,

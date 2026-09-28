@@ -163,8 +163,8 @@ export default function OrdersScreen({ navigation }: any) {
     return [
       { key: 'all', label: 'جميع الطلبات' },
       { key: 'pending', label: '⏳ معلقة' },
-      { key: 'maintenance', label: '🔧 صيانة' },
-      { key: 'purchase', label: '🛍️ شراء' },
+      { key: 'active', label: '🔄 نشطة' },
+      { key: 'completed', label: '✅ مكتملة' },
       { key: 'cancelled', label: '❌ ملغاة' },
     ];
   })();
@@ -185,7 +185,7 @@ export default function OrdersScreen({ navigation }: any) {
     if (activeTab === 'maintenance' && o.type !== 'maintenance') return false;
     if (activeTab === 'purchase' && o.type !== 'purchase') return false;
     if (activeTab === 'pending' && o.status !== 'pending') return false;
-    if (activeTab === 'in_progress' && !inProgressStatuses.includes(o.status)) return false;
+    if ((activeTab === 'in_progress' || activeTab === 'active') && !inProgressStatuses.includes(o.status)) return false;
     if (activeTab === 'on_way' && o.status !== 'on_way') return false;
     if (activeTab === 'completed' && o.status !== 'completed') return false;
     if (activeTab === 'cancelled' && o.status !== 'cancelled') return false;

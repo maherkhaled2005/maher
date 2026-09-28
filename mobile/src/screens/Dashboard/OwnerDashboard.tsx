@@ -346,21 +346,26 @@ export default function OwnerDashboard({ navigation }: any) {
             </View>
 
             {/* KPI 2: المستخدمون النشطون */}
-            <View style={[styles.kpiCard, stats.isUsersLow && { borderColor: '#F59E0B' }]}>
+            <TouchableOpacity 
+              style={[styles.kpiCard, stats.isUsersLow && { borderColor: '#F59E0B' }]}
+              onPress={() => navigation.navigate('Customers')}
+            >
               <View style={styles.kpiHeaderRow}>
                 <View style={[styles.kpiIconBox, { backgroundColor: '#3B82F622' }]}>
                   <Users size={18} color="#3B82F6" />
                 </View>
-                {stats.isUsersLow && (
+                {stats.isUsersLow ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
                     <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: '900' }}>أقل من 100</Text>
                     <AlertTriangle size={12} color="#F59E0B" />
                   </View>
+                ) : (
+                  <Text style={{ fontSize: 11, color: '#3B82F6', fontWeight: '700' }}>العملاء ↗</Text>
                 )}
               </View>
               <Text style={styles.kpiValue}>{stats.activeUsers}</Text>
               <Text style={styles.kpiLabel}>المستخدمون النشطون</Text>
-            </View>
+            </TouchableOpacity>
 
             {/* KPI 3: الطلبات الجديدة اليوم */}
             <TouchableOpacity
@@ -378,18 +383,19 @@ export default function OwnerDashboard({ navigation }: any) {
             </TouchableOpacity>
 
             {/* KPI 4: الفنيون المتاحون */}
-            <View
+            <TouchableOpacity
               style={[
                 styles.kpiCard,
                 stats.availableTechnicians === 0 && { backgroundColor: '#181818', borderColor: '#444' },
               ]}
+              onPress={() => navigation.navigate('TechniciansTeam')}
             >
               <View style={styles.kpiHeaderRow}>
                 <View style={[styles.kpiIconBox, { backgroundColor: stats.availableTechnicians === 0 ? '#444' : '#F59E0B22' }]}>
                   <Wrench size={18} color={stats.availableTechnicians === 0 ? '#888' : '#F59E0B'} />
                 </View>
                 <Text style={{ fontSize: 11, color: stats.availableTechnicians === 0 ? '#888' : '#F59E0B', fontWeight: '700' }}>
-                  {stats.availableTechnicians > 0 ? 'جاهزون الآن' : 'غير متوفر'}
+                  {stats.availableTechnicians > 0 ? 'كادر الفنيين ↗' : 'غير متوفر'}
                 </Text>
               </View>
               <Text style={[styles.kpiValue, stats.availableTechnicians === 0 && { color: '#888' }]}>
@@ -398,7 +404,7 @@ export default function OwnerDashboard({ navigation }: any) {
               <Text style={styles.kpiLabel}>
                 {stats.availableTechnicians === 0 ? 'لا يوجد فنيين متاحين' : 'الفنيون المتاحون'}
               </Text>
-            </View>
+            </TouchableOpacity>
 
             {/* KPI 5: تذاكر الدعم العالقة */}
             <TouchableOpacity
@@ -511,10 +517,10 @@ export default function OwnerDashboard({ navigation }: any) {
             </View>
 
             {/* Segmented Percentage Bar */}
-            <View style={{ height: 16, backgroundColor: '#222', borderRadius: 8, overflow: 'hidden', flexDirection: 'row', marginVertical: spacing.sm }}>
-              <View style={{ flex: stats.revenueBreakdown?.marketplace ?? 0, backgroundColor: colors.primary }} />
-              <View style={{ flex: stats.revenueBreakdown?.subscriptions ?? 0, backgroundColor: '#3B82F6' }} />
-              <View style={{ flex: stats.revenueBreakdown?.courses ?? 0, backgroundColor: '#10B981' }} />
+            <View style={{ height: 16, backgroundColor: '#222', borderRadius: 8, overflow: 'hidden', flexDirection: 'row-reverse', marginVertical: spacing.sm, width: '100%' }}>
+              <View style={{ width: `${stats.revenueBreakdown?.marketplace || 0}%`, backgroundColor: colors.primary }} />
+              <View style={{ width: `${stats.revenueBreakdown?.subscriptions || 0}%`, backgroundColor: '#3B82F6' }} />
+              <View style={{ width: `${stats.revenueBreakdown?.courses || 0}%`, backgroundColor: '#10B981' }} />
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
@@ -814,12 +820,13 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   kpiGrid: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   kpiCard: {
-    width: '48.5%',
+    width: '48%',
+    marginBottom: spacing.sm,
     backgroundColor: colors.darkCard,
     borderWidth: 1,
     borderColor: colors.border,

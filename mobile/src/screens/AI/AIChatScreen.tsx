@@ -116,6 +116,8 @@ export default function AIChatScreen({ navigation }: any) {
 
   const customerMessagesSent = messages.filter((m) => m.role === 'user').length;
   const isCustomerLocked = currentRole === 'customer' && !subStatus.isSubscribed && (subStatus.freePreviewsLeft <= 0 || customerMessagesSent >= 3);
+  const isMerchantLocked = currentRole === 'merchant' && !subStatus.isSubscribed && customerMessagesSent >= 5;
+  const isLocked = isCustomerLocked || isMerchantLocked;
 
   const loadSubscriptionStatus = useCallback(async () => {
     try {
@@ -135,6 +137,17 @@ export default function AIChatScreen({ navigation }: any) {
 
   // Query Logs State (Owner only)
   const [queryLogs, setQueryLogs] = useState<any[]>([]);
+
+  const handleClearConversation = () => {
+    setMessages([
+      {
+        id: 'welcome',
+        role: 'ai',
+        text: 'مرحباً بك في المساعد الذكي لمنصة TecnoRexa 🤖✨\n\nأنا هنا لمساعدتك في تشخيص أعطال الأجهزة المنزلية (تكييف منزلي، غسالة ملابس، غسالة أطباق، ثلاجة، سخان، بوتاجاز، ميكروويف...)، تقديم خطوات فحص الأمان الأولية، واستكشاف وحل الأعطال الفنية بدقة.',
+        timestamp: new Date(),
+      },
+    ]);
+  };
 
   const handleSubscribe = async (paymentMethod: 'wallet' | 'vodafone_cash') => {
     setPurchasing(true);
@@ -174,7 +187,7 @@ export default function AIChatScreen({ navigation }: any) {
     setIsTyping(true);
 
     try {
-      const res = await fetchApi('/ai/chat', {
+      const res = await fetchApi('/api/ai/chat', {
         method: 'POST',
         data: { message: text },
       });
@@ -357,7 +370,23 @@ export default function AIChatScreen({ navigation }: any) {
                   </Text>
                 </TouchableOpacity>
               )}
-
+              <TouchableOpacity
+                onPress={handleClearConversation}
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 5,
+                  borderRadius: borderRadius.md,
+                  backgroundColor: '#1A1A1A',
+                  borderWidth: 1,
+                  borderColor: '#333',
+                  flexDirection: 'row-reverse',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+              >
+                <Trash2 size={12} color={colors.gray} />
+                <Text style={{ color: colors.gray, fontSize: 10, fontWeight: 'bold' }}>مسح</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -502,6 +531,12 @@ export default function AIChatScreen({ navigation }: any) {
             data={messages}
             keyExtractor={(m) => m.id}
             contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: 110 }}
+            ListEmptyComponent={
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
+                <Bot size={40} color={colors.primary} style={{ marginBottom: 10 }} />
+                <Text style={{ color: colors.gray, fontSize: 14, textAlign: 'center' }}>لا توجد رسائل حالياً. ابدأ المحادثة الآن!</Text>
+              </View>
+            }
             renderItem={({ item }) => {
               const isAi = item.role === 'ai';
 
@@ -631,7 +666,7 @@ export default function AIChatScreen({ navigation }: any) {
           )}
 
           {/* Chat Input Bar or Customer 3-Message Lock */}
-          {isCustomerLocked ? (
+          {isLocked ? (
             <View
               style={{
                 backgroundColor: '#18181B',

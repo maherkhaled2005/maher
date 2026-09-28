@@ -10,7 +10,7 @@ import {
   Platform,
   Modal,
   Alert,
-} from 'react-native';
+ StatusBar,  SafeAreaView, } from 'react-native';
 import {
   Code2,
   Bug,
@@ -134,7 +134,8 @@ export default function ProgrammerDashboard({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
       {/* Role Header with ☰ Drawer */}
       <OwnerHeader
         title="لوحة القيادة والمراقبة التقنية"
@@ -163,7 +164,7 @@ export default function ProgrammerDashboard({ navigation }: any) {
       ) : (
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -202,7 +203,7 @@ export default function ProgrammerDashboard({ navigation }: any) {
                   onPress={() => navigation.navigate('ErrorReports')}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.bugItemTitle}>{bug.title}</Text>
+                    <Text style={styles.bugItemTitle} numberOfLines={1}>{bug.title}</Text>
                     <Text style={styles.bugItemSub}>
                       القسم: {bug.system || 'الخادم والواجهة'} | الخطورة: {bug.severity || 'متوسط'}
                     </Text>
@@ -265,7 +266,7 @@ export default function ProgrammerDashboard({ navigation }: any) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -339,7 +340,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing.md,
     gap: 14,
-    paddingBottom: 150,
+    paddingBottom: 100,
   },
   sectionHeader: {
     color: colors.white,

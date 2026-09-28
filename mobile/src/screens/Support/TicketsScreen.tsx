@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   SafeAreaView, Alert, Platform, RefreshControl, Modal,
-  ScrollView, ActivityIndicator,
+  ScrollView, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
 import { 
   Search, ChevronRight, Copy, Headphones, Plus, X, Send, AlertCircle
@@ -223,203 +223,205 @@ export default function TicketsScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* تصنيف المشكلة */}
-              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                نوع المشكلة / القسم:
-              </Text>
-              <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: spacing.md }}>
-                {CATEGORIES.map(cat => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => setCategory(cat.id)}
-                    style={{
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: borderRadius.sm,
-                      backgroundColor: category === cat.id ? colors.primary : colors.dark,
-                      borderWidth: 1,
-                      borderColor: category === cat.id ? colors.primary : colors.border,
-                    }}
-                  >
-                    <Text style={{ color: category === cat.id ? colors.dark : colors.gray, fontSize: 12, fontWeight: '700' }}>
-                      {cat.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, width: '100%' }}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* تصنيف المشكلة */}
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                  نوع المشكلة / القسم:
+                </Text>
+                <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: spacing.md }}>
+                  {CATEGORIES.map(cat => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      onPress={() => setCategory(cat.id)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: borderRadius.sm,
+                        backgroundColor: category === cat.id ? colors.primary : colors.dark,
+                        borderWidth: 1,
+                        borderColor: category === cat.id ? colors.primary : colors.border,
+                      }}
+                    >
+                      <Text style={{ color: category === cat.id ? colors.dark : colors.gray, fontSize: 12, fontWeight: '700' }}>
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-              {/* الأولوية */}
-              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                درجة الأهمية:
-              </Text>
-              <View style={{ flexDirection: 'row-reverse', gap: 8, marginBottom: spacing.md }}>
-                {PRIORITIES.map(pri => (
-                  <TouchableOpacity
-                    key={pri.id}
-                    onPress={() => setPriority(pri.id)}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 6,
-                      borderRadius: borderRadius.sm,
-                      alignItems: 'center',
-                      backgroundColor: priority === pri.id ? (pri.id === 'urgent' ? colors.danger : colors.primary) : colors.dark,
-                      borderWidth: 1,
-                      borderColor: priority === pri.id ? (pri.id === 'urgent' ? colors.danger : colors.primary) : colors.border,
-                    }}
-                  >
-                    <Text style={{ color: priority === pri.id ? colors.white : colors.gray, fontSize: 12, fontWeight: '700' }}>
-                      {pri.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                {/* الأولوية */}
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                  درجة الأهمية:
+                </Text>
+                <View style={{ flexDirection: 'row-reverse', gap: 8, marginBottom: spacing.md }}>
+                  {PRIORITIES.map(pri => (
+                    <TouchableOpacity
+                      key={pri.id}
+                      onPress={() => setPriority(pri.id)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 6,
+                        borderRadius: borderRadius.sm,
+                        alignItems: 'center',
+                        backgroundColor: priority === pri.id ? (pri.id === 'urgent' ? colors.danger : colors.primary) : colors.dark,
+                        borderWidth: 1,
+                        borderColor: priority === pri.id ? (pri.id === 'urgent' ? colors.danger : colors.primary) : colors.border,
+                      }}
+                    >
+                      <Text style={{ color: priority === pri.id ? colors.white : colors.gray, fontSize: 12, fontWeight: '700' }}>
+                        {pri.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-              {/* الاسم بالكامل */}
-              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                الاسم بالكامل *:
-              </Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="أدخل اسمك بالكامل هنا..."
-                placeholderTextColor={colors.gray}
-                style={{
-                  backgroundColor: colors.dark,
-                  color: colors.white,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: borderRadius.md,
-                  padding: spacing.md,
-                  textAlign: 'right',
-                  marginBottom: spacing.md,
-                  fontSize: 14,
-                }}
-              />
+                {/* الاسم بالكامل */}
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                  الاسم بالكامل *:
+                </Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="أدخل اسمك بالكامل هنا..."
+                  placeholderTextColor={colors.gray}
+                  style={{
+                    backgroundColor: colors.dark,
+                    color: colors.white,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    textAlign: 'right',
+                    marginBottom: spacing.md,
+                    fontSize: 14,
+                  }}
+                />
 
-              {/* رقم الهاتف للتواصل */}
-              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                رقم الهاتف للتواصل *:
-              </Text>
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="010XXXXXXXX (11 رقماً)"
-                placeholderTextColor={colors.gray}
-                keyboardType="phone-pad"
-                maxLength={11}
-                style={{
-                  backgroundColor: colors.dark,
-                  color: colors.white,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: borderRadius.md,
-                  padding: spacing.md,
-                  textAlign: 'right',
-                  marginBottom: spacing.md,
-                  fontSize: 14,
-                }}
-              />
+                {/* رقم الهاتف للتواصل */}
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                  رقم الهاتف للتواصل *:
+                </Text>
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="010XXXXXXXX (11 رقماً)"
+                  placeholderTextColor={colors.gray}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  style={{
+                    backgroundColor: colors.dark,
+                    color: colors.white,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    textAlign: 'right',
+                    marginBottom: spacing.md,
+                    fontSize: 14,
+                  }}
+                />
 
-              {/* البريد الإلكتروني للتواصل */}
-              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                البريد الإلكتروني للتواصل:
-              </Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="example@email.com (اختياري)"
-                placeholderTextColor={colors.gray}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={{
-                  backgroundColor: colors.dark,
-                  color: colors.white,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: borderRadius.md,
-                  padding: spacing.md,
-                  textAlign: 'right',
-                  marginBottom: spacing.md,
-                  fontSize: 14,
-                }}
-              />
+                {/* البريد الإلكتروني للتواصل */}
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                  البريد الإلكتروني للتواصل:
+                </Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="example@email.com (اختياري)"
+                  placeholderTextColor={colors.gray}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={{
+                    backgroundColor: colors.dark,
+                    color: colors.white,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    textAlign: 'right',
+                    marginBottom: spacing.md,
+                    fontSize: 14,
+                  }}
+                />
 
-              {/* العنوان */}
-              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                عنوان المشكلة أو الاستفسار *:
-              </Text>
-              <TextInput
-                value={subject}
-                onChangeText={setSubject}
-                placeholder="مثال: مشكلة في موعد صيانة التكييف / عطل فني"
-                placeholderTextColor={colors.gray}
-                style={{
-                  backgroundColor: colors.dark,
-                  color: colors.white,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: borderRadius.md,
-                  padding: spacing.md,
-                  textAlign: 'right',
-                  marginBottom: spacing.md,
-                  fontSize: 14,
-                }}
-              />
+                {/* العنوان */}
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                  عنوان المشكلة أو الاستفسار *:
+                </Text>
+                <TextInput
+                  value={subject}
+                  onChangeText={setSubject}
+                  placeholder="مثال: مشكلة في موعد صيانة التكييف / عطل فني"
+                  placeholderTextColor={colors.gray}
+                  style={{
+                    backgroundColor: colors.dark,
+                    color: colors.white,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    textAlign: 'right',
+                    marginBottom: spacing.md,
+                    fontSize: 14,
+                  }}
+                />
 
-              {/* التفاصيل والشرح */}
-              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
-                تفاصيل المشكلة والشكوى بالكامل *:
-              </Text>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder="اشرح المشكلة بالتفصيل ليتمكن فريق الدعم والفنيون من مساعدتك فوراً..."
-                placeholderTextColor={colors.gray}
-                multiline
-                numberOfLines={4}
-                style={{
-                  backgroundColor: colors.dark,
-                  color: colors.white,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: borderRadius.md,
-                  padding: spacing.md,
-                  textAlign: 'right',
-                  height: 100,
-                  textAlignVertical: 'top',
-                  marginBottom: spacing.lg,
-                  fontSize: 14,
-                }}
-              />
+                {/* التفاصيل والشرح */}
+                <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 6 }}>
+                  تفاصيل المشكلة والشكوى بالكامل *:
+                </Text>
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="اشرح المشكلة بالتفصيل ليتمكن فريق الدعم والفنيون من مساعدتك فوراً..."
+                  placeholderTextColor={colors.gray}
+                  multiline
+                  numberOfLines={4}
+                  style={{
+                    backgroundColor: colors.dark,
+                    color: colors.white,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: borderRadius.md,
+                    padding: spacing.md,
+                    textAlign: 'right',
+                    height: 100,
+                    textAlignVertical: 'top',
+                    marginBottom: spacing.lg,
+                    fontSize: 14,
+                  }}
+                />
 
-              {/* زر الإرسال */}
-              <TouchableOpacity
-                onPress={handleCreateTicket}
-                disabled={submitting}
-                style={{
-                  backgroundColor: colors.primary,
-                  paddingVertical: 14,
-                  borderRadius: borderRadius.md,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'row-reverse',
-                  gap: 8,
-                  opacity: submitting ? 0.7 : 1,
-                }}
-              >
-                {submitting ? (
-                  <ActivityIndicator color={colors.dark} />
-                ) : (
-                  <>
-                    <Send color={colors.dark} size={18} />
-                    <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 15 }}>
-                      إرسال التذكرة الآن
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
+                {/* زر الإرسال */}
+                <TouchableOpacity
+                  onPress={handleCreateTicket}
+                  disabled={submitting}
+                  style={{
+                    backgroundColor: colors.primary,
+                    paddingVertical: 14,
+                    borderRadius: borderRadius.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row-reverse',
+                    gap: 8,
+                    opacity: submitting ? 0.7 : 1,
+                  }}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color={colors.dark} />
+                  ) : (
+                    <>
+                      <Send color={colors.dark} size={18} />
+                      <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 15 }}>
+                        إرسال التذكرة الآن
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </KeyboardAvoidingView>
           </View>
         </View>
       </Modal>

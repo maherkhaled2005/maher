@@ -11,7 +11,7 @@ import {
   Platform,
   Modal,
   Share,
-} from 'react-native';
+ StatusBar,  SafeAreaView, } from 'react-native';
 import {
   Briefcase,
   CheckCircle,
@@ -227,7 +227,8 @@ export default function ManagerDashboard({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
       {/* Role Header with ☰ Drawer */}
       <OwnerHeader
         title="غرفة العمليات والرقابة"
@@ -256,7 +257,7 @@ export default function ManagerDashboard({ navigation }: any) {
       ) : (
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -315,7 +316,7 @@ export default function ManagerDashboard({ navigation }: any) {
               {pendingProductsList.map(prod => (
                 <View key={prod.id} style={styles.pendingItem}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.pendingItemTitle}>{prod.name}</Text>
+                    <Text style={styles.pendingItemTitle} numberOfLines={1}>{prod.name}</Text>
                     <Text style={styles.pendingItemSub}>
                       السعر: {prod.price} ج.م | البائع: {prod.sellerName || 'تاجر معتمد'}
                     </Text>
@@ -350,7 +351,7 @@ export default function ManagerDashboard({ navigation }: any) {
               {pendingUpgradesList.map(upg => (
                 <View key={upg.id} style={styles.pendingItem}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.pendingItemTitle}>{upg.technicianName || upg.userName || 'طلب ترقية معتمد'}</Text>
+                    <Text style={styles.pendingItemTitle} numberOfLines={1}>{upg.technicianName || upg.userName || 'طلب ترقية معتمد'}</Text>
                     <Text style={styles.pendingItemSub}>
                       📞 هاتف: {upg.userPhone || upg.senderPhone || upg.phone || 'مسجل'} | الرسوم: {upg.fee || 300} ج.م
                     </Text>
@@ -455,7 +456,7 @@ export default function ManagerDashboard({ navigation }: any) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -529,7 +530,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing.md,
     gap: 14,
-    paddingBottom: 150,
+    paddingBottom: 100,
   },
   sectionHeader: {
     color: colors.white,

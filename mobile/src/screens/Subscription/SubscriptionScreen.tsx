@@ -770,8 +770,8 @@ export default function SubscriptionScreen({ route, navigation }: any) {
                       {selectedPayment === 'instapay' ? 'بيانات التحويل عبر InstaPay ⚡' : 'بيانات التحويل عبر فودافون كاش 📱'}
                     </Text>
                     {selectedPayment === 'instapay' && (
-                      <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '900', textAlign: 'right' }}>
+                      <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 4 }}>
+                        <Text style={{ color: '#D4AF37', fontSize: 13, fontWeight: '900', textAlign: 'right', flexShrink: 1 }}>
                           معرّف إنستاباي: {paymentSettings.instapayHandle}
                         </Text>
                         <TouchableOpacity
@@ -786,8 +786,8 @@ export default function SubscriptionScreen({ route, navigation }: any) {
                         </TouchableOpacity>
                       </View>
                     )}
-                    <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ color: colors.white, fontSize: 13, fontWeight: '900', textAlign: 'right' }}>
+                    <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                      <Text style={{ color: colors.white, fontSize: 13, fontWeight: '900', textAlign: 'right', flexShrink: 1 }}>
                         رقم الهاتف: {paymentSettings.vodafoneCashNumber}
                       </Text>
                       <TouchableOpacity

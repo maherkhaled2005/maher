@@ -106,22 +106,34 @@ export const MANAGER_SECTIONS: RoleSectionItem[] = [
   { id: 17, label: 'الإعدادات التشغيلية', sub: 'ضبط مواعيد العمل وقنوات التواصل', screen: 'Settings', icon: Settings, color: '#64748B' },
 ];
 
-// 💻 المبرمج (14 قسماً تقنياً)
+// 💻 المبرمج (26 قسماً تقنياً وإدارياً)
 export const PROGRAMMER_SECTIONS: RoleSectionItem[] = [
   { id: 1, label: 'لوحة القيادة التقنية', sub: 'مؤشرات الخوادم وسرعة الاستجابة والتشغيل', screen: 'Home', icon: LayoutDashboard, color: '#7C3AED' },
   { id: 2, label: 'مركز المطورين والمهام', sub: 'إدارة المهام البرمجية ولوحة الإنجاز', screen: 'DevHub', icon: Code, color: '#7C3AED' },
   { id: 3, label: 'تقارير الأخطاء والأعطال', sub: 'تتبع تفاصيل الأعطال وتحديث الحلول', screen: 'ErrorReports', icon: AlertTriangle, color: '#DC2626' },
   { id: 4, label: 'شات المطورين المشفر', sub: 'غرفة النقاش التقني المباشر', screen: 'DevChat', icon: MessageSquare, color: '#A855F7' },
   { id: 5, label: 'مكتبة ومستودع الأكواد', sub: 'مقتطفات الأكواد المشتركة والدوال', screen: 'CodeSnippets', icon: Terminal, color: '#3B82F6' },
-  { id: 6, label: 'مجتمع TecnoRexa والفيديوهات', sub: 'استعراض مجتمع المطورين والمنصة', screen: 'WebCommunity', icon: Film, color: '#8B5CF6' },
-  { id: 7, label: 'الأكاديمية والكورسات البرمجية', sub: 'الكورسات التقنية والمهنية', screen: 'Courses', icon: BookOpen, color: '#F59E0B' },
-  { id: 8, label: 'سجل العمليات والتدقيق', sub: 'سجل العمليات الإدارية والأنشطة والتغييرات', screen: 'AuditLogs', icon: ShieldCheck, color: '#6366F1' },
-  { id: 9, label: 'مراقبة الخوادم والأنظمة', sub: 'حالة الذاكرة والمنافذ وقاعدة البيانات', screen: 'SystemOps', icon: Server, color: '#10B981' },
-  { id: 10, label: 'استعراض المستخدمين (للمراجعة)', sub: 'فحص الحسابات لأغراض التدقيق والمراجعة', screen: 'AdminUsers', icon: UserCog, color: '#64748B' },
-  { id: 11, label: 'مساعد الذكاء البرمجي (المساعد الذكي)', sub: 'توليد ومراجعة وتصحيح الأكواد', screen: 'AIChat', icon: Bot, color: '#8B5CF6' },
-  { id: 12, label: 'مركز الإشعارات التقنية', sub: 'تنبيهات السيرفر والأعطال الطارئة', screen: 'Notifications', icon: Bell, color: '#F97316' },
-  { id: 13, label: 'الملف الشخصي للمطور', sub: 'مستودعاتك ورتبتك وسجل مساهماتك', screen: 'Profile', icon: User, color: '#7C3AED' },
-  { id: 14, label: 'إعدادات بيئة العمل', sub: 'ضبط خوادم العمل ومفاتيح الربط', screen: 'Settings', icon: Settings, color: '#64748B' },
+  { id: 6, label: 'مراقبة الخوادم والأنظمة', sub: 'حالة الذاكرة والمنافذ وقاعدة البيانات', screen: 'SystemOps', icon: Server, color: '#10B981' },
+  { id: 7, label: 'إدارة المستخدمين (Admin Users)', sub: 'سجل الناخبين والموظفين', screen: 'AdminUsers', icon: UserCog, color: '#3B82F6' },
+  { id: 8, label: 'السوق والمنتجات (Marketplace)', sub: 'الرقابة العامة على البضاعة', screen: 'Marketplace', icon: ShoppingBag, color: '#F59E0B' },
+  { id: 9, label: 'إدارة الطلبات (Orders)', sub: 'غرفة العمليات اللوجستية', screen: 'Orders', icon: Package, color: '#10B981' },
+  { id: 10, label: 'المحفظة والماليات (Wallet)', sub: 'خزينة الشركة والمدفوعات', screen: 'Wallet', icon: Wallet, color: colors.primary },
+  { id: 11, label: 'إدارة الأقسام (Categories)', sub: 'هيكل المنصة والتصنيفات', screen: 'AdminCategories', icon: Layers, color: '#8B5CF6' },
+  { id: 12, label: 'إدارة المخازن (Warehouses)', sub: 'جرد المستودعات المركزية', screen: 'Warehouses', icon: Building2, color: '#EC4899' },
+  { id: 13, label: 'خدمة العملاء والدعم (Support)', sub: 'غرفة الشكاوى ومتابعة التذاكر', screen: 'Tickets', icon: Headphones, color: '#EF4444' },
+  { id: 14, label: 'الشات والمحادثات (Chat)', sub: 'الرقابة الأمنية (Observer)', screen: 'ChatList', icon: MessageSquare, color: '#06B6D4' },
+  { id: 15, label: 'فريق الفنيين (Technicians)', sub: 'كادر الصيانة وترقيات 300 ج.م', screen: 'TechniciansTeam', icon: Wrench, color: '#F59E0B' },
+  { id: 16, label: 'سجل العمليات الأمني (Audit Logs)', sub: 'كاميرات المراقبة وتدقيق الأنشطة', screen: 'AuditLogs', icon: ShieldCheck, color: '#6366F1' },
+  { id: 17, label: 'طلبات التوثيق والترقية (Trade Requests)', sub: 'مراجعة إيصالات 300 ج.م و 100 ج.م', screen: 'TradeRequests', icon: CheckSquare, color: '#10B981' },
+  { id: 18, label: 'التقارير المالية والتحليلات (Analytics)', sub: 'إحصائيات المبيعات والأرباح الشاملة', screen: 'Analytics', icon: BarChart2, color: '#A855F7' },
+  { id: 19, label: 'قسم التسويق والحملات (Marketing)', sub: 'البوق الإعلامي والكوبونات', screen: 'Marketing', icon: Megaphone, color: '#14B8A6' },
+  { id: 20, label: 'المركز الإعلامي والفيديوهات (Videos)', sub: 'رقابة المحتوى والريلز', screen: 'MediaApproval', icon: Film, color: '#E11D48' },
+  { id: 21, label: 'مجتمع TecnoRexa والفيديوهات', sub: 'استعراض المحتوى والتفاعل المجتمعي', screen: 'WebCommunity', icon: Film, color: '#8B5CF6' },
+  { id: 22, label: 'الأكاديمية والكورسات', sub: 'استعراض الكورسات وشروحات الصيانة', screen: 'Courses', icon: BookOpen, color: '#F59E0B' },
+  { id: 23, label: 'مساعد الذكاء البرمجي (المساعد الذكي)', sub: 'توليد ومراجعة وتصحيح الأكواد', screen: 'AIChat', icon: Bot, color: '#8B5CF6' },
+  { id: 24, label: 'مركز الإشعارات التقنية', sub: 'تنبيهات السيرفر والأعطال الطارئة', screen: 'Notifications', icon: Bell, color: '#F97316' },
+  { id: 25, label: 'الملف الشخصي للمطور', sub: 'مستودعاتك ورتبتك وسجل مساهماتك', screen: 'Profile', icon: User, color: '#7C3AED' },
+  { id: 26, label: 'إعدادات بيئة العمل', sub: 'ضبط خوادم العمل ومفاتيح الربط', screen: 'Settings', icon: Settings, color: '#64748B' },
 ];
 
 // 🎧 خدمة العملاء (12 قسماً)
@@ -344,7 +356,8 @@ export default function RoleSideDrawer({
         <View
           {...drawerPanResponder.panHandlers}
           style={{
-            width: Platform.OS === 'web' ? 360 : 310,
+            width: Platform.OS === 'web' ? 360 : '85%',
+            maxWidth: 360,
             backgroundColor: '#0E0E0E',
             borderLeftWidth: 2,
             borderLeftColor: config.color,

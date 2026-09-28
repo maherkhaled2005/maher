@@ -295,9 +295,7 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }}
         renderItem={({ item }) => {
           const isStaffMsg = item.senderType === 'staff' || item.isFromSupport === 1 || item.sender === 'agent';
-          const isMe = item.senderId
-            ? item.senderId === user?.id
-            : (isStaff ? isStaffMsg : !isStaffMsg);
+          const isCustomer = !isStaffMsg;
           const msgText = item.message || item.text || '';
           const senderLabel = item.senderName || (isStaffMsg ? 'فريق الدعم الفني' : 'العميل');
           const timeLabel = item.createdAt
@@ -306,31 +304,31 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
 
           return (
             <View style={{
-              alignSelf: isMe ? 'flex-end' : 'flex-start',
-              backgroundColor: isMe ? colors.primary : colors.darkCard,
+              alignSelf: isCustomer ? 'flex-end' : 'flex-start',
+              backgroundColor: isCustomer ? colors.primary : colors.darkCard,
               maxWidth: '85%',
               padding: spacing.md,
               borderRadius: borderRadius.lg,
               marginBottom: spacing.md,
-              borderBottomRightRadius: isMe ? 0 : borderRadius.lg,
-              borderBottomLeftRadius: !isMe ? 0 : borderRadius.lg,
+              borderBottomRightRadius: isCustomer ? 0 : borderRadius.lg,
+              borderBottomLeftRadius: !isCustomer ? 0 : borderRadius.lg,
             }}>
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 {isStaffMsg ? (
-                  <Shield color={isMe ? colors.dark : colors.support} size={14} />
+                  <Shield color={isCustomer ? colors.dark : colors.support} size={14} />
                 ) : (
-                  <User color={isMe ? colors.dark : colors.white} size={14} />
+                  <User color={isCustomer ? colors.dark : colors.white} size={14} />
                 )}
-                <Text style={{ color: isMe ? colors.dark : colors.white, fontSize: typography.sizes.xs, fontWeight: '900' }}>
+                <Text style={{ color: isCustomer ? colors.dark : colors.white, fontSize: typography.sizes.xs, fontWeight: '900' }}>
                   {senderLabel}
                 </Text>
               </View>
-              <Text style={{ color: isMe ? colors.dark : colors.white, fontSize: typography.sizes.md, textAlign: 'right', lineHeight: 22 }}>
+              <Text style={{ color: isCustomer ? colors.dark : colors.white, fontSize: typography.sizes.md, textAlign: 'right', lineHeight: 22 }}>
                 {msgText}
               </Text>
               {timeLabel ? (
-                <View style={{ flexDirection: 'row', justifyContent: isMe ? 'flex-start' : 'flex-end', marginTop: 4 }}>
-                  <Text style={{ color: isMe ? 'rgba(0,0,0,0.6)' : colors.gray, fontSize: 10 }}>{timeLabel}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: isCustomer ? 'flex-start' : 'flex-end', marginTop: 4 }}>
+                  <Text style={{ color: isCustomer ? 'rgba(0,0,0,0.6)' : colors.gray, fontSize: 10 }}>{timeLabel}</Text>
                 </View>
               ) : null}
             </View>
@@ -345,6 +343,7 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingHorizontal: spacing.sm, gap: 6, flexDirection: 'row-reverse' }}
             data={[
               'أهلاً بك! تم استلام طلبك وجاري إسناد فني معتمد لمنطقتك حالاً ⚡',

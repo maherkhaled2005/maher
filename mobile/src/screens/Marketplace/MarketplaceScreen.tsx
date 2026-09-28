@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
-} from 'react-native';
+ StatusBar, } from 'react-native';
 import {
   Search,
   Plus,
@@ -309,12 +309,8 @@ export default function MarketplaceScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView
-      style={[
-        { flex: 1, backgroundColor: colors.dark },
-        
-      ]}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
       {/* ☰ Owner Header with Drawer navigation */}
       <OwnerHeader
         title={isBuyer ? "سوق قطع الغيار المعتمدة" : isManager ? "مراجعة واعتماد منتجات السوق" : isSupport ? "دليل منتجات المنصة (استعلام)" : "السوق والرقابة على البضائع"}
@@ -428,7 +424,7 @@ export default function MarketplaceScreen({ navigation }: any) {
 
         {/* Categories Bar */}
         {categoriesList.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingTop: 4 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingTop: 4 , paddingBottom: 100 }}>
             {categoriesList.map((cat: any) => {
               const isSelected = selectedCategory === cat;
               return (
@@ -470,10 +466,11 @@ export default function MarketplaceScreen({ navigation }: any) {
         </View>
       ) : (
         <FlatList
+          ListFooterComponent={<View style={{ height: 100 }} />}
           data={filteredProducts}
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: 150 }}
+          contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: 100 }}
           renderItem={({ item }) => {
             const isApproved = item.isApproved === 1;
             const isBlocked = item.isApproved === -1;
@@ -501,14 +498,19 @@ export default function MarketplaceScreen({ navigation }: any) {
                       justifyContent: 'center',
                       borderWidth: 1,
                       borderColor: '#333',
+                      overflow: 'hidden',
                     }}
                   >
-                    <Text style={{ fontSize: 26 }}>{item.image || '📦'}</Text>
+                    {item.image && item.image.startsWith('http') ? (
+                      <Image source={{ uri: item.image }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    ) : (
+                      <Text style={{ fontSize: 26 }}>📦</Text>
+                    )}
                   </View>
 
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <Text style={{ color: colors.white, fontSize: 15, fontWeight: 'bold' }}>{item.name}</Text>
+                      <Text style={{ color: colors.white, fontSize: 15, fontWeight: 'bold', flex: 1, textAlign: 'right' }} numberOfLines={1}>{item.name}</Text>
                       {/* Status Tag */}
                       <View
                         style={{

@@ -71,19 +71,11 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView
-      style={[
-        {
-          flex: 1,
-          backgroundColor: '#0A0A0A',
-          height: '100%',
-          paddingTop: Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 36) : 0,
-        },
-      ]}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           style={[{ flex: 1, width: '100%' }, Platform.OS === 'web' && ({ overflowY: 'auto' } as any)]}

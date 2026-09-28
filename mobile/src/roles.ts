@@ -196,6 +196,7 @@ export function normalizeRole(role: string): ValidRole {
     case "developer":
     case "programmer":
     case "dev":
+    case "lead_developer":
     case "assistant_programmer":
       return "programmer";
     case "support":

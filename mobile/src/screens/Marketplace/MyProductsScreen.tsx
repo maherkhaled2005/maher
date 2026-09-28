@@ -373,7 +373,14 @@ export default function MyProductsScreen({ navigation }: any) {
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <Package size={48} color={colors.gray} style={{ marginBottom: 12 }} />
               <Text style={{ color: colors.white, fontSize: 16, fontWeight: '700' }}>لا توجد منتجات مطابقة</Text>
-              <Text style={{ color: colors.gray, fontSize: 12, marginTop: 4 }}>اضغط على إضافة منتج للبدء في عرض بضاعتك</Text>
+              <Text style={{ color: colors.gray, fontSize: 12, marginTop: 4, marginBottom: 16 }}>اضغط على إضافة منتج للبدء في عرض بضاعتك</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AddProduct')}
+                style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: borderRadius.md, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              >
+                <Plus size={16} color={colors.dark} />
+                <Text style={{ color: colors.dark, fontWeight: 'bold' }}>إضافة منتج</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             filteredProducts.map((p) => (

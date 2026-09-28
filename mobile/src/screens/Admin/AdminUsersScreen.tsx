@@ -75,8 +75,7 @@ export default function AdminUsersScreen({ navigation }: any) {
   const currentRole = normalizeRole(currentUser?.role || '');
   const isOwner = currentRole === 'owner';
   const isManager = currentRole === 'manager';
-  const isLeadProgrammer = (currentRole === 'programmer' || currentUser?.role === 'programmer') && 
-    (currentUser?.developerRank === 'lead' || (currentUser as any)?.programmerLevel === 'lead' || currentUser?.phone === '01064739664');
+  const isLeadProgrammer = currentRole === 'programmer' || currentUser?.role === 'programmer' || currentUser?.role === 'lead_developer';
   const canAddUser = isOwner || isLeadProgrammer;
   const isReadOnly = !isOwner && !isManager && !isLeadProgrammer;
 
@@ -390,7 +389,7 @@ export default function AdminUsersScreen({ navigation }: any) {
                   phone: formPhone.trim(),
                   email: formEmail.trim() || undefined,
                   role: formRole,
-                  developerRank: formRole === 'programmer' ? (u.phone === '01064739664' ? 'lead' : 'junior') : undefined,
+                  developerRank: formRole === 'programmer' ? (u.id === 'programmer_maher' ? 'lead' : 'junior') : undefined,
                   status: formStatus,
                   balance: isOwner ? Number(formBalance) || 0 : u.balance,
                 }
@@ -829,7 +828,7 @@ export default function AdminUsersScreen({ navigation }: any) {
 
                   <View style={{ alignItems: 'flex-end', flex: 1, paddingRight: spacing.sm }}>
                     <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15 }}>
-                      {normalizeRole(item.role) === 'owner' ? '👑 مالك المنظومة' : (item.phone === '01064739664' || normalizeRole(item.role) === 'programmer') ? '💻 رئيس التقني وقائد التطوير' : item.name}
+                      {normalizeRole(item.role) === 'owner' ? '👑 مالك المنظومة' : normalizeRole(item.role) === 'programmer' ? '💻 رئيس التقني وقائد التطوير' : item.name}
                     </Text>
                     <Text style={{ color: colors.gray, fontSize: 12 }}>{item.phone}</Text>
                     {item.email && <Text style={{ color: colors.gray, fontSize: 11 }}>{item.email}</Text>}
@@ -1171,13 +1170,10 @@ export default function AdminUsersScreen({ navigation }: any) {
                     <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
                       {ALL_ROLES.filter((r) => {
                         if (r.key === 'all') return false;
-                        // Lead Programmer has superpower to assign ANY role
+                        // Lead Programmer can assign ANY role including owner and programmer
                         if (isLeadProgrammer) return true;
-                        // Owner can only assign: manager, customer_support, technician, merchant, customer
-                        if (isOwner) {
-                          if (r.key === 'owner' || r.key === 'programmer') return false;
-                          return true;
-                        }
+                        // Owner can assign all roles
+                        if (isOwner) return true;
                         // Manager cannot assign owner, manager, or programmer
                         if (isManager && (r.key === 'owner' || r.key === 'manager' || r.key === 'programmer')) return false;
                         return true;

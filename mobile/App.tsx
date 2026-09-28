@@ -129,8 +129,14 @@ export default function App() {
   }, []);
 
   // 1. Splash Screen Animation State
-  const splashOpacity = React.useRef(new Animated.Value(0)).current;
-  const splashScale = React.useRef(new Animated.Value(1.15)).current;
+  const logoOpacity = React.useRef(new Animated.Value(0)).current;
+  const logoScale = React.useRef(new Animated.Value(0.8)).current;
+  const subtitleOpacity = React.useRef(new Animated.Value(0)).current;
+  const loadingOpacity = React.useRef(new Animated.Value(0)).current;
+  const splashContainerOpacity = React.useRef(new Animated.Value(1)).current;
+
+  const [typedText, setTypedText] = React.useState('');
+  const fullText = 'TecnoRexa';
 
   useEffect(() => {
     if (notification) {
@@ -139,64 +145,109 @@ export default function App() {
   }, [notification]);
 
   useEffect(() => {
-    // Elegant entrance animation: scale down smoothly into focus
+    // 0ms: Logo image fades in and scales
     Animated.parallel([
-      Animated.timing(splashOpacity, {
+      Animated.timing(logoOpacity, {
         toValue: 1,
-        duration: 350,
+        duration: 300,
         useNativeDriver: Platform.OS !== 'web',
       }),
-      Animated.spring(splashScale, {
+      Animated.timing(logoScale, {
         toValue: 1,
-        friction: 8,
-        tension: 50,
+        duration: 300,
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
 
-    // Fast, crisp splash: 350ms on Web, 1500ms on Native
-    const splashDuration = Platform.OS === 'web' ? 350 : 1500;
+    // 300ms: Start typing 'TecnoRexa' letter by letter
+    let typeIndex = 0;
+    let typeInterval: ReturnType<typeof setInterval>;
+    const typingDelay = setTimeout(() => {
+      typeInterval = setInterval(() => {
+        typeIndex++;
+        setTypedText(fullText.substring(0, typeIndex));
+        if (typeIndex >= fullText.length) {
+          clearInterval(typeInterval);
+        }
+      }, 100);
+    }, 300);
+
+    // 1300ms: Subtitle text fades in
+    const subtitleTimer = setTimeout(() => {
+      Animated.timing(subtitleOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }, 1300);
+
+    // 1800ms: 'جاري التحميل...' fades in
+    const loadingTimer = setTimeout(() => {
+      Animated.timing(loadingOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }, 1800);
+
+    // 2800ms: Splash fades out, app starts
     const transitionTimer = setTimeout(() => {
-      Animated.timing(splashOpacity, {
+      Animated.timing(splashContainerOpacity, {
         toValue: 0,
-        duration: 200,
+        duration: 300,
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setAppReady(true);
       });
-    }, splashDuration);
+    }, 2800);
 
-    return () => clearTimeout(transitionTimer);
+    return () => {
+      clearTimeout(typingDelay);
+      clearInterval(typeInterval);
+      clearTimeout(subtitleTimer);
+      clearTimeout(loadingTimer);
+      clearTimeout(transitionTimer);
+    };
   }, []);
 
   if (!appReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#070A0F', justifyContent: 'center', alignItems: 'center' }}>
+      <Animated.View style={{ flex: 1, backgroundColor: '#070A0F', justifyContent: 'center', alignItems: 'center', opacity: splashContainerOpacity }}>
         <StatusBar barStyle="light-content" backgroundColor="#070A0F" translucent />
 
-        <Animated.View
-          style={{
-            opacity: splashOpacity,
-            transform: [{ scale: splashScale }],
-            alignItems: 'center',
-            paddingHorizontal: 20,
-          }}
-        >
-          {/* Brand Typography in Royal Gold */}
-          <Text style={{ color: '#D4AF37', fontSize: 36, fontWeight: '900', letterSpacing: 1, marginBottom: 8, textAlign: 'center' }}>
-            Tecno<Text style={{ color: '#F3E5AB' }}>Rexa</Text>
-          </Text>
-          <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 28, opacity: 0.95 }}>
-            منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
+        <View style={{ alignItems: 'center', paddingHorizontal: 20 }}>
+          {/* Logo Image */}
+          <Animated.Image
+            source={require('./assets/tr_logo.jpg')}
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: 20,
+              marginBottom: 24,
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }],
+            }}
+          />
+
+          {/* Brand Typography in Royal Gold with Typing Effect */}
+          <Text style={{ color: '#D4AF37', fontSize: 36, fontWeight: '900', letterSpacing: 1, marginBottom: 8, textAlign: 'center', minHeight: 45 }}>
+            {typedText.substring(0, 5)}
+            <Text style={{ color: '#F3E5AB' }}>{typedText.substring(5)}</Text>
           </Text>
 
+          {/* Subtitle */}
+          <Animated.Text style={{ opacity: subtitleOpacity, color: '#D4AF37', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 28 }}>
+            منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
+          </Animated.Text>
+
           {/* Luxury Gold Loading Indicator */}
-          <View
+          <Animated.View
             style={{
+              opacity: loadingOpacity,
               flexDirection: 'row-reverse',
               alignItems: 'center',
               gap: 10,
-              backgroundColor: 'rgba(212, 175, 55, 0.1)',
+              backgroundColor: '#070A0F',
               paddingHorizontal: 20,
               paddingVertical: 10,
               borderRadius: 24,
@@ -213,9 +264,9 @@ export default function App() {
             <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '900' }}>
               جاري التحميل...
             </Text>
-          </View>
-        </Animated.View>
-      </View>
+          </Animated.View>
+        </View>
+      </Animated.View>
     );
   }
 

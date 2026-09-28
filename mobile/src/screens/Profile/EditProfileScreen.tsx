@@ -323,7 +323,6 @@ export default function EditProfileScreen({ navigation }: any) {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        enabled={Platform.OS === 'ios'}
         style={{ flex: 1 }}
       >
         <ScrollView

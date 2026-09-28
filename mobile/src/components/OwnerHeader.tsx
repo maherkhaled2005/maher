@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar, Image, SafeAreaView } from 'react-native';
 import {
   Menu,
   ChevronRight,
@@ -104,103 +104,109 @@ export default function OwnerHeader({
 
   return (
     <>
-      <View style={[styles.container, { borderBottomColor: activeColor + '33' }]}>
-        {/* Right side (RTL Start): ☰ Hamburger Button, Role Badge & Official TR Logo */}
-        <View style={[styles.sideGroup, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-          <TouchableOpacity
-            style={[styles.hamburgerBtn, { borderColor: activeColor + '55' }]}
-            onPress={() => setDrawerOpen(true)}
-            activeOpacity={0.8}
-            accessibilityLabel="فتح القايمه الرئيسية ☰"
-          >
-            <Menu size={22} color={activeColor} />
-            <View style={[styles.crownBadge, { backgroundColor: activeColor }]}>
-              <RoleIcon size={10} color="#0A0A0A" />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Center: Title and Subtitle / Section Number */}
-        <View style={styles.centerGroup}>
-          <View style={styles.titleRow}>
-            {sectionNumber ? (
-              <View style={[styles.numBadge, { borderColor: activeColor, backgroundColor: activeColor + '22' }]}>
-                <Text style={[styles.numText, { color: activeColor }]}>#{sectionNumber}</Text>
-              </View>
-            ) : null}
-            <Text style={styles.titleText} numberOfLines={1}>
-              {title}
-            </Text>
-          </View>
-          {subtitle ? (
-            <Text style={styles.subtitleText} numberOfLines={1}>
-              {subtitle}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Left side: Notifications + Chat + Optional Back button (Always Available) */}
-        <View style={[styles.sideGroup, { flexDirection: 'row', gap: 5, alignItems: 'center' }]}>
-          {/* Notifications Button */}
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => navigation?.navigate && navigation.navigate('Notifications')}
-            activeOpacity={0.8}
-            accessibilityLabel="الإشعارات"
-          >
-            <Bell size={17} color={colors.gray} />
-            {unreadNotifications > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Chat Button */}
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => navigation?.navigate && navigation.navigate('ChatList')}
-            activeOpacity={0.8}
-            accessibilityLabel="المحادثات"
-          >
-            <MessageCircle size={17} color={colors.gray} />
-            {unreadMessages > 0 && (
-              <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                <Text style={[styles.badgeText, { color: '#0A0A0A' }]}>
-                  {unreadMessages > 99 ? '99+' : unreadMessages}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {rightAction}
-
-          {onRefresh && showBack && (
-            <TouchableOpacity style={styles.iconBtn} onPress={onRefresh} activeOpacity={0.8} accessibilityLabel="تحديث">
-              <RefreshCw size={15} color={colors.gray} />
-            </TouchableOpacity>
-          )}
-
-          {showBack && (
+      <SafeAreaView style={{ backgroundColor: '#0A0A0A', zIndex: 10 }}>
+        <View style={[styles.container, { borderBottomColor: activeColor + '33' }]}>
+          {/* Right side (RTL Start): ☰ Hamburger Button, Role Badge & Official TR Logo */}
+          <View style={[styles.sideGroup, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
             <TouchableOpacity
-              style={[styles.iconBtn, { borderColor: activeColor + '55', backgroundColor: '#1A1A1A' }]}
-              onPress={() => {
-                if (navigation?.canGoBack && navigation.canGoBack()) {
-                  navigation.goBack();
-                } else if (navigation?.navigate) {
-                  navigation.navigate('Home');
-                }
-              }}
+              style={[styles.hamburgerBtn, { borderColor: activeColor + '55' }]}
+              onPress={() => setDrawerOpen(true)}
               activeOpacity={0.8}
-              accessibilityLabel="العوده للخلف"
+              accessibilityLabel="فتح القايمه الرئيسية ☰"
             >
-              <ChevronRight size={20} color={activeColor} />
+              <Menu size={22} color={activeColor} />
+              <View style={[styles.crownBadge, { backgroundColor: activeColor }]}>
+                <RoleIcon size={10} color="#0A0A0A" />
+              </View>
             </TouchableOpacity>
-          )}
+          </View>
+
+          {/* Center: Title and Subtitle / Section Number */}
+          <View style={styles.centerGroup}>
+            <View style={styles.titleRow}>
+              {sectionNumber ? (
+                <View style={[styles.numBadge, { borderColor: activeColor, backgroundColor: activeColor + '22' }]}>
+                  <Text style={[styles.numText, { color: activeColor }]}>#{sectionNumber}</Text>
+                </View>
+              ) : null}
+              <Text style={styles.titleText} numberOfLines={1}>
+                {title}
+              </Text>
+            </View>
+            {subtitle ? (
+              <Text style={styles.subtitleText} numberOfLines={1}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Left side: Notifications + Chat + Optional Back button (Always Available) */}
+          <View style={[styles.sideGroup, { flexDirection: 'row', gap: 5, alignItems: 'center' }]}>
+            {/* Notifications Button */}
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => navigation?.navigate && navigation.navigate('Notifications')}
+              activeOpacity={0.8}
+              accessibilityLabel="الإشعارات"
+            >
+              <Bell size={17} color={colors.gray} />
+              {unreadNotifications > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Chat Button */}
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => navigation?.navigate && navigation.navigate('ChatList')}
+              activeOpacity={0.8}
+              accessibilityLabel="المحادثات"
+            >
+              <MessageCircle size={17} color={colors.gray} />
+              {unreadMessages > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.badgeText, { color: '#0A0A0A' }]}>
+                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {rightAction}
+
+            {onRefresh && showBack && (
+              <TouchableOpacity style={styles.iconBtn} onPress={onRefresh} activeOpacity={0.8} accessibilityLabel="تحديث">
+                <RefreshCw size={15} color={colors.gray} />
+              </TouchableOpacity>
+            )}
+
+            {showBack && (
+              <TouchableOpacity
+                style={[styles.iconBtn, { borderColor: activeColor + '55', backgroundColor: '#1A1A1A' }]}
+                onPress={() => {
+                  try {
+                    if (navigation?.canGoBack?.()) {
+                      navigation.goBack();
+                    } else if (navigation?.navigate) {
+                      navigation.navigate('Home');
+                    }
+                  } catch (e) {
+                    if (navigation?.navigate) navigation.navigate('Home');
+                  }
+                }}
+                activeOpacity={0.8}
+                accessibilityLabel="العوده للخلف"
+              >
+                <ChevronRight size={20} color={activeColor} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
 
       {/* Embedded Role-Aware Side Drawer */}
       <OwnerSideDrawer
@@ -230,14 +236,13 @@ export default function OwnerHeader({
 }
 
 const STATUSBAR_HEIGHT = Platform.OS === 'web' ? 6 : 4;
-
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.sm,
-    paddingTop: STATUSBAR_HEIGHT + 4,
+    paddingTop: 8,
     paddingBottom: 8,
     backgroundColor: '#0A0A0A',
     borderBottomWidth: 1,

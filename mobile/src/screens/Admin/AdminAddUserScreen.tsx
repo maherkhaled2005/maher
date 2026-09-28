@@ -30,8 +30,7 @@ export default function AdminAddUserScreen({ navigation }: any) {
   const { user: currentUser } = useAuthStore();
   const currentRole = normalizeRole(currentUser?.role || '');
   const isOwner = currentRole === 'owner';
-  const isLeadProgrammer = currentRole === 'programmer' || currentUser?.role === 'programmer' || 
-    currentUser?.role === 'lead_developer' || currentUser?.phone === '01064739664';
+  const isLeadProgrammer = currentRole === 'programmer' || currentUser?.role === 'programmer' || currentUser?.role === 'lead_developer';
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -95,11 +94,6 @@ export default function AdminAddUserScreen({ navigation }: any) {
       Alert.alert('تنبيه', 'يرجى إدخال رقم هاتف صحيح (11 رقماً)');
       return;
     }
-    if (cleanPhone === '01064739664') {
-      Alert.alert('تنبيه', 'رقم الهاتف 01064739664 مخصص حصرياً لرئيس التقني ولا يمكن تكراره.');
-      return;
-    }
-
     setIsLoading(true);
     try {
       await fetchApi('/admin/users', {

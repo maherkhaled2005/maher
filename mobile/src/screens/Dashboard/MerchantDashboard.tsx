@@ -9,7 +9,7 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
-} from 'react-native';
+ StatusBar, } from 'react-native';
 import {
   Package,
   Plus,
@@ -40,6 +40,7 @@ export default function MerchantDashboard({ navigation }: any) {
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [activeProductsCount, setActiveProductsCount] = useState<number>(0);
   const [totalSales, setTotalSales] = useState<number>(0);
+  const [recentProducts, setRecentProducts] = useState<any[]>([]);
 
   const loadMerchantData = async () => {
     try {
@@ -69,12 +70,21 @@ export default function MerchantDashboard({ navigation }: any) {
         setPendingOrders([]);
       }
 
-      // 2. Fetch Products Count
+      // 2. Fetch Products
       const prodsRes = await api.get('/products').catch(() => null);
       if (prodsRes?.data && Array.isArray(prodsRes.data)) {
         setActiveProductsCount(prodsRes.data.length);
+        const mappedProds = prodsRes.data.slice(0, 3).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          price: `${p.price} ج.م`,
+          stock: p.stock || 0,
+          raw: p
+        }));
+        setRecentProducts(mappedProds);
       } else {
         setActiveProductsCount(0);
+        setRecentProducts([]);
       }
 
       // 3. Fetch Balance
@@ -136,12 +146,11 @@ export default function MerchantDashboard({ navigation }: any) {
   // Subscription Gate Screen
   if (showSubscription) {
     return (
-      <SafeAreaView
-        style={{ flex: 1, backgroundColor: colors.dark, padding: spacing.xl, justifyContent: 'center' }}
-      >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ alignItems: 'center', paddingVertical: spacing.xl, paddingBottom: 150 }}
+          contentContainerStyle={{ alignItems: 'center', paddingVertical: spacing.xl, paddingBottom: 100 }}
           showsVerticalScrollIndicator={true}
         >
           <View
@@ -265,7 +274,7 @@ export default function MerchantDashboard({ navigation }: any) {
       />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }}
+        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
         showsVerticalScrollIndicator={true}
         refreshControl={
           <RefreshControl
@@ -387,7 +396,7 @@ export default function MerchantDashboard({ navigation }: any) {
                     <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 14 }}>{ord.price}</Text>
                     <Text style={{ color: colors.white, fontWeight: '900', fontSize: 13 }}>{ord.id}</Text>
                   </View>
-                  <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right' }}>
+                  <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700', textAlign: 'right' }} numberOfLines={1}>
                     {ord.item}
                   </Text>
                   <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right', marginTop: 2 }}>
@@ -408,6 +417,67 @@ export default function MerchantDashboard({ navigation }: any) {
                     </TouchableOpacity>
 
                     <Text style={{ color: colors.gray, fontSize: 10 }}>{ord.time}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+
+        {/* Recent Products */}
+        <View style={{ marginBottom: spacing.xxl }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+            <TouchableOpacity onPress={() => navigation.navigate('MyProducts')}>
+              <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>كل المنتجات</Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.white, fontSize: 16, fontWeight: '900', textAlign: 'right' }}>
+              منتجاتي النشطة في السوق 📦
+            </Text>
+          </View>
+
+          <View style={{ gap: spacing.sm }}>
+            {recentProducts.length === 0 ? (
+              <View
+                style={{
+                  backgroundColor: colors.darkCard,
+                  borderRadius: borderRadius.lg,
+                  padding: spacing.xl,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <Boxes size={32} color={colors.gray} style={{ marginBottom: spacing.sm }} />
+                <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: 4 }}>
+                  لا توجد منتجات مضافة حالياً
+                </Text>
+                <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'center' }}>
+                  قم بإضافة قطع غيار وأجهزة لعرضها في المتجر للعملاء والفنيين
+                </Text>
+              </View>
+            ) : (
+              recentProducts.map((prod) => (
+                <View
+                  key={prod.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: colors.darkCard,
+                    borderRadius: borderRadius.lg,
+                    padding: spacing.md,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <View style={{ alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: borderRadius.md }}>
+                    <Text style={{ color: '#10B981', fontWeight: '900', fontSize: 11 }}>المخزون: {prod.stock}</Text>
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end', paddingRight: spacing.sm }}>
+                    <Text style={{ color: colors.white, fontWeight: '700', fontSize: 13, textAlign: 'right' }} numberOfLines={1}>{prod.name}</Text>
+                    <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 14, marginTop: 4 }}>{prod.price}</Text>
+                  </View>
+                  <View style={{ width: 44, height: 44, borderRadius: borderRadius.md, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
+                    <Package size={20} color={colors.gray} />
                   </View>
                 </View>
               ))

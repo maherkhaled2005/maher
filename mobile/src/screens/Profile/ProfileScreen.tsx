@@ -12,7 +12,7 @@ import {
   Platform,
   ActivityIndicator,
   RefreshControl,
-} from 'react-native';
+ StatusBar, } from 'react-native';
 import {
   Crown,
   Edit3,
@@ -188,6 +188,7 @@ export default function ProfileScreen({ navigation }: any) {
   // Reels
   const [reels, setReels] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadProfileData = useCallback(async () => {
     try {
@@ -203,6 +204,7 @@ export default function ProfileScreen({ navigation }: any) {
       }
     } finally {
       setRefreshing(false);
+      setLoading(false);
     }
   }, [user]);
 
@@ -373,9 +375,8 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.dark, height: '100%' }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <StatusBar backgroundColor='#0A0A0A' barStyle='light-content' />
       <OwnerHeader
         title={roleInfo.title}
         subtitle={roleInfo.sub}
@@ -407,9 +408,14 @@ export default function ProfileScreen({ navigation }: any) {
         }
       />
 
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
       <ScrollView
         style={[{ flex: 1 }, Platform.OS === 'web' && { overflowY: 'auto' } as any]}
-        contentContainerStyle={{ paddingBottom: 150 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -564,12 +570,14 @@ export default function ProfileScreen({ navigation }: any) {
                 marginTop: spacing.sm,
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={{ color: colors.gray, fontSize: 12 }}>
-                  {user?.phone || 'غير محدد'}
-                </Text>
-                <Phone size={13} color={colors.gray} />
-              </View>
+              {roleKey !== 'owner' && roleKey !== 'manager' && roleKey !== 'programmer' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ color: colors.gray, fontSize: 12, flexShrink: 1 }}>
+                    {user?.phone || 'غير محدد'}
+                  </Text>
+                  <Phone size={13} color={colors.gray} />
+                </View>
+              )}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={{ color: colors.gray, fontSize: 12 }}>
                   {user?.email || 'غير محدد'}
@@ -1259,8 +1267,7 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         )}
       </ScrollView>
-
-
+      )}
 
       {/* MODAL 2: CUSTOMER UPGRADE REQUEST */}
       <Modal visible={upgradeModalVisible} transparent animationType="fade">
@@ -1329,7 +1336,7 @@ export default function ProfileScreen({ navigation }: any) {
                   : 'رسوم توثيق الفني (300 ج.م) لاعتماد حسابك وبدء استقبال طلبات الصيانة بالعمولة المباشرة.'}
               </Text>
               <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '900', textAlign: 'right' }}>
-                يرجى تحويل الرسوم عبر فودافون كاش أو إنستاباي إلى الرقم: 01012345678
+                يرجى تحويل الرسوم عبر فودافون كاش أو إنستاباي إلى الرقم: 01020000000
               </Text>
             </View>
 

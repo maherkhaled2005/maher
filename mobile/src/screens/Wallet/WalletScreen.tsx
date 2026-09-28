@@ -388,7 +388,11 @@ export default function WalletScreen({ navigation }: any) {
           </Text>
         </View>
 
-        <Text style={{ color: colors.primary, fontSize: 34, fontWeight: '900', marginVertical: 2 }}>
+        <Text 
+          style={{ color: colors.primary, fontSize: 34, fontWeight: '900', marginVertical: 2 }}
+          adjustsFontSizeToFit
+          numberOfLines={1}
+        >
           {(isOwner ? platformBalance : personalBalance).toLocaleString('ar-EG')}{' '}
           <Text style={{ fontSize: 18 }}>ج.م</Text>
         </Text>

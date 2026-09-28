@@ -19,6 +19,7 @@ import { Card } from '../../components/common';
 import OwnerHeader from '../../components/OwnerHeader';
 import CourseDetailsModal from '../../components/CourseDetailsModal';
 import { useAuthStore } from '../../store/authStore';
+import { normalizeRole } from '../../utils/permissions';
 
 type Course = {
   id: string;
@@ -114,7 +115,7 @@ export default function CoursesScreen({ navigation }: any) {
         showBack={true}
         onRefresh={() => loadCourses(true)}
         rightAction={
-          (user?.role === 'technician' || user?.role === 'owner' || user?.role === 'manager') ? (
+          (user?.role && ['technician', 'owner', 'manager', 'programmer'].includes(normalizeRole(user.role))) ? (
             <TouchableOpacity
               onPress={() => setAddModalVisible(true)}
               style={{
@@ -141,8 +142,12 @@ export default function CoursesScreen({ navigation }: any) {
             <Text style={{ color: colors.primary, fontWeight: '800' }}>إعادة المحاولة</Text>
           </TouchableOpacity>
         </View>
-      ) : null}
-
+      ) : loading && !refreshing ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ color: colors.gray, marginTop: spacing.sm }}>جاري تحميل الكورسات...</Text>
+        </View>
+      ) : (
       <FlatList
         data={courses}
         keyExtractor={(course) => course.id}
@@ -157,7 +162,7 @@ export default function CoursesScreen({ navigation }: any) {
             </View>
 
             {/* 80/20 Revenue Split Notice (Visible only to instructors and technical staff) */}
-            {Boolean(user?.role && ['technician', 'merchant', 'owner', 'manager', 'programmer'].includes(user.role)) && (
+            {Boolean(user?.role && ['technician', 'merchant', 'owner', 'manager', 'programmer'].includes(normalizeRole(user.role))) && (
               <View style={{ backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: '#10B981', padding: spacing.sm, borderRadius: borderRadius.md, flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ color: '#10B981', fontWeight: '800', fontSize: 11 }}>💡 نسبة الأرباح للمدربين:</Text>
                 <Text style={{ color: colors.white, fontWeight: '900', fontSize: 11 }}>80% للمصمم / 20% عمولة المنصة</Text>
@@ -197,7 +202,7 @@ export default function CoursesScreen({ navigation }: any) {
               <Text style={{ color: colors.gray, fontSize: 10 }}>#{item.id}</Text>
             </View>
 
-            <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15, textAlign: 'right', marginBottom: 4 }}>
+            <Text style={{ color: colors.white, fontWeight: '900', fontSize: 15, textAlign: 'right', marginBottom: 4 }} numberOfLines={1}>
               {item.title}
             </Text>
             <Text style={{ color: colors.gray, fontSize: 12, textAlign: 'right', lineHeight: 18, marginBottom: 10 }} numberOfLines={2}>
@@ -222,6 +227,7 @@ export default function CoursesScreen({ navigation }: any) {
           </View>
         }
       />
+      )}
 
       {/* Interactive Course Details Modal */}
       <CourseDetailsModal

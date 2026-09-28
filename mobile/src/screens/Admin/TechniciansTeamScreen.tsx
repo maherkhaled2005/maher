@@ -176,21 +176,26 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
     setRefreshing(false);
   }, [currentRole]);
 
-  // Filtering & Sorting (Best to Worst by Rating and Completed Jobs)
+  const normalizeArabic = (text: string) => {
+    return text.replace(/[أإآا]/g, 'ا').replace(/[ةه]/g, 'ه').replace(/[ىي]/g, 'ي').toLowerCase();
+  };
+
   const filteredTechs = technicians
     .filter((t) => {
+      const normSearch = normalizeArabic(search);
       const matchesSearch =
-        (t.name || '').toLowerCase().includes(search.toLowerCase()) ||
-        (t.specialty || '').toLowerCase().includes(search.toLowerCase()) ||
-        (t.phone || '').includes(search) ||
-        (t.city || '').toLowerCase().includes(search.toLowerCase());
+        search === '' ||
+        normalizeArabic(t.name || '').includes(normSearch) ||
+        normalizeArabic(t.specialty || '').includes(normSearch) ||
+        (t.phone || '').includes(normSearch) ||
+        normalizeArabic(t.city || '').includes(normSearch);
 
       const filterObj = SPECIALTY_FILTERS.find(f => f.id === selectedSpecialty || (f.aliases && f.aliases.includes(selectedSpecialty)));
       const matchesSpecialty =
         selectedSpecialty === 'all' ||
         (filterObj && filterObj.match.length > 0
-          ? filterObj.match.some(m => (t.specialty || '').toLowerCase().includes(m))
-          : (t.specialty || '').toLowerCase().includes(selectedSpecialty.toLowerCase()));
+          ? filterObj.match.some(m => normalizeArabic(t.specialty || '').includes(normalizeArabic(m)))
+          : normalizeArabic(t.specialty || '').includes(normalizeArabic(selectedSpecialty)));
 
       return matchesSearch && matchesSpecialty;
     })
@@ -203,7 +208,8 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
 
   const filteredUpgrades = upgrades.filter(
     (u) =>
-      (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      search === '' ||
+      normalizeArabic(u.name || '').includes(normalizeArabic(search)) ||
       (u.phone || '').includes(search)
   );
 

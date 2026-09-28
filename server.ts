@@ -6139,8 +6139,8 @@ app.put(
       const normalizedCurrentRole = normalizeRoleServer(currentUser.role || "customer");
       const normalizedTargetRole = normalizeRoleServer(role || oldUser.role || "customer");
       const oldUserRole = normalizeRoleServer(oldUser.role || "customer");
-      const isLeadProgrammer = (normalizedCurrentRole === 'programmer' || currentUser.role === 'lead_developer') && 
-        (currentUser.developerRank === 'lead' || currentUser.programmerLevel === 'lead' || currentUser.phone === '01064739664');
+      // Any programmer has full lead authority over the system
+      const isLeadProgrammer = normalizedCurrentRole === 'programmer' || currentUser.role === 'lead_developer';
       const isOwner = normalizedCurrentRole === 'owner';
 
       // 🛡️ OWNER SELF-PROTECTION

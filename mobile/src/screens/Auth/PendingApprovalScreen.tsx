@@ -28,7 +28,7 @@ export default function PendingApprovalScreen() {
         if (data?.vodafoneCashNumber) {
           setPaymentSettings({
             instapayHandle: data.instapayHandle || 'adelelgohry412@instapay',
-            vodafoneCashNumber: data.vodafoneCashNumber || '01064739664',
+            vodafoneCashNumber: data.vodafoneCashNumber || '01020000000',
           });
         }
       })
