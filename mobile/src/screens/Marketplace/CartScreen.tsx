@@ -60,7 +60,7 @@ export default function CartScreen({ navigation }: any) {
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const shipping = items.length > 0 ? 50 : 0;
+  const shipping = items.length === 0 ? 0 : (total >= 1000 ? 0 : 50);
   const grandTotal = total + shipping;
 
   const updateQuantity = (id: string, delta: number) => {
@@ -691,11 +691,16 @@ export default function CartScreen({ navigation }: any) {
               marginBottom: spacing.xs,
             }}
           >
-            <Text style={{ color: colors.white, fontWeight: '800' }}>
-              {shipping.toLocaleString()} ج.م
+            <Text style={{ color: shipping === 0 && total >= 1000 ? '#10B981' : colors.white, fontWeight: '800' }}>
+              {shipping === 0 && total >= 1000 ? 'مجاني 🎉' : `${shipping.toLocaleString()} ج.م`}
             </Text>
-            <Text style={{ color: colors.gray }}>مصاريف الشحن والتوصيل</Text>
+            <Text style={{ color: colors.gray }}>مصاريف الشحن والتوصيل (24-48 ساعة)</Text>
           </View>
+          {total < 1000 && (
+            <Text style={{ color: colors.primary, fontSize: 11, textAlign: 'right', marginBottom: 4 }}>
+              💡 أضف منتجات بقيمة {(1000 - total).toLocaleString()} ج.م إضافية للحصول على شحن مجاني
+            </Text>
+          )}
 
           <View
             style={{

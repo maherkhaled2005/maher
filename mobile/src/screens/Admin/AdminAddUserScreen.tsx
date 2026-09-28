@@ -30,8 +30,8 @@ export default function AdminAddUserScreen({ navigation }: any) {
   const { user: currentUser } = useAuthStore();
   const currentRole = normalizeRole(currentUser?.role || '');
   const isOwner = currentRole === 'owner';
-  const isLeadProgrammer = (currentRole === 'programmer' || currentUser?.role === 'programmer') && 
-    (currentUser?.developerRank === 'lead' || currentUser?.phone === '01064739664');
+  const isLeadProgrammer = currentRole === 'programmer' || currentUser?.role === 'programmer' || 
+    currentUser?.role === 'lead_developer' || currentUser?.phone === '01064739664';
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');

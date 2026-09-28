@@ -76,8 +76,16 @@ export default function ChatScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
-  const isGroupOrDevChat = Boolean(String(chatId || '').includes('dev') || String(chatId || '').includes('group') || String(chatId || '').includes('team'));
-  const hasDirectPhone = Boolean(phone && phone !== '01000000000' && phone !== '01000000001');
+  const isGroupOrDevChat = Boolean(
+    String(chatId || '').includes('dev') ||
+    String(chatId || '').includes('group') ||
+    String(chatId || '').includes('team') ||
+    route.params?.isGroup ||
+    userName?.includes('فريق') ||
+    userName?.includes('مطورين') ||
+    userName?.includes('برمجة')
+  );
+  const hasDirectPhone = Boolean(phone && phone !== '01000000000' && phone !== '01000000001' && phone !== '01020000000' && phone !== '01064739664');
   const canCall = !isGroupOrDevChat && hasDirectPhone;
 
   const scrollViewRef = useRef<ScrollView>(null);
@@ -287,7 +295,7 @@ export default function ChatScreen({ route, navigation }: any) {
       {/* Chat Area & Input wrapped in KeyboardAvoidingView */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {/* Messages Scroll Area */}
@@ -414,7 +422,8 @@ export default function ChatScreen({ route, navigation }: any) {
             flexDirection: 'row-reverse',
             alignItems: 'center',
             paddingHorizontal: spacing.md,
-            paddingVertical: spacing.sm,
+            paddingTop: spacing.sm,
+            paddingBottom: Platform.OS === 'ios' ? 24 : 12,
             backgroundColor: '#121212',
             borderTopWidth: 1,
             borderColor: '#222222',

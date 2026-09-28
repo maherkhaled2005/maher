@@ -41,12 +41,13 @@ import { colors, spacing, borderRadius } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type SettingsTab = 'payment' | 'commissions' | 'general' | 'security' | 'terms';
 
 const SettingsScreen = ({ navigation }: any) => {
   const { user, logout } = useAuthStore();
-  const isOwner = user?.role === 'owner' || (user?.role === 'programmer' && (user?.developerRank === 'lead' || user?.phone === '01064739664'));
+  const isOwner = user?.role === 'owner' || user?.role === 'programmer' || user?.role === 'lead_developer' || user?.developerRank === 'lead' || user?.phone === '01064739664';
   const [activeTab, setActiveTab] = useState<SettingsTab>('payment');
   const [loading, setLoading] = useState(isOwner);
   const [saving, setSaving] = useState(false);
@@ -54,6 +55,16 @@ const SettingsScreen = ({ navigation }: any) => {
   // User preferences for non-owners
   const [darkMode, setDarkMode] = useState(true);
   const [language, setLanguage] = useState<'ar' | 'en'>('ar');
+
+  const handleToggleDarkMode = async (val: boolean) => {
+    setDarkMode(val);
+    try {
+      await AsyncStorage.setItem('app_theme', val ? 'dark' : 'light');
+    } catch {}
+    const msg = val ? 'تم تفعيل مظهر المنصة الفخم (الوضع الليلي) 🌙' : 'تم تفعيل الوضع النهاري (الخلفية الفاتحة) ☀️';
+    if (Platform.OS === 'web') window.alert(msg);
+    else Alert.alert('مظهر المنصة', msg);
+  };
   const [pushEnabled, setPushEnabled] = useState(true);
   const [chatAlerts, setChatAlerts] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(true);
@@ -72,7 +83,7 @@ const SettingsScreen = ({ navigation }: any) => {
     fawry_merchant_code: '',
     fawry_security_key: '',
     vodafone_cash_enabled: true,
-    vodafone_cash_number: '01064739664',
+    vodafone_cash_number: '01020000000',
     instapay_handle: 'adelelgohry412@instapay',
     cod_enabled: true,
 
@@ -86,7 +97,7 @@ const SettingsScreen = ({ navigation }: any) => {
     // General Settings
     platform_name: 'TecnoRexa',
     support_email: 'tecnorexa@gmail.com',
-    support_phone: '01064739664',
+    support_phone: '01020000000',
     maintenance_mode: false,
     allow_registrations: true,
     marketplace_enabled: true,
@@ -397,7 +408,7 @@ const SettingsScreen = ({ navigation }: any) => {
             <View style={styles.toggleRow}>
               <Switch
                 value={darkMode}
-                onValueChange={setDarkMode}
+                onValueChange={handleToggleDarkMode}
                 trackColor={{ false: '#333', true: colors.primary }}
                 thumbColor={colors.white}
               />

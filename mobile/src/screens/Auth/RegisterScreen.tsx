@@ -119,7 +119,7 @@ export default function RegisterScreen({ navigation }: any) {
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [paymentSettings, setPaymentSettings] = useState({
     instapayHandle: 'adelelgohry412@instapay',
-    vodafoneCashNumber: '01064739664',
+    vodafoneCashNumber: '01020000000',
   });
 
   useEffect(() => {
@@ -128,7 +128,7 @@ export default function RegisterScreen({ navigation }: any) {
         if (data?.instapayHandle || data?.vodafoneCashNumber) {
           setPaymentSettings({
             instapayHandle: data.instapayHandle || 'adelelgohry412@instapay',
-            vodafoneCashNumber: data.vodafoneCashNumber || '01064739664',
+            vodafoneCashNumber: data.vodafoneCashNumber || '01020000000',
           });
         }
       })

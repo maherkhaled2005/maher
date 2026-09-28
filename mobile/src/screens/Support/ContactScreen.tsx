@@ -244,7 +244,7 @@ export default function ContactScreen({ navigation }: any) {
             }}
           >
             <TouchableOpacity
-              onPress={() => openLink('tel:+201064739664')}
+              onPress={() => openLink('tel:+201020000000')}
               style={{
                 flex: 1,
                 minWidth: '47%',
@@ -275,7 +275,7 @@ export default function ContactScreen({ navigation }: any) {
                 اتصال هاتفي
               </Text>
               <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700', marginTop: 2 }}>
-                01064739664
+                01020000000
               </Text>
             </TouchableOpacity>
 

@@ -113,6 +113,10 @@ export default function MyProductsScreen({ navigation }: any) {
   };
 
   const handleOpenAddModal = () => {
+    if (navigation?.navigate) {
+      navigation.navigate('AddProduct');
+      return;
+    }
     setEditingProduct(null);
     setFormName('');
     setFormDesc('');

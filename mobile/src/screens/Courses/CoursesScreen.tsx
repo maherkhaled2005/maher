@@ -156,11 +156,13 @@ export default function CoursesScreen({ navigation }: any) {
               <Text style={{ color: colors.gray, fontSize: 10, marginTop: 2, textAlign: 'center' }}>جميع الفيديوهات والملفات مشفرة ومحمية بالحقوق الملكية الفكرية لمنصة TecnoRexa</Text>
             </View>
 
-            {/* 80/20 Revenue Split Notice */}
-            <View style={{ backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: '#10B981', padding: spacing.sm, borderRadius: borderRadius.md, flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ color: '#10B981', fontWeight: '800', fontSize: 11 }}>💡 نسبة الأرباح للمدربين:</Text>
-              <Text style={{ color: colors.white, fontWeight: '900', fontSize: 11 }}>80% للمصمم / 20% عمولة المنصة</Text>
-            </View>
+            {/* 80/20 Revenue Split Notice (Visible only to instructors and technical staff) */}
+            {Boolean(user?.role && ['technician', 'merchant', 'owner', 'manager', 'programmer'].includes(user.role)) && (
+              <View style={{ backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: '#10B981', padding: spacing.sm, borderRadius: borderRadius.md, flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ color: '#10B981', fontWeight: '800', fontSize: 11 }}>💡 نسبة الأرباح للمدربين:</Text>
+                <Text style={{ color: colors.white, fontWeight: '900', fontSize: 11 }}>80% للمصمم / 20% عمولة المنصة</Text>
+              </View>
+            )}
           </View>
         }
         renderItem={({ item }) => (

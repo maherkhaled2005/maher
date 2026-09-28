@@ -339,9 +339,42 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
+      {/* Canned Quick Replies (for Staff) */}
+      {isStaff && (
+        <View style={{ backgroundColor: '#111', paddingVertical: 6, borderTopWidth: 1, borderColor: '#222' }}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: spacing.sm, gap: 6, flexDirection: 'row-reverse' }}
+            data={[
+              'أهلاً بك! تم استلام طلبك وجاري إسناد فني معتمد لمنطقتك حالاً ⚡',
+              'تم تحويل تذكرتك للدعم الفني وسنتواصل معك هاتفياً للمتابعة 🎧',
+              'تم تأكيد فحص الجهاز وإغلاق البلاغ بنجاح، شكراً لثقتكم ✅',
+              'يرجى تزويدنا برقم الهاتف البديل لتسهيل وصول الفني 📍',
+            ]}
+            keyExtractor={(_, i) => String(i)}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => setInputText(item)}
+                style={{
+                  backgroundColor: 'rgba(212, 175, 55, 0.12)',
+                  borderWidth: 1,
+                  borderColor: colors.primary,
+                  paddingHorizontal: 12,
+                  paddingVertical: 5,
+                  borderRadius: borderRadius.full,
+                }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>{item}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
+
       {/* Input */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, backgroundColor: colors.darkCard, borderTopWidth: 1, borderColor: colors.border }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: Platform.OS === 'ios' ? 24 : 12, backgroundColor: colors.darkCard, borderTopWidth: 1, borderColor: colors.border }}>
           <TouchableOpacity 
             onPress={handleSendReply}
             style={{ backgroundColor: colors.primary, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}

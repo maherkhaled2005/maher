@@ -19,7 +19,7 @@ export default function PendingApprovalScreen() {
   const [checking, setChecking] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState({
     instapayHandle: 'adelelgohry412@instapay',
-    vodafoneCashNumber: '01064739664',
+    vodafoneCashNumber: '01020000000',
   });
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function PendingApprovalScreen() {
   };
 
   const handleContactAdmin = () => {
-    const phone = paymentSettings.vodafoneCashNumber || '01064739664';
+    const phone = paymentSettings.vodafoneCashNumber || '01020000000';
     Linking.openURL(`tel:${phone}`).catch(() => {
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const clean = phone.replace(/\D/g, '');

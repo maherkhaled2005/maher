@@ -1186,7 +1186,7 @@ export default function WalletScreen({ navigation }: any) {
                   </Text>
                 )}
                 <Text style={{ color: colors.white, fontSize: 12, textAlign: 'right', marginBottom: 2 }}>
-                  رقم الهاتف: <Text style={{ color: colors.primary, fontWeight: 'bold' }}>01064739664</Text>
+                  رقم الهاتف: <Text style={{ color: colors.primary, fontWeight: 'bold' }}>01020000000</Text>
                 </Text>
                 <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'right', marginTop: 4 }}>
                   يرجى تحويل المبلغ ثم إدخال رقم هاتفك أو حسابك المحول منه لتأكيد إضافة الرصيد.

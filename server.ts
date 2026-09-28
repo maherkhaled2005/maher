@@ -4378,7 +4378,33 @@ app.get("/api/technician/overview", authenticateToken, requireActiveTechnician, 
 
     const overallRating = ratingRow?.avgRating ? Number(Number(ratingRow.avgRating).toFixed(1)) : (user.rating ? Number(user.rating) : 0);
     const ratingCount = ratingRow?.cnt ? Number(ratingRow.cnt) : (user.ratingCount ? Number(user.ratingCount) : 0);
-    const workedHours = Number((completedOrders * 2.0).toFixed(1));
+
+    // Calculate realistic task-based worked hours based on actual assigned orders & support requests
+    const completedOrdersList = db.prepare(`
+      SELECT createdAt, completedAt FROM orders 
+      WHERE technicianId = ? AND status = 'completed'
+    `).all(userId) as any[];
+
+    const completedSupportReqs = db.prepare(`
+      SELECT createdAt, completedAt FROM support_requests 
+      WHERE assignedTechnicianId = ? AND status = 'completed'
+    `).all(userId) as any[];
+
+    let calculatedHours = 0;
+    const allCompletedTasks = [...completedOrdersList, ...completedSupportReqs];
+    for (const t of allCompletedTasks) {
+      if (t.createdAt && t.completedAt) {
+        const start = new Date(t.createdAt).getTime();
+        const end = new Date(t.completedAt).getTime();
+        const diffH = (end - start) / (1000 * 60 * 60);
+        if (diffH >= 0.5 && diffH <= 8) {
+          calculatedHours += diffH;
+          continue;
+        }
+      }
+      calculatedHours += 1.5; // Realistic 1.5 hours per maintenance mission
+    }
+    const workedHours = Number(calculatedHours.toFixed(1));
 
     const kpis = {
       pendingRequests,
@@ -6010,10 +6036,10 @@ app.post(
   "/api/admin/users", authenticateToken, async (req: any, res) => {
     const role = normalizeRoleServer(req.user?.role);
     const isOwner = role === 'owner';
-    const isLeadProgrammer = (role === 'programmer' || role === 'lead_developer') && 
-      (req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead' || req.user?.phone === '01064739664');
+    const isLeadProgrammer = role === 'programmer' || role === 'lead_developer' || 
+      req.user?.developerRank === 'lead' || req.user?.programmerLevel === 'lead' || req.user?.phone === '01064739664';
 
-    // Strict rule: Manager is NOT allowed to add users. Only Lead Programmer and Owner can add users.
+    // Strict rule: Manager is NOT allowed to add users. Only Programmer and Owner can add users.
     if (!isOwner && !isLeadProgrammer) {
       return res.status(403).json({ error: "صلاحية إضافة المستخدمين مقتصرة حصرياً على رئيس التقني والمالك." });
     }
@@ -6028,14 +6054,9 @@ app.post(
       return res.status(400).json({ error: "يرجى إدخال رقم هاتف صحيح مكون من 11 رقماً" });
     }
 
-    // Lead Programmer phone is unique and exclusive
-    if (cleanPhone === '01064739664') {
-      return res.status(400).json({ error: "رقم هاتف رئيس التقني مسجل بالفعل وحصري." });
-    }
-
     const normalizedRole = normalizeRoleServer(userRole || "customer");
 
-    // Restrictions: Only Lead Programmer (Maher Khaled) can create owner or programmer accounts
+    // Restrictions: Only Programmer can create owner or programmer accounts
     if (['owner', 'programmer'].includes(normalizedRole) && !isLeadProgrammer) {
       return res.status(403).json({ error: "فقط رئيس التقني (المبرمج الرئيسي) يملك صلاحية إضافة حسابات المالك والمبرمجين 🛡️" });
     }
@@ -7370,10 +7391,46 @@ app.get("/api/conversations", authenticateToken,async (req: any, res) => {
       )
       .all(req.user.id, req.user.id, req.user.id) as any[];
 
-    const withOnline = conversations.map((c) => ({
-      ...c,
-      isOnline: c.otherUserId ? (userSocketCount.get(c.otherUserId) || 0) > 0 : false,
-    }));
+    const isNonStaff = ["customer", "technician", "merchant"].includes(role);
+
+    const withOnline = conversations.map((c) => {
+      let displayName = c.name || "محادثة";
+      let displayAvatar = c.avatar || "👤";
+      let lastMsg = c.lastMessage || "";
+
+      if (isNonStaff) {
+        if (c.otherUserId) {
+          try {
+            const otherUser = db.prepare("SELECT name, role FROM users WHERE id = ?").get(c.otherUserId) as any;
+            if (otherUser) {
+              const oRole = normalizeRoleServer(otherUser.role);
+              if (["owner", "manager"].includes(oRole)) {
+                displayName = "إدارة TecnoRexa 🏢";
+                displayAvatar = "🏢";
+              } else if (["programmer", "lead_developer"].includes(oRole)) {
+                displayName = "فريق التطوير البرمجي 💻";
+                displayAvatar = "💻";
+              } else if (["customer_support", "support"].includes(oRole)) {
+                displayName = "خدمة العملاء والدعم الفني 🎧";
+                displayAvatar = "🎧";
+              }
+            }
+          } catch {}
+        }
+        if (displayName.includes("ماهر") || displayName.includes("Maher") || displayName.includes("01064739664")) {
+          displayName = "إدارة TecnoRexa 🛡️";
+        }
+        lastMsg = lastMsg.replace(/01064739664/g, "01020000000");
+      }
+
+      return {
+        ...c,
+        name: displayName,
+        avatar: displayAvatar,
+        lastMessage: lastMsg,
+        isOnline: c.otherUserId ? (userSocketCount.get(c.otherUserId) || 0) > 0 : false,
+      };
+    });
     res.json(withOnline);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -7742,13 +7799,26 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
         description,
         new Date().toISOString(),
       );
+      try {
+        db.prepare(
+          "INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'customer', ?, ?)"
+        ).run(
+          `smsg_${Date.now()}`,
+          ticketId,
+          req.user.id,
+          customerName,
+          description,
+          new Date().toISOString(),
+        );
+      } catch {}
     }
     try {
       io.emit("new_ticket", { ticketId, subject, customerName, priority });
       io.emit("ticket_update", { ticketId, status: 'open' });
+      io.emit("new_notification", { title: "تذكرة دعم فني جديدة 🎧", message: `تذكرة جديدة من ${customerName}` });
 
       // Insert database notifications for staff
-      const staffMembers = db.prepare("SELECT id FROM users WHERE role IN ('customer_support', 'manager', 'owner')").all() as any[];
+      const staffMembers = db.prepare("SELECT id FROM users WHERE role IN ('customer_support', 'manager', 'owner', 'programmer')").all() as any[];
       const notifStmt = db.prepare(`
         INSERT INTO notifications (id, userId, type, title, message, data, read, createdAt)
         VALUES (?, ?, 'new_ticket', 'تذكرة دعم فني جديدة 🎧', ?, ?, 0, datetime('now'))
@@ -7805,6 +7875,7 @@ app.post(
         "admin",
         "manager",
         "customer_support",
+        "programmer",
       ].includes(req.user.role);
       const senderType = isStaff ? "staff" : "customer";
       const newStatus = isStaff ? "in_progress" : "open";
@@ -7823,6 +7894,20 @@ app.post(
         isStaff ? 1 : 0,
         new Date().toISOString(),
       );
+
+      try {
+        db.prepare(
+          "INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).run(
+          `smsg_${Date.now()}`,
+          req.params.id,
+          req.user.id,
+          req.user.name || (isStaff ? "فريق الدعم الفني" : "العميل"),
+          isStaff ? "support" : "customer",
+          replyMessage,
+          new Date().toISOString(),
+        );
+      } catch {}
 
       await db.prepare("UPDATE support_tickets SET status = ?, updatedAt = ? WHERE id = ?").run(
         newStatus,
@@ -11530,39 +11615,37 @@ app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
       now,
     );
 
-    // Auto-create chat conversation for customer so complaints immediately appear in Chat
-    const convId = `conv_${id}`;
     try {
       db.prepare(
-        "INSERT OR IGNORE INTO conversations (id, name, avatar, type, lastMessage, lastMessageTime, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, text, isFromSupport, createdAt) VALUES (?, ?, ?, ?, 'customer', ?, ?, 0, ?)"
       ).run(
-        convId,
-        `تذكرة دعم: ${finalSubject}`,
-        "🎧",
-        "support",
+        msgId,
+        id,
+        req.user.id,
+        finalCustomerName,
+        finalDesc,
         finalDesc,
         now,
-        now
       );
+    } catch {}
 
-      db.prepare("INSERT OR IGNORE INTO conversation_participants (conversationId, userId) VALUES (?, ?)").run(convId, req.user.id);
-      const supportLead = await db.prepare("SELECT id FROM users WHERE role = 'customer_support' LIMIT 1").get() as any;
-      if (supportLead?.id && supportLead.id !== req.user.id) {
-        db.prepare("INSERT OR IGNORE INTO conversation_participants (conversationId, userId) VALUES (?, ?)").run(convId, supportLead.id);
+    try {
+      const staffMembers = db.prepare("SELECT id FROM users WHERE role IN ('customer_support', 'manager', 'owner', 'programmer')").all() as any[];
+      const notifStmt = db.prepare(`
+        INSERT INTO notifications (id, userId, type, title, message, data, read, createdAt)
+        VALUES (?, ?, 'new_ticket', 'تذكرة دعم فني جديدة 🎧', ?, ?, 0, datetime('now'))
+      `);
+      for (const sm of staffMembers) {
+        notifStmt.run(
+          `notif_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          sm.id,
+          `تم إنشاء تذكرة دعم جديدة: "${finalSubject}" من ${finalCustomerName}`,
+          JSON.stringify({ ticketId: id, screen: 'TicketDetails' }),
+        );
       }
-
-      db.prepare(
-        "INSERT INTO messages (id, conversationId, senderId, receiverId, content, encrypted, type, createdAt) VALUES (?, ?, ?, ?, ?, 0, 'text', ?)"
-      ).run(
-        `msg_conv_${Date.now()}`,
-        convId,
-        req.user.id,
-        supportLead?.id || null,
-        `📌 [تذكرة دعم جديدة - #${id.slice(-6)}]\n${finalSubject}\n\n${finalDesc}`,
-        now
-      );
-    } catch (eChat) {
-      console.warn("Could not sync ticket to chat conversation:", eChat);
+      io.emit("new_notification", { title: "تذكرة دعم فني جديدة 🎧", message: `تذكرة جديدة من ${finalCustomerName}` });
+    } catch (eNotif) {
+      console.warn("Could not dispatch ticket notifications:", eNotif);
     }
 
     const ticket = db

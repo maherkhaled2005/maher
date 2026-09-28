@@ -115,7 +115,7 @@ export default function AIChatScreen({ navigation }: any) {
   const [questionsLeft, setQuestionsLeft] = useState(3);
 
   const customerMessagesSent = messages.filter((m) => m.role === 'user').length;
-  const isCustomerLocked = currentRole === 'customer' && !subStatus.isSubscribed && customerMessagesSent >= 3;
+  const isCustomerLocked = currentRole === 'customer' && !subStatus.isSubscribed && (subStatus.freePreviewsLeft <= 0 || customerMessagesSent >= 3);
 
   const loadSubscriptionStatus = useCallback(async () => {
     try {
@@ -469,7 +469,7 @@ export default function AIChatScreen({ navigation }: any) {
 
       {/* 3. Main Chat View */}
       {activeTab === 'chat' ? (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} style={{ flex: 1 }}>
           {/* Quick Prompt Chips */}
           <View style={{ backgroundColor: '#111111', paddingVertical: 6, borderBottomWidth: 1, borderColor: '#222' }}>
             <ScrollView
@@ -913,7 +913,7 @@ export default function AIChatScreen({ navigation }: any) {
                     تحويل فودافون كاش أو إنستاباي
                   </Text>
                   <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 2 }}>
-                    تحويل إلى محفظة المنصة 01064739664 وتأكيد الطلب
+                    تحويل إلى محفظة المنصة 01020000000 وتأكيد الطلب
                   </Text>
                 </View>
                 <View style={{ backgroundColor: 'rgba(230,0,0,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#E60000' }}>
@@ -928,7 +928,7 @@ export default function AIChatScreen({ navigation }: any) {
                 بيانات التحويل الرسمي:
               </Text>
               <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '900', textAlign: 'right' }}>
-                فودافون كاش: 01064739664 | إنستاباي: adelelgohry412@instapay
+                فودافون كاش: 01020000000 | إنستاباي: adelelgohry412@instapay
               </Text>
               <Text style={{ color: '#71717A', fontSize: 10, textAlign: 'right', marginTop: 2 }}>
                 * الذكاء الاصطناعي خدمة سحابية متصلة بالإنترنت حصراً لضمان أعلى دقة فنية

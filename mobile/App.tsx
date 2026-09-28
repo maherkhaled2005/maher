@@ -182,38 +182,11 @@ export default function App() {
             paddingHorizontal: 20,
           }}
         >
-          {/* Official TecnoRexa Large Blue Sphere Showcase Graphic with Royal Gold Border */}
-          <View
-            style={{
-              width: 220,
-              height: 220,
-              borderRadius: 110,
-              backgroundColor: '#0A1118',
-              borderWidth: 3.5,
-              borderColor: '#D4AF37',
-              overflow: 'hidden',
-              justifyContent: 'center',
-              alignItems: 'center',
-              shadowColor: '#D4AF37',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.65,
-              shadowRadius: 28,
-              elevation: 16,
-              marginBottom: 24,
-            }}
-          >
-            <Image
-              source={require('./assets/tecnorexa_sphere_showcase.jpg')}
-              style={{ width: '100%', height: '100%', borderRadius: 110 }}
-              resizeMode="cover"
-            />
-          </View>
-
           {/* Brand Typography in Royal Gold */}
-          <Text style={{ color: '#D4AF37', fontSize: 34, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }}>
+          <Text style={{ color: '#D4AF37', fontSize: 36, fontWeight: '900', letterSpacing: 1, marginBottom: 8, textAlign: 'center' }}>
             Tecno<Text style={{ color: '#F3E5AB' }}>Rexa</Text>
           </Text>
-          <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 24, opacity: 0.95 }}>
+          <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 28, opacity: 0.95 }}>
             منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
           </Text>
 
