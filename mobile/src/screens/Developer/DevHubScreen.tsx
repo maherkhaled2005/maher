@@ -705,7 +705,7 @@ export default function DevHubScreen({ navigation }: any) {
 
         {isOwner ? (
           <TouchableOpacity
-            onPress={() => navigation.navigate('AdminReports')}
+            onPress={() => navigation.navigate('ErrorReports')}
             style={{
               flex: 1,
               flexDirection: 'row-reverse',
@@ -948,7 +948,9 @@ export default function DevHubScreen({ navigation }: any) {
       ) : (
         /* ===== Kanban Board ===== */
         <ScrollView
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150, gap: spacing.md }}
           refreshControl={
             <RefreshControl
               refreshing={loading}
@@ -959,6 +961,7 @@ export default function DevHubScreen({ navigation }: any) {
           }
         >
           {/* عمود المهام الجديدة */}
+          <View style={{ width: 300 }}>
           <Text style={{ color: colors.info, fontWeight: '900', fontSize: typography.sizes.lg, textAlign: 'right', marginBottom: spacing.sm }}>
             🆕 جديدة ({newTasks.length})
           </Text>
@@ -971,9 +974,11 @@ export default function DevHubScreen({ navigation }: any) {
           {newTasks.length === 0 && (
             <Text style={{ color: colors.gray, textAlign: 'center', paddingVertical: spacing.md }}>لا توجد مهام جديدة</Text>
           )}
+          </View>
 
           {/* عمود قيد التطوير */}
-          <Text style={{ color: colors.warning, fontWeight: '900', fontSize: typography.sizes.lg, textAlign: 'right', marginTop: spacing.lg, marginBottom: spacing.sm }}>
+          <View style={{ width: 300 }}>
+          <Text style={{ color: colors.warning, fontWeight: '900', fontSize: typography.sizes.lg, textAlign: 'right', marginBottom: spacing.sm }}>
             ⏳ قيد التطوير ({inProgressTasks.length})
           </Text>
           {inProgressTasks.map(task => (
@@ -985,9 +990,11 @@ export default function DevHubScreen({ navigation }: any) {
           {inProgressTasks.length === 0 && (
             <Text style={{ color: colors.gray, textAlign: 'center', paddingVertical: spacing.md }}>لا توجد مهام قيد التطوير</Text>
           )}
+          </View>
 
           {/* عمود تحت المراجعة */}
-          <Text style={{ color: colors.purple, fontWeight: '900', fontSize: typography.sizes.lg, textAlign: 'right', marginTop: spacing.lg, marginBottom: spacing.sm }}>
+          <View style={{ width: 300 }}>
+          <Text style={{ color: colors.purple, fontWeight: '900', fontSize: typography.sizes.lg, textAlign: 'right', marginBottom: spacing.sm }}>
             👀 تحت المراجعة ({reviewTasks.length})
           </Text>
           {reviewTasks.map(task => (
@@ -999,9 +1006,11 @@ export default function DevHubScreen({ navigation }: any) {
           {reviewTasks.length === 0 && (
             <Text style={{ color: colors.gray, textAlign: 'center', paddingVertical: spacing.md }}>لا توجد مهام تحت المراجعة</Text>
           )}
+          </View>
 
           {/* عمود مكتملة */}
-          <Text style={{ color: colors.success, fontWeight: '900', fontSize: typography.sizes.lg, textAlign: 'right', marginTop: spacing.lg, marginBottom: spacing.sm }}>
+          <View style={{ width: 300 }}>
+          <Text style={{ color: colors.success, fontWeight: '900', fontSize: typography.sizes.lg, textAlign: 'right', marginBottom: spacing.sm }}>
             ✅ مكتملة ({doneTasks.length})
           </Text>
           {doneTasks.map(task => (
@@ -1013,6 +1022,7 @@ export default function DevHubScreen({ navigation }: any) {
           {doneTasks.length === 0 && (
             <Text style={{ color: colors.gray, textAlign: 'center', paddingVertical: spacing.md }}>لا توجد مهام مكتملة</Text>
           )}
+          </View>
         </ScrollView>
       )}
 

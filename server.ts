@@ -521,7 +521,7 @@ async function runMigrations() {
     CREATE TABLE IF NOT EXISTS stock_movements (id TEXT PRIMARY KEY, productId TEXT, productName TEXT, movementType TEXT, fromWarehouseId TEXT, fromWarehouseName TEXT, toWarehouseId TEXT, toWarehouseName TEXT, quantity INTEGER, userId TEXT, userName TEXT, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, action TEXT, targetUserId TEXT, performedBy TEXT, details TEXT, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, label TEXT, icon TEXT, orderIndex INTEGER DEFAULT 0, createdAt TEXT);
-    CREATE TABLE IF NOT EXISTS ai_usage (id TEXT PRIMARY KEY, userId TEXT, tokensUsed INTEGER DEFAULT 0, timestamp TEXT);
+    CREATE TABLE IF NOT EXISTS ai_usage (userId TEXT PRIMARY KEY, count INTEGER DEFAULT 0, lastReset TEXT);
     CREATE TABLE IF NOT EXISTS ai_history (id TEXT PRIMARY KEY, userId TEXT, role TEXT, text TEXT, image TEXT, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS wishlist (userId TEXT, productId TEXT, PRIMARY KEY (userId, productId));
     CREATE TABLE IF NOT EXISTS approval_requests (id TEXT PRIMARY KEY, requesterId TEXT, requesterName TEXT, type TEXT, details TEXT, status TEXT DEFAULT 'pending', approvedBy TEXT, createdAt TEXT);
@@ -4422,6 +4422,8 @@ app.get("/api/technician/overview", authenticateToken, requireActiveTechnician, 
       success: true,
       ...kpis,
       kpis,
+      rating: overallRating,
+      ordersCompleted: completedOrders,
       available: Boolean(user.available !== undefined ? user.available : 1),
       availabilityStatus: user.availabilityStatus || (user.available ? 'available' : 'unavailable'),
       specialty: user.specialty || 'صيانة أجهزة منزلية',
@@ -6997,13 +6999,13 @@ app.get("/api/orders", async (req: any, res) => {
     } else if (role === "technician") {
       orders = db
         .prepare(
-          "SELECT * FROM orders WHERE technicianId = ? OR type = 'maintenance' OR (type = 'technician' AND status = 'pending') ORDER BY createdAt DESC",
+          "SELECT * FROM orders WHERE technicianId = ? ORDER BY createdAt DESC",
         )
         .all(userId || "") as any[];
     } else if (role === "merchant") {
       orders = db
         .prepare(
-          "SELECT * FROM orders WHERE sellerId = ? OR type = 'purchase' ORDER BY createdAt DESC",
+          "SELECT * FROM orders WHERE sellerId = ? ORDER BY createdAt DESC",
         )
         .all(userId || "") as any[];
     } else {
@@ -9553,28 +9555,39 @@ app.post(
     const imageFile = req.file;
     const userRole = req.user.role || "customer";
 
-    // Quota Enforcement: Customers get 3 free previews daily before requiring AI subscription (100 EGP/mo)
-    const isExempt = userRole === "owner" || userRole === "programmer";
+    // Quota Enforcement
+    const isExempt = userRole !== "customer" && userRole !== "merchant";
     if (!isExempt) {
-      const activeSub = db.prepare(`
-        SELECT id FROM subscriptions
-        WHERE userId = ? AND planId LIKE 'ai%' AND status = 'active'
-        AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
-      `).get(req.user.id);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ai_usage (
+          userId TEXT PRIMARY KEY,
+          count INTEGER DEFAULT 0,
+          lastReset TEXT
+        )
+      `);
 
-      if (!activeSub) {
-        const todayCount = (db.prepare(`
-          SELECT COUNT(*) as c FROM ai_chat_history
-          WHERE userId = ? AND role = 'user' AND date(createdAt) = date('now')
-        `).get(req.user.id) as any)?.c || 0;
-
-        if (todayCount >= 3) {
-          return res.status(403).json({
-            error: "AI_SUBSCRIPTION_REQUIRED",
-            message: "عفواً، لقد استهلكت المعاينات الـ 3 المجانية المتاحة لليوم. يتطلب الاستمرار تفعيل الاشتراك الشهري (100 ج.م).",
-            freePreviewsLeft: 0,
-          });
+      let usage = db.prepare(`SELECT * FROM ai_usage WHERE userId = ?`).get(req.user.id) as any;
+      const currentMonth = new Date().toISOString().substring(0, 7);
+      
+      if (!usage) {
+        db.prepare(`INSERT INTO ai_usage (userId, count, lastReset) VALUES (?, 0, ?)`).run(req.user.id, currentMonth);
+        usage = { count: 0, lastReset: currentMonth };
+      } else {
+        const usageMonth = usage.lastReset ? usage.lastReset.substring(0, 7) : "";
+        if (usageMonth !== currentMonth) {
+          db.prepare(`UPDATE ai_usage SET count = 0, lastReset = ? WHERE userId = ?`).run(currentMonth, req.user.id);
+          usage.count = 0;
+          usage.lastReset = currentMonth;
         }
+      }
+
+      const limit = userRole === "customer" ? 3 : 5;
+      
+      if (usage.count >= limit) {
+        return res.status(402).json({
+          error: "AI_QUOTA_EXCEEDED",
+          message: "لقد استنفدت رسائلك المجانية. اشترك في خطة مميزة للاستمرار."
+        });
       }
     }
 
@@ -9654,13 +9667,16 @@ app.post(
       ).run(aiMsgId, req.user.id, aiResponse, nowIso);
 
       // Track usage
-      const tokensCount = Math.max(25, Math.ceil((message.length + aiResponse.length) / 4));
-      db.prepare(
-        "INSERT INTO ai_usage (id, userId, tokensUsed, timestamp) VALUES (?, ?, ?, ?)",
-      ).run(`usage_${Date.now()}`, req.user.id, tokensCount, nowIso);
-
-      const todayCount = (db.prepare("SELECT COUNT(*) as c FROM ai_chat_history WHERE userId = ? AND role = 'user' AND date(createdAt) = date('now')").get(req.user.id) as any)?.c || 0;
-      const remainingQuestions = Math.max(0, 50 - todayCount);
+      if (!isExempt) {
+        db.prepare("UPDATE ai_usage SET count = count + 1 WHERE userId = ?").run(req.user.id);
+      }
+      
+      let remainingQuestions = 999;
+      if (!isExempt) {
+         const limit = userRole === "customer" ? 3 : 5;
+         const currentUsage = (db.prepare("SELECT count FROM ai_usage WHERE userId = ?").get(req.user.id) as any)?.count || 0;
+         remainingQuestions = Math.max(0, limit - currentUsage);
+      }
 
       res.json({
         success: true,

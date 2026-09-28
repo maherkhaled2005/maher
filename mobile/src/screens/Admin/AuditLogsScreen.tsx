@@ -49,6 +49,7 @@ export default function AuditLogsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -76,7 +77,8 @@ export default function AuditLogsScreen({ navigation }: any) {
   const filteredLogs = visibleLogs.filter(l => {
     const matchSearch = (l.userName || '').includes(search) || (l.action || '').includes(search) || (l.details || '').includes(search);
     const matchRole = roleFilter === 'all' || l.userRole === roleFilter;
-    return matchSearch && matchRole;
+    const matchDate = dateFilter === '' || l.createdAt.startsWith(dateFilter);
+    return matchSearch && matchRole && matchDate;
   });
 
   const getRoleColor = (role: string) => {
@@ -162,16 +164,28 @@ export default function AuditLogsScreen({ navigation }: any) {
       />
 
       <View style={{ padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-        {/* البحث */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.darkCard, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, paddingHorizontal: spacing.md }}>
-          <Search color={colors.gray} size={20} />
-          <TextInput
-            style={{ flex: 1, padding: spacing.sm, color: colors.white, textAlign: 'right' }}
-            placeholder="بحث بالمستخدم، العملية، التفاصيل..."
-            placeholderTextColor={colors.gray}
-            value={search}
-            onChangeText={setSearch}
-          />
+        {/* البحث والتاريخ */}
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.darkCard, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, paddingHorizontal: spacing.md }}>
+            <Search color={colors.gray} size={20} />
+            <TextInput
+              style={{ flex: 1, padding: spacing.sm, color: colors.white, textAlign: 'right' }}
+              placeholder="بحث..."
+              placeholderTextColor={colors.gray}
+              value={search}
+              onChangeText={setSearch}
+            />
+          </View>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.darkCard, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, paddingHorizontal: spacing.md }}>
+            <Clock color={colors.gray} size={20} />
+            <TextInput
+              style={{ flex: 1, padding: spacing.sm, color: colors.white, textAlign: 'right' }}
+              placeholder="التاريخ (YYYY-MM-DD)"
+              placeholderTextColor={colors.gray}
+              value={dateFilter}
+              onChangeText={setDateFilter}
+            />
+          </View>
         </View>
 
         {/* فلاتر الرتب */}

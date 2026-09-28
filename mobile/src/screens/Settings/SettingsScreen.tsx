@@ -137,6 +137,9 @@ const SettingsScreen = ({ navigation }: any) => {
   };
 
   useEffect(() => {
+    AsyncStorage.getItem('app_theme').then(theme => {
+      if (theme) setDarkMode(theme === 'dark');
+    });
     if (isOwner) {
       fetchSettings();
     } else {
@@ -623,56 +626,58 @@ const SettingsScreen = ({ navigation }: any) => {
       />
 
       {/* Tabs */}
-      <View style={styles.tabsRow}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'payment' && styles.activeTabBtn]}
-          onPress={() => setActiveTab('payment')}
-        >
-          <CreditCard size={14} color={activeTab === 'payment' ? colors.primary : colors.gray} />
-          <Text style={[styles.tabText, activeTab === 'payment' && styles.activeTabText]}>
-            بوابات الدفع
-          </Text>
-        </TouchableOpacity>
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'payment' && styles.activeTabBtn]}
+            onPress={() => setActiveTab('payment')}
+          >
+            <CreditCard size={14} color={activeTab === 'payment' ? colors.primary : colors.gray} />
+            <Text style={[styles.tabText, activeTab === 'payment' && styles.activeTabText]}>
+              بوابات الدفع
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'commissions' && styles.activeTabBtn]}
-          onPress={() => setActiveTab('commissions')}
-        >
-          <Percent size={14} color={activeTab === 'commissions' ? colors.primary : colors.gray} />
-          <Text style={[styles.tabText, activeTab === 'commissions' && styles.activeTabText]}>
-            العمولات
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'commissions' && styles.activeTabBtn]}
+            onPress={() => setActiveTab('commissions')}
+          >
+            <Percent size={14} color={activeTab === 'commissions' ? colors.primary : colors.gray} />
+            <Text style={[styles.tabText, activeTab === 'commissions' && styles.activeTabText]}>
+              العمولات
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'general' && styles.activeTabBtn]}
-          onPress={() => setActiveTab('general')}
-        >
-          <Sliders size={14} color={activeTab === 'general' ? colors.primary : colors.gray} />
-          <Text style={[styles.tabText, activeTab === 'general' && styles.activeTabText]}>
-            العامة
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'general' && styles.activeTabBtn]}
+            onPress={() => setActiveTab('general')}
+          >
+            <Sliders size={14} color={activeTab === 'general' ? colors.primary : colors.gray} />
+            <Text style={[styles.tabText, activeTab === 'general' && styles.activeTabText]}>
+              العامة
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'security' && styles.activeTabBtn]}
-          onPress={() => setActiveTab('security')}
-        >
-          <Shield size={14} color={activeTab === 'security' ? colors.primary : colors.gray} />
-          <Text style={[styles.tabText, activeTab === 'security' && styles.activeTabText]}>
-            الأمان
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'security' && styles.activeTabBtn]}
+            onPress={() => setActiveTab('security')}
+          >
+            <Shield size={14} color={activeTab === 'security' ? colors.primary : colors.gray} />
+            <Text style={[styles.tabText, activeTab === 'security' && styles.activeTabText]}>
+              الأمان
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'terms' && styles.activeTabBtn]}
-          onPress={() => setActiveTab('terms')}
-        >
-          <FileText size={14} color={activeTab === 'terms' ? colors.primary : colors.gray} />
-          <Text style={[styles.tabText, activeTab === 'terms' && styles.activeTabText]}>
-            الشروط
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'terms' && styles.activeTabBtn]}
+            onPress={() => setActiveTab('terms')}
+          >
+            <FileText size={14} color={activeTab === 'terms' ? colors.primary : colors.gray} />
+            <Text style={[styles.tabText, activeTab === 'terms' && styles.activeTabText]}>
+              الشروط
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {loading ? (
@@ -737,6 +742,7 @@ const SettingsScreen = ({ navigation }: any) => {
                       onChangeText={v => updateField('stripe_publishable_key', v)}
                       placeholder="pk_test_..."
                       placeholderTextColor={colors.gray}
+                      secureTextEntry={true}
                     />
                   </View>
                 )}
@@ -762,6 +768,7 @@ const SettingsScreen = ({ navigation }: any) => {
                       onChangeText={v => updateField('paymob_api_key', v)}
                       placeholder="Paymob API Key..."
                       placeholderTextColor={colors.gray}
+                      secureTextEntry={true}
                     />
 
                     <Text style={styles.inputLabel}>Integration ID:</Text>

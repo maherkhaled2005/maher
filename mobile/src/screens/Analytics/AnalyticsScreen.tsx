@@ -265,9 +265,9 @@ export default function AnalyticsScreen({ navigation }: any) {
           }}
         >
           {[
-            { id: 'week', label: 'هذا الأسبوع 📅' },
-            { id: 'month', label: 'هذا الشهر 📊' },
-            { id: 'year', label: 'هذا العام 🏆' },
+            { id: 'today', label: 'اليوم 📅' },
+            { id: '7d', label: '7 أيام 📊' },
+            { id: '30d', label: '30 يوم 🏆' },
           ].map(p => (
             <TouchableOpacity
               key={p.id}

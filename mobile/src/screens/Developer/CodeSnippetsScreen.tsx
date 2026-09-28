@@ -93,9 +93,11 @@ const SnippetItem = ({
 
       {/* الكود */}
       <View style={{ backgroundColor: colors.dark, borderRadius: borderRadius.md, padding: spacing.md, marginVertical: spacing.sm }}>
-        <Text style={{ color: colors.primary, fontFamily: 'monospace', fontSize: typography.sizes.sm, textAlign: 'left' }} numberOfLines={4}>
-          {snippet.code}
-        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <Text style={{ color: colors.primary, fontFamily: 'monospace', fontSize: typography.sizes.sm, textAlign: 'left' }}>
+            {snippet.code}
+          </Text>
+        </ScrollView>
       </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm }}>

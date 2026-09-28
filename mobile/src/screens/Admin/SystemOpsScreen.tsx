@@ -44,6 +44,7 @@ export default function SystemOpsScreen({ navigation }: any) {
   const isLead = user?.developerRank === 'lead' || role === 'owner';
 
   const [services, setServices] = useState<Service[]>([]);
+  const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -52,6 +53,8 @@ export default function SystemOpsScreen({ navigation }: any) {
     try {
       const data = await fetchApi('/system/services');
       if (Array.isArray(data)) setServices(data);
+      const logsData = await fetchApi('/system/logs').catch(() => []);
+      if (Array.isArray(logsData)) setSystemLogs(logsData);
     } catch (error) {
       // fallback if offline
     } finally {
@@ -263,6 +266,28 @@ export default function SystemOpsScreen({ navigation }: any) {
               fullWidth
               disabled={restarting}
             />
+          </Card>
+        )}
+
+        {/* ===== السجلات المباشرة ===== */}
+        {isLead && (
+          <Card style={{ marginTop: spacing.md }}>
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <Text style={{ color: colors.white, fontWeight: '900', fontSize: typography.sizes.lg, textAlign: 'right' }}>
+                السجلات المباشرة (Live Logs) 📝
+              </Text>
+            </View>
+            <View style={{ backgroundColor: '#1A1A1A', padding: spacing.sm, borderRadius: borderRadius.sm, minHeight: 150 }}>
+              {systemLogs.length === 0 ? (
+                <Text style={{ color: colors.gray, textAlign: 'center', marginTop: 40 }}>لا توجد سجلات حديثة</Text>
+              ) : (
+                systemLogs.map((log, idx) => (
+                  <Text key={idx} style={{ color: colors.success, fontFamily: 'monospace', fontSize: 11, textAlign: 'left', marginBottom: 4 }}>
+                    [{new Date(log.timestamp || Date.now()).toLocaleTimeString()}] {log.message || log.error || JSON.stringify(log)}
+                  </Text>
+                ))
+              )}
+            </View>
           </Card>
         )}
       </ScrollView>
