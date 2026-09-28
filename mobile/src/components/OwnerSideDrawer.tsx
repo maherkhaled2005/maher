@@ -535,6 +535,33 @@ export default function RoleSideDrawer({
             })}
           </ScrollView>
 
+          {/* Quick Legal & Terms Link */}
+          <View style={{ paddingHorizontal: spacing.md, paddingVertical: 8, backgroundColor: '#0D0D0E', borderTopWidth: 1, borderTopColor: '#222' }}>
+            <TouchableOpacity
+              onPress={() => {
+                onClose();
+                navigation?.navigate('Terms');
+              }}
+              style={{
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderRadius: borderRadius.md,
+                borderWidth: 1,
+                borderColor: 'rgba(59, 130, 246, 0.25)',
+              }}
+            >
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 14 }}>📜</Text>
+                <Text style={{ color: '#60A5FA', fontSize: 12, fontWeight: 'bold' }}>ميثاق القوانين وشروط الخدمة والضمان</Text>
+              </View>
+              <ChevronLeft size={16} color="#60A5FA" />
+            </TouchableOpacity>
+          </View>
+
           {/* Drawer Footer */}
           <View
             style={{

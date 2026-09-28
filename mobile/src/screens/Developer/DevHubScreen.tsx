@@ -445,12 +445,16 @@ export default function DevHubScreen({ navigation }: any) {
     try {
       await fetchApi(`/dev/tasks/${taskId}/status`, { method: 'PUT', data: { status: newStatus } });
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as any } : t));
-      const msg = `تم تغيير حالة المهمة إلى ${newStatus}`;
+      const statusLabel =
+        newStatus === 'in_progress' ? 'قيد التطوير ⏳' :
+        newStatus === 'done' ? 'تم الإنجاز والاعتماد ✅' :
+        newStatus === 'review' ? 'تحت المراجعة 👀' : newStatus;
+      const msg = `تم تحديث حالة المهمة بنجاح إلى: ${statusLabel}`;
       if (Platform.OS === 'web') window.alert('تم التحديث: ' + msg);
-      else Alert.alert('تم التحديث', msg);
+      else Alert.alert('✅ تم التحديث', msg);
     } catch (error) {
       if (Platform.OS === 'web') window.alert('خطأ: فشل تغيير الحالة');
-      else Alert.alert('خطأ', 'فشل تغيير الحالة');
+      else Alert.alert('خطأ', 'فشل تغيير حالة المهمة، يرجى المحاولة لاحقاً');
     }
   };
 
@@ -510,6 +514,20 @@ export default function DevHubScreen({ navigation }: any) {
             canManageTasks ? (
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 <TouchableOpacity
+                  onPress={() => setShowOnboardingModal(true)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#8B5CF6',
+                    paddingHorizontal: 8,
+                    paddingVertical: 5,
+                    borderRadius: borderRadius.md,
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 11 }}>📜 القوانين</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   onPress={() => setShowCreateModal(true)}
                   style={{
                     flexDirection: 'row',
@@ -540,7 +558,22 @@ export default function DevHubScreen({ navigation }: any) {
                   <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: 11 }}>إصلاح سريع ⚡</Text>
                 </TouchableOpacity>
               </View>
-            ) : undefined
+            ) : (
+              <TouchableOpacity
+                onPress={() => setShowOnboardingModal(true)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#8B5CF6',
+                  paddingHorizontal: 8,
+                  paddingVertical: 5,
+                  borderRadius: borderRadius.md,
+                  gap: 4,
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 11 }}>📜 ميثاق وقوانين المبرمجين</Text>
+              </TouchableOpacity>
+            )
           }
         />
       ) : (

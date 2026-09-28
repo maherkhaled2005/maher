@@ -11,6 +11,11 @@ import { getActiveSocketURL } from './src/api/client';
 import { useAuthStore } from './src/store/authStore';
 import { Alert } from 'react-native';
 
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  document.documentElement.lang = 'ar';
+  document.documentElement.dir = 'rtl';
+}
+
 interface ErrorBoundaryProps {
   children: ReactNode;
 }

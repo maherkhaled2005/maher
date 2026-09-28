@@ -34,6 +34,7 @@ import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, borderRadius } from '../../theme';
 import { api } from '../../api/client';
 import OwnerHeader from '../../components/OwnerHeader';
+import * as Clipboard from 'expo-clipboard';
 
 export default function SupportDashboard({ navigation }: any) {
   const { user } = useAuthStore();
@@ -138,8 +139,13 @@ export default function SupportDashboard({ navigation }: any) {
     'تم تأكيد وصول الفني، يمكنك متابعة موقعه المباشر على الخريطة من خلال صفحة الطلب.',
   ];
 
-  const handleCopyReply = (text: string) => {
-    Alert.alert('✅ تم النسخ', `تم نسخ الرد السريع بنجاح:\n"${text}"`);
+  const handleCopyReply = async (text: string) => {
+    try {
+      await Clipboard.setStringAsync(text);
+      Alert.alert('✅ تم النسخ إلى الحافظة', `تم نسخ نص الرد السريع وجاهز للصق في الشات:\n\n"${text}"`);
+    } catch {
+      Alert.alert('تم النسخ', text);
+    }
   };
 
   return (
@@ -250,7 +256,7 @@ export default function SupportDashboard({ navigation }: any) {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>قسم التواصل والتصعيد للمبرمجين 💻</Text>
-                  <Text style={{ color: '#A1A1AA', fontSize: 11 }}>تحويل الأعطال التقنية المستعصية للمهندس ماهر وفريق البرمجة</Text>
+                  <Text style={{ color: '#A1A1AA', fontSize: 11 }}>تحويل الأعطال التقنية المستعصية للدعم التقني وفريق البرمجة</Text>
                 </View>
               </View>
               <View style={{ backgroundColor: 'rgba(124, 58, 237, 0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: borderRadius.sm }}>

@@ -88,8 +88,17 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
         method: 'POST',
         data: { action },
       });
-      Alert.alert('✅ تم الإجراء', res?.message || 'تم تحديث التذكرة بنجاح');
-      loadTicketDetails();
+      const successTitle =
+        action === 'transfer_programmer' ? '✅ تم التصعيد للمبرمجين' :
+        action === 'transfer_tech' ? '✅ تم التوجيه لفريق الفنيين' : '✅ تم إغلاق التذكرة';
+      const successMsg =
+        action === 'transfer_programmer'
+          ? 'تم تصعيد العطل وإرسال إشعار فوري للمسؤول التقني وفريق البرمجة مع توثيقه في مركز الأخطاء 💻'
+          : action === 'transfer_tech'
+          ? 'تم توجيه الاستفسار لغرفة الفنيين لمتابعة مواصفات الجهاز والإصلاح 🔧'
+          : res?.message || 'تم تحديث التذكرة بنجاح';
+      Alert.alert(successTitle, successMsg);
+      await loadTicketDetails();
     } catch (err: any) {
       Alert.alert('خطأ', err.message || 'تعذر تنفيذ الإجراء');
     }

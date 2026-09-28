@@ -41,7 +41,9 @@
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "lang": "ar"
     },
     "owner": "maher2006",
     "extra": {

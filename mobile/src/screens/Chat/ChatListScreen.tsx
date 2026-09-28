@@ -40,6 +40,7 @@ interface ConvItem {
   lastMessage?: string;
   lastMessageTime?: string;
   createdAt: string;
+  isOnline?: boolean;
 }
 
 export default function ChatListScreen({ navigation }: any) {
@@ -256,7 +257,7 @@ export default function ChatListScreen({ navigation }: any) {
                   navigation.navigate('ChatScreen', {
                     chatId: item.id,
                     userName: item.name,
-                    isOnline: true,
+                    isOnline: Boolean(item.isOnline),
                   });
                 }
               }}
@@ -282,9 +283,25 @@ export default function ChatListScreen({ navigation }: any) {
                     borderColor: '#333',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    position: 'relative',
                   }}
                 >
                   <Text style={{ fontSize: 20 }}>💬</Text>
+                  {Boolean(item.isOnline) && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: '#10B981',
+                        borderWidth: 2,
+                        borderColor: '#141414',
+                      }}
+                    />
+                  )}
                 </View>
 
                 <View style={{ alignItems: 'flex-end', flex: 1 }}>

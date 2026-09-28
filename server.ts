@@ -489,6 +489,11 @@ io.on("connection", (socket) => {
   });
 });
 
+app.get("/api/system/presence", (req, res) => {
+  const onlineUserIds = Array.from(userSocketCount.keys()).filter((id) => (userSocketCount.get(id) || 0) > 0);
+  res.json({ onlineUserIds });
+});
+
 // ========== 4. MIGRATIONS ==========
 async function runMigrations() {
   await db.exec(`
@@ -4149,7 +4154,7 @@ app.post("/api/support/tickets/:id/actions", authenticateToken,async (req: any, 
     } else if (action === 'transfer_tech') {
       await db.prepare("UPDATE support_tickets SET status = 'in_progress' WHERE id = ?").run(id);
       const msgId = `tmsg_${Date.now()}`;
-      const textMsg = 'تم توجيه الاستفسار للمشرف الهندسي لفحص مواصفات الجهاز.';
+      const textMsg = 'تم توجيه الاستفسار للمشرف الهندسي والفنيين لفحص مواصفات الجهاز.';
       db.prepare("INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, ?)").run(
         msgId, id, req.user?.id || 'support', 'التنسيق الفني 🔧', textMsg, new Date().toISOString()
       );
@@ -4157,6 +4162,14 @@ app.post("/api/support/tickets/:id/actions", authenticateToken,async (req: any, 
         db.prepare("INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, datetime('now'))").run(
           msgId, id, req.user?.id || 'support', 'التنسيق الفني 🔧', textMsg
         );
+      } catch {}
+      try {
+        const techs = db.prepare("SELECT id FROM users WHERE role = 'technician' LIMIT 20").all() as any[];
+        for (const t of techs) {
+          db.prepare("INSERT INTO notifications (id, userId, title, message, type, read, createdAt) VALUES (?, ?, 'توجيه فني جديد 🔧', ?, 'tech', 0, datetime('now'))")
+            .run(`notif_${Date.now()}_${t.id}`, t.id, `تم توجيه استفسار صيانة جديد #${id} من خدمة العملاء.`);
+        }
+        io.emit('new_notification', { title: 'توجيه فني جديد 🔧', role: 'technician' });
       } catch {}
     } else if (action === 'transfer_programmer') {
       await db.prepare("UPDATE support_tickets SET status = 'in_progress', priority = 'critical' WHERE id = ?").run(id);
@@ -4181,6 +4194,15 @@ app.post("/api/support/tickets/:id/actions", authenticateToken,async (req: any, 
         db.prepare("INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, datetime('now'))").run(
           msgId, id, req.user?.id || 'support', 'فريق التطوير والبرمجة 💻', textMsg
         );
+      } catch {}
+      try {
+        const progs = db.prepare("SELECT id FROM users WHERE role = 'programmer'").all() as any[];
+        for (const p of progs) {
+          db.prepare("INSERT INTO notifications (id, userId, title, message, type, read, createdAt) VALUES (?, ?, '🚨 عطل تقني مصعد للمطورين', ?, 'dev', 0, datetime('now'))")
+            .run(`notif_${Date.now()}_${p.id}`, p.id, `تم تصعيد التذكرة #${id} (${ticket?.subject || 'عطل تقني'}) لفريق البرمجة لمراجعته.`);
+        }
+        io.emit('new_notification', { title: '🚨 عطل تقني مصعد للمطورين', role: 'programmer' });
+        io.emit('bug_created', { bugId, title: ticket?.subject });
       } catch {}
     }
     res.json({ success: true, message: 'تم تطبيق الإجراء على التذكرة بنجاح.' });
@@ -7326,22 +7348,33 @@ app.get("/api/conversations", authenticateToken,async (req: any, res) => {
   try {
     const role = normalizeRoleServer(req.user.role);
     if (role === 'owner' || role === 'manager') {
-      const allConversations = await db.prepare("SELECT c.*, 0 as unreadCount FROM conversations c ORDER BY c.lastMessageTime DESC").all();
-      return res.json(allConversations || []);
+      const allConversations = await db.prepare("SELECT c.*, 0 as unreadCount FROM conversations c ORDER BY c.lastMessageTime DESC").all() as any[];
+      const withOnline = allConversations.map((c) => {
+        const participants = db.prepare("SELECT userId FROM conversation_participants WHERE conversationId = ?").all(c.id) as any[];
+        const hasOnline = participants.some((p) => (userSocketCount.get(p.userId) || 0) > 0);
+        return { ...c, isOnline: hasOnline };
+      });
+      return res.json(withOnline);
     }
     const conversations = db
       .prepare(
         `
       SELECT c.*,
-        (SELECT COUNT(*) FROM messages m WHERE m.conversationId = c.id AND m.read = 0 AND m.receiverId = ?) as unreadCount
+        (SELECT COUNT(*) FROM messages m WHERE m.conversationId = c.id AND m.read = 0 AND m.receiverId = ?) as unreadCount,
+        (SELECT cp2.userId FROM conversation_participants cp2 WHERE cp2.conversationId = c.id AND cp2.userId != ? LIMIT 1) as otherUserId
       FROM conversations c
       JOIN conversation_participants cp ON cp.conversationId = c.id
       WHERE cp.userId = ?
       ORDER BY c.lastMessageTime DESC
     `,
       )
-      .all(req.user.id, req.user.id);
-    res.json(conversations || []);
+      .all(req.user.id, req.user.id, req.user.id) as any[];
+
+    const withOnline = conversations.map((c) => ({
+      ...c,
+      isOnline: c.otherUserId ? (userSocketCount.get(c.otherUserId) || 0) > 0 : false,
+    }));
+    res.json(withOnline);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -7551,7 +7584,7 @@ app.get("/api/support/tickets", authenticateToken,async (req: any, res) => {
   try {
     const { status, priority, category, search } = req.query as any;
     const role = req.user.role;
-    const isStaff = ["owner", "admin", "manager", "customer_support"].includes(
+    const isStaff = ["owner", "admin", "manager", "customer_support", "programmer", "lead_developer"].includes(
       role,
     );
 
@@ -11669,17 +11702,19 @@ app.post(
       // Update ticket status to escalated
       await db.prepare("UPDATE support_tickets SET status = 'escalated' WHERE id = ?").run(ticketId);
 
-      // Add support escalation message
+      // Add support escalation message to both tables
       const msgId = `smsg_${Date.now()}`;
-      db.prepare(
-        "INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'support', ?, datetime('now'))"
-      ).run(
-        msgId,
-        ticketId,
-        req.user.id,
-        req.user.name || 'خدمة العملاء',
-        `[تم تصعيد التذكرة للمبرمجين]\nملاحظة: ${note || 'مشكلة برمجية تحتاج فحص المطورين'}`
-      );
+      const escText = `[تم تصعيد التذكرة للمبرمجين]\nملاحظة: ${note || 'مشكلة برمجية تحتاج فحص المطورين'}`;
+      try {
+        db.prepare(
+          "INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'support', ?, datetime('now'))"
+        ).run(msgId, ticketId, req.user.id, req.user.name || 'خدمة العملاء', escText);
+      } catch {}
+      try {
+        db.prepare(
+          "INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, text, isFromSupport, createdAt) VALUES (?, ?, ?, ?, 'staff', ?, ?, 1, datetime('now'))"
+        ).run(msgId, ticketId, req.user.id, req.user.name || 'خدمة العملاء', escText, escText);
+      } catch {}
 
       // Find lead programmer (developerRank = 'lead' or programmerLevel = 'lead')
       const lead = db.prepare("SELECT id, name FROM users WHERE role = 'programmer' AND (developerRank = 'lead' OR programmerLevel = 'lead') LIMIT 1").get() as any;
@@ -11709,6 +11744,17 @@ app.post(
         req.user.id,
         req.user.name || 'خدمة العملاء'
       );
+
+      // Notify all programmers
+      try {
+        const progs = db.prepare("SELECT id FROM users WHERE role = 'programmer'").all() as any[];
+        for (const p of progs) {
+          db.prepare("INSERT INTO notifications (id, userId, title, message, type, read, createdAt) VALUES (?, ?, '🚨 عطل تقني مصعد للمطورين', ?, 'dev', 0, datetime('now'))")
+            .run(`notif_${Date.now()}_${p.id}`, p.id, `تم تصعيد التذكرة #${ticketId} (${ticket.subject}) للمبرمجين لمتابعتها وإصلاحها.`);
+        }
+        io.emit('new_notification', { title: '🚨 عطل تقني مصعد للمطورين', role: 'programmer' });
+        io.emit('bug_created', { bugId, title: ticket.subject });
+      } catch {}
 
       // Notify customer
       if (ticket.customerId) {

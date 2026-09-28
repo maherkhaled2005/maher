@@ -25,6 +25,7 @@ import {
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
+import useSocket from '../../hooks/useSocket';
 
 interface MessageItem {
   id: string;
@@ -46,6 +47,29 @@ export default function ChatScreen({ route, navigation }: any) {
     isOnline: true,
     phone: '',
   };
+
+  const [onlineState, setOnlineState] = useState<boolean>(isOnline !== false);
+  const { socket } = useSocket(user?.id || null);
+
+  useEffect(() => {
+    if (!socket || !chatId) return;
+    const handlePresence = (data: { userId: string; status: 'online' | 'offline' }) => {
+      if (String(data.userId) === String(chatId)) {
+        setOnlineState(data.status === 'online');
+      }
+    };
+    socket.on('user_presence', handlePresence);
+    socket.emit('check_presence', chatId);
+    socket.on('presence_status', (data: { userId: string; status: string }) => {
+      if (String(data.userId) === String(chatId)) {
+        setOnlineState(data.status === 'online');
+      }
+    });
+    return () => {
+      socket.off('user_presence', handlePresence);
+      socket.off('presence_status');
+    };
+  }, [socket, chatId]);
 
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<MessageItem[]>([]);
@@ -210,17 +234,17 @@ export default function ChatScreen({ route, navigation }: any) {
             <Text style={{ color: colors.white, fontSize: 15, fontWeight: '800' }}>
               {userName}
             </Text>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
               <View
                 style={{
                   width: 8,
                   height: 8,
                   borderRadius: 4,
-                  backgroundColor: isOnline !== false ? colors.success : colors.gray,
+                  backgroundColor: onlineState ? colors.success : colors.gray,
                 }}
               />
-              <Text style={{ color: colors.gray, fontSize: 11 }}>
-                {isOnline !== false ? 'متصل الآن' : 'غير متصل'}
+              <Text style={{ color: onlineState ? colors.success : colors.gray, fontSize: 11, fontWeight: '700' }}>
+                {onlineState ? 'متصل الآن 🟢' : 'غير متصل ⚪'}
               </Text>
             </View>
           </View>
