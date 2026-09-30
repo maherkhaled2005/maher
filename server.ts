@@ -1438,16 +1438,31 @@ app.post("/api/auth/login", async (req, res) => {
 
   const cleanPhone = user.phone || normalizedPhone;
   if (process.env.NODE_ENV !== 'production') console.log(`📱 [Login OTP] sent to ${maskPhone(cleanPhone)}`);
-  await sendRealSMS(cleanPhone, `رمز التحقق لتسجيل الدخول إلى TecnoRexa هو: ${otp}`);
+  const smsResult = await sendRealSMS(cleanPhone, `رمز التحقق لتسجيل الدخول إلى TecnoRexa هو: ${otp}`);
 
-  res.json({
+  // Build WhatsApp URL — temporary OTP delivery (no paid API, user sends manually)
+  const whatsappUrl = buildWhatsAppOtpUrl(cleanPhone, otp);
+
+  const responsePayload: any = {
     success: true,
     requireOtp: true,
     tempToken,
     phone: maskPhone(cleanPhone),
-    message: "تم إرسال رمز التحقق إلى هاتفك، برجاء إدخال الرمز للمتابعة",
-  });
+    whatsappUrl,
+    smsDelivered: smsResult.success,
+    message: "تم تجهيز رمز التحقق. سيتم فتح WhatsApp لإرساله إليك",
+  };
+
+  // Only expose OTP in development (NEVER in production)
+  const isProd = process.env.NODE_ENV === 'production' || req.headers['x-test-env'] === 'production';
+  if (!isProd) {
+    responsePayload.devOtp = otp;
+  }
+
+  res.json(responsePayload);
 });
+
+
 
 app.post("/api/auth/verify-login-otp", async (req, res) => {
   const { tempToken, phone, otp } = req.body;
@@ -1595,16 +1610,27 @@ app.post("/api/auth/resend-otp", async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log(`📱 [Resend OTP] sent to ${maskPhone(targetPhone)}`);
     await sendRealSMS(targetPhone, `رمز التحقق الجديد الخاص بك هو: ${otp}`);
 
-    res.json({
+    // Build fresh WhatsApp URL with the new OTP
+    const whatsappUrl = buildWhatsAppOtpUrl(targetPhone, otp);
+
+    const resendPayload: any = {
       success: true,
       tempToken: newTempToken,
       phone: maskPhone(targetPhone),
-      message: "تم إعادة إرسال رمز التحقق بنجاح",
-    });
+      whatsappUrl,
+      message: "تم تجهيز رمز تحقق جديد. سيتم فتح WhatsApp لإرساله إليك",
+    };
+    const isResendProd = process.env.NODE_ENV === 'production' || req.headers['x-test-env'] === 'production';
+    if (!isResendProd) {
+      resendPayload.devOtp = otp;
+    }
+    res.json(resendPayload);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
+
+
 
 app.post("/api/auth/forgot-password", async (req, res) => {
   const { phone } = req.body;
@@ -1640,11 +1666,19 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log(`📱 [Forgot Password OTP] sent to ${maskPhone(cleanPhone)}`);
     await sendRealSMS(cleanPhone, `رمز استعادة كلمة المرور الخاص بك في TecnoRexa هو: ${otp}`);
 
-    res.json({
+    const whatsappUrl = buildWhatsAppOtpUrl(cleanPhone, otp);
+
+    const forgotPayload: any = {
       success: true,
-      message: "تم إرسال رمز استعادة كلمة المرور إلى هاتفك عبر رسالة SMS",
+      message: "تم تجهيز رمز استعادة كلمة المرور. سيتم فتح WhatsApp لإرساله إليك",
       phone: maskPhone(cleanPhone),
-    });
+      whatsappUrl,
+    };
+    if (process.env.NODE_ENV !== 'production') {
+      forgotPayload.devOtp = otp;
+    }
+
+    res.json(forgotPayload);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1690,7 +1724,31 @@ app.post("/api/auth/reset-password", async (req, res) => {
 });
 
 // ─── SMS GATEWAY DISPATCHER ──────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// WhatsApp OTP URL Builder (temporary delivery method — no paid API)
+// Converts Egyptian phone 01012345678 → 201012345678 (no + sign for wa.me)
+// ─────────────────────────────────────────────────────────────
+function buildWhatsAppOtpUrl(phone: string, otp: string): string {
+  // Normalize to local Egyptian format first (011 digits)
+  let digits = String(phone).trim().replace(/\D/g, '');
+  if (digits.startsWith('0020')) digits = digits.slice(4);
+  else if (digits.startsWith('020')) digits = digits.slice(3);
+  else if (digits.startsWith('20') && digits.length === 12) digits = digits.slice(2);
+  if (digits.length === 10 && digits.startsWith('1')) digits = '0' + digits;
+
+  // Convert to international without + : 01012345678 → 201012345678
+  const intlPhone = digits.startsWith('0') ? '2' + digits : digits;
+
+  const message =
+    `رمز التحقق الخاص بك في TecnoRexa هو: ${otp}\n` +
+    `صالح لمدة 10 دقائق.\n` +
+    `لا تشاركه مع أي شخص.`;
+
+  return `https://wa.me/${intlPhone}?text=${encodeURIComponent(message)}`;
+}
+
 async function sendRealSMS(phone: string, text: string): Promise<{ success: boolean; provider?: string; error?: string }> {
+
   let normalizedPhone = String(phone).trim().replace(/\D/g, '');
   if (normalizedPhone.startsWith('0')) {
     normalizedPhone = '+2' + normalizedPhone;
@@ -1932,12 +1990,20 @@ app.post("/api/auth/request-otp", async (req: any, res) => {
     // Send real SMS if gateway credentials are provided
     const smsResult = await sendRealSMS(cleanPhone, `رمز تأكيد حسابك في منصة TecnoRexa هو: ${otp}`);
 
-    res.json({
+    const whatsappUrl = buildWhatsAppOtpUrl(cleanPhone, otp);
+
+    const otpPayload: any = {
       success: true,
-      message: "OTP sent",
+      message: "تم تجهيز رمز التحقق. سيتم فتح WhatsApp لإرساله إليك",
+      whatsappUrl,
       smsDelivered: smsResult.success,
       smsProvider: smsResult.provider,
-    });
+    };
+    if (process.env.NODE_ENV !== 'production') {
+      otpPayload.devOtp = otp;
+    }
+
+    res.json(otpPayload);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2123,16 +2189,31 @@ app.post("/api/auth/register", async (req, res) => {
       JWT_SECRET,
       { expiresIn: "30d" },
     );
+    const tempToken = jwt.sign(
+      { id: freshUser?.id, phone: freshUser?.phone, purpose: 'login_otp' },
+      JWT_SECRET,
+      { expiresIn: "10m" },
+    );
 
-    res.status(201).json({
+    const whatsappUrl = buildWhatsAppOtpUrl(cleanPhone, otp);
+
+    const registerPayload: any = {
       success: true,
       token,
+      tempToken,
       requireOtp: true,
+      phone: maskPhone(cleanPhone),
+      whatsappUrl,
       user: sanitizeUser(freshUser),
       message: isProfessionalRole
         ? "تم تسجيل بياناتك بنجاح. يرجى توثيق رقم هاتفك أولاً، ثم سيقوم فريق الإدارة بمراجعة الحساب والاعتماد."
         : "تم إنشاء الحساب بنجاح! أدخل رمز التأكيد لتفعيل الحساب."
-    });
+    };
+    if (process.env.NODE_ENV !== 'production') {
+      registerPayload.devOtp = otp;
+    }
+
+    res.status(201).json(registerPayload);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

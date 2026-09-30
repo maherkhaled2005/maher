@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Phone, ChevronRight, RefreshCw, Lock, ShieldCheck } from 'lucide-react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Linking } from 'react-native';
+import { Phone, ChevronRight, RefreshCw, Lock, ShieldCheck, MessageCircle } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 
@@ -30,11 +30,13 @@ function maskPhone(p: string): string {
 export default function OTPScreen({ navigation, route }: any) {
   const initialPhone = route?.params?.phone || '';
   const initialFlow = route?.params?.flow || (route?.params?.tempToken ? 'login' : 'register');
+  const initialWhatsappUrl = route?.params?.whatsappUrl || '';
   const [step, setStep] = useState<'phone' | 'otp'>(
     initialPhone || route?.params?.tempToken ? 'otp' : 'phone'
   );
   const [phone, setPhone] = useState(initialPhone);
   const [tempToken, setTempToken] = useState(route?.params?.tempToken || '');
+  const [whatsappUrl, setWhatsappUrl] = useState(initialWhatsappUrl);
   const [flow, setFlow] = useState(initialFlow);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,8 +45,33 @@ export default function OTPScreen({ navigation, route }: any) {
 
   const intervalRef = useRef<any>(null);
   const inputRefs = useRef<any[]>([]);
+  const hasAutoOpenedWhatsAppRef = useRef(false);
 
   const { loginWithOTP, verifyLoginOTP, resendOTP } = useAuthStore();
+
+  const openWhatsApp = async (urlToOpen?: string) => {
+    const targetUrl = urlToOpen || whatsappUrl;
+    if (!targetUrl) {
+      Alert.alert('تنبيه', 'رابط WhatsApp غير متوفر حالياً');
+      return;
+    }
+    try {
+      const canOpen = await Linking.canOpenURL(targetUrl);
+      if (canOpen) {
+        await Linking.openURL(targetUrl);
+      } else {
+        Alert.alert(
+          'تعذر فتح WhatsApp',
+          'WhatsApp غير مثبت على هذا الجهاز.\nيمكنك الرجوع والمحاولة بطريقة أخرى أو إدخال رمز التحقق يدوياً.'
+        );
+      }
+    } catch (err) {
+      Alert.alert(
+        'تعذر فتح WhatsApp',
+        'تأكد من تثبيت WhatsApp على الجهاز ثم حاول مرة أخرى'
+      );
+    }
+  };
 
   useEffect(() => {
     if (route?.params?.phone) {
@@ -52,6 +79,9 @@ export default function OTPScreen({ navigation, route }: any) {
     }
     if (route?.params?.tempToken) {
       setTempToken(route.params.tempToken);
+    }
+    if (route?.params?.whatsappUrl) {
+      setWhatsappUrl(route.params.whatsappUrl);
     }
     if (route?.params?.flow) {
       setFlow(route.params.flow);
@@ -61,6 +91,17 @@ export default function OTPScreen({ navigation, route }: any) {
       setTimer(60);
     }
   }, [route?.params]);
+
+  // Auto-open WhatsApp once when entering OTP step with a valid whatsappUrl
+  useEffect(() => {
+    if (step === 'otp' && whatsappUrl && !hasAutoOpenedWhatsAppRef.current) {
+      hasAutoOpenedWhatsAppRef.current = true;
+      const t = setTimeout(() => {
+        openWhatsApp(whatsappUrl);
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [step, whatsappUrl]);
 
   // 60-second Countdown Timer
   useEffect(() => {
@@ -106,6 +147,10 @@ export default function OTPScreen({ navigation, route }: any) {
       if (res?.tempToken) {
         setTempToken(res.tempToken);
       }
+      if (res?.whatsappUrl) {
+        setWhatsappUrl(res.whatsappUrl);
+        hasAutoOpenedWhatsAppRef.current = false;
+      }
       setStep('otp');
       setTimer(60);
       setOtpDigits(['', '', '', '', '', '']);
@@ -125,10 +170,14 @@ export default function OTPScreen({ navigation, route }: any) {
       if (res?.tempToken) {
         setTempToken(res.tempToken);
       }
+      if (res?.whatsappUrl) {
+        setWhatsappUrl(res.whatsappUrl);
+        openWhatsApp(res.whatsappUrl);
+      }
       setTimer(60);
       setOtpDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-      Alert.alert('تم الإرسال 📱', 'تم إرسال رمز تحقق جديد إلى هاتفك عبر رسالة SMS');
+      Alert.alert('تم التجهيز 📱', 'تم تجهيز رمز تحقق جديد. سيتم فتح WhatsApp لإرساله.');
     } catch (e: any) {
       Alert.alert('تنبيه', e.message || 'تعذر إعادة إرسال الرمز، يرجى المحاولة بعد قليل');
     } finally {
@@ -406,7 +455,7 @@ export default function OTPScreen({ navigation, route }: any) {
                       lineHeight: 20,
                     }}
                   >
-                    تم إرسال رمز التحقق المكون من 6 أرقام عبر SMS إلى
+                    تم تجهيز رمز التحقق للرقم
                   </Text>
                   <Text
                     style={{
@@ -420,6 +469,66 @@ export default function OTPScreen({ navigation, route }: any) {
                     {maskPhone(phone)}
                   </Text>
                 </View>
+
+                {/* WhatsApp Helper Card */}
+                {!!whatsappUrl && (
+                  <View
+                    style={{
+                      backgroundColor: 'rgba(37, 211, 102, 0.08)',
+                      borderWidth: 1.5,
+                      borderColor: 'rgba(37, 211, 102, 0.3)',
+                      borderRadius: borderRadius.lg,
+                      padding: spacing.md,
+                      marginBottom: spacing.xl,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <MessageCircle color="#25D366" size={20} />
+                      <Text style={{ color: '#25D366', fontWeight: '800', fontSize: 15 }}>
+                        تم تجهيز رمز التحقق
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color: '#E4E4E7',
+                        fontSize: 13,
+                        textAlign: 'center',
+                        lineHeight: 20,
+                        marginBottom: 12,
+                      }}
+                    >
+                      سيتم فتح WhatsApp لإرسال الرسالة.{'\n'}
+                      بعد إرسال الرسالة ارجع إلى TecnoRexa وأدخل رمز التحقق.
+                    </Text>
+
+                    <TouchableOpacity
+                      onPress={() => openWhatsApp(whatsappUrl)}
+                      activeOpacity={0.85}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        backgroundColor: '#25D366',
+                        paddingVertical: 12,
+                        paddingHorizontal: 18,
+                        borderRadius: borderRadius.md,
+                        width: '100%',
+                        shadowColor: '#25D366',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 6,
+                        elevation: 3,
+                      }}
+                    >
+                      <MessageCircle color="#0A0A0A" size={18} />
+                      <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: 15 }}>
+                        فتح WhatsApp مرة أخرى
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* 6-Digit OTP Input Cells */}
                 <View

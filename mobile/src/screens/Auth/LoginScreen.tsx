@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TextInput, TouchableOpacity, Pressable, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform, StatusBar, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Pressable, ActivityIndicator, ScrollView, Alert, KeyboardAvoidingView, Platform, StatusBar, Image, Linking } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
 import { Phone, Lock, Eye, EyeOff, MessageSquare, Wrench } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -46,6 +46,7 @@ export default function LoginScreen({ navigation }: any) {
           tempToken: res.tempToken,
           phone: res.phone || cleanPhone,
           flow: 'login',
+          whatsappUrl: res.whatsappUrl,
         });
       }
     } catch (err: any) {

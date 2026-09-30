@@ -35,6 +35,7 @@ export interface LoginResult {
   requireOtp: boolean;
   tempToken?: string;
   phone?: string;
+  whatsappUrl?: string;
   message?: string;
   user?: User;
   token?: string;
@@ -90,6 +91,7 @@ export const useAuthStore = create<AuthState>()(
               requireOtp: true,
               tempToken: data.tempToken,
               phone: data.phone || cleanId,
+              whatsappUrl: data.whatsappUrl,
               message: data.message || 'تم إرسال رمز التحقق إلى هاتفك',
             };
           }

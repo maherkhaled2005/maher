@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { KeyRound, ChevronRight, Phone, Lock, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Linking } from 'react-native';
+import { KeyRound, ChevronRight, Phone, Lock, Eye, EyeOff, ShieldCheck, RefreshCw, MessageCircle } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 
@@ -30,6 +30,7 @@ function maskPhone(p: string): string {
 export default function ForgotPasswordScreen({ navigation, route }: any) {
   const [step, setStep] = useState<'phone' | 'otp' | 'password'>('phone');
   const [phone, setPhone] = useState(route?.params?.phone || '');
+  const [whatsappUrl, setWhatsappUrl] = useState('');
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,14 +41,49 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
 
   const intervalRef = useRef<any>(null);
   const inputRefs = useRef<any[]>([]);
+  const hasAutoOpenedWhatsAppRef = useRef(false);
 
   const { forgotPassword, resetPassword } = useAuthStore();
+
+  const openWhatsApp = async (urlToOpen?: string) => {
+    const targetUrl = urlToOpen || whatsappUrl;
+    if (!targetUrl) {
+      Alert.alert('تنبيه', 'رابط WhatsApp غير متوفر حالياً');
+      return;
+    }
+    try {
+      const canOpen = await Linking.canOpenURL(targetUrl);
+      if (canOpen) {
+        await Linking.openURL(targetUrl);
+      } else {
+        Alert.alert(
+          'تعذر فتح WhatsApp',
+          'WhatsApp غير مثبت على هذا الجهاز.\nيمكنك كتابة رمز التحقق يدوياً.'
+        );
+      }
+    } catch (err) {
+      Alert.alert(
+        'تعذر فتح WhatsApp',
+        'تأكد من تثبيت WhatsApp على الجهاز ثم حاول مرة أخرى'
+      );
+    }
+  };
 
   useEffect(() => {
     if (route?.params?.phone) {
       setPhone(route.params.phone);
     }
   }, [route?.params]);
+
+  useEffect(() => {
+    if (step === 'otp' && whatsappUrl && !hasAutoOpenedWhatsAppRef.current) {
+      hasAutoOpenedWhatsAppRef.current = true;
+      const t = setTimeout(() => {
+        openWhatsApp(whatsappUrl);
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [step, whatsappUrl]);
 
   // Cooldown countdown timer
   useEffect(() => {
@@ -67,7 +103,11 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
     }
     setIsLoading(true);
     try {
-      await forgotPassword(cleanPhone);
+      const res = await forgotPassword(cleanPhone);
+      if (res?.whatsappUrl) {
+        setWhatsappUrl(res.whatsappUrl);
+        hasAutoOpenedWhatsAppRef.current = false;
+      }
       setStep('otp');
       setTimer(60);
       setOtpDigits(['', '', '', '', '', '']);
@@ -83,11 +123,15 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
     setIsResending(true);
     try {
       const cleanPhone = normalizePhone(phone);
-      await forgotPassword(cleanPhone);
+      const res = await forgotPassword(cleanPhone);
+      if (res?.whatsappUrl) {
+        setWhatsappUrl(res.whatsappUrl);
+        openWhatsApp(res.whatsappUrl);
+      }
       setTimer(60);
       setOtpDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-      Alert.alert('تم الإرسال 📱', 'تم إرسال رمز تحقق جديد إلى هاتفك عبر رسالة SMS');
+      Alert.alert('تم التجهيز 📱', 'تم تجهيز رمز تحقق جديد. سيتم فتح WhatsApp لإرساله.');
     } catch (e: any) {
       Alert.alert('تنبيه', e.message || 'تعذر إعادة إرسال الرمز، يرجى المحاولة بعد قليل');
     } finally {
@@ -359,6 +403,66 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
             {/* STEP 2: OTP */}
             {step === 'otp' && (
               <View>
+                {/* WhatsApp Helper Card */}
+                {!!whatsappUrl && (
+                  <View
+                    style={{
+                      backgroundColor: 'rgba(37, 211, 102, 0.08)',
+                      borderWidth: 1.5,
+                      borderColor: 'rgba(37, 211, 102, 0.3)',
+                      borderRadius: borderRadius.lg,
+                      padding: spacing.md,
+                      marginBottom: spacing.xl,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <MessageCircle color="#25D366" size={20} />
+                      <Text style={{ color: '#25D366', fontWeight: '800', fontSize: 15 }}>
+                        تم تجهيز رمز استعادة كلمة المرور
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color: '#E4E4E7',
+                        fontSize: 13,
+                        textAlign: 'center',
+                        lineHeight: 20,
+                        marginBottom: 12,
+                      }}
+                    >
+                      سيتم فتح WhatsApp لإرسال الرسالة إلى هاتفك.{'\n'}
+                      بعد إرسال الرسالة، ارجع إلى التطبيق وأدخل رمز التحقق أدناه.
+                    </Text>
+
+                    <TouchableOpacity
+                      onPress={() => openWhatsApp(whatsappUrl)}
+                      activeOpacity={0.85}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        backgroundColor: '#25D366',
+                        paddingVertical: 12,
+                        paddingHorizontal: 18,
+                        borderRadius: borderRadius.md,
+                        width: '100%',
+                        shadowColor: '#25D366',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 6,
+                        elevation: 3,
+                      }}
+                    >
+                      <MessageCircle color="#0A0A0A" size={18} />
+                      <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: 15 }}>
+                        فتح WhatsApp مرة أخرى
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 <View
                   style={{
                     flexDirection: 'row',

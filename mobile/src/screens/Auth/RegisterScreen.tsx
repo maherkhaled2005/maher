@@ -230,24 +230,34 @@ export default function RegisterScreen({ navigation }: any) {
         if (role === 'customer') {
           Alert.alert(
             'تم إنشاء الحساب بنجاح 📱',
-            'تم إرسال رمز التحقق إلى هاتفك عبر رسالة SMS. أدخل رمز التأكيد لتفعيل حسابك.',
+            'تم تجهيز رمز التحقق لتأكيد حسابك. سيتم فتح WhatsApp لإرسال الرمز إليك.',
             [
               {
                 text: 'إدخال رمز التحقق',
                 onPress: () =>
-                  navigation.navigate('OTP', { phone: cleanPhone, flow: 'register' }),
+                  navigation.navigate('OTP', {
+                    phone: cleanPhone,
+                    flow: 'register',
+                    whatsappUrl: res.whatsappUrl,
+                    tempToken: res.tempToken,
+                  }),
               },
             ]
           );
         } else {
           Alert.alert(
             'تم استلام طلبك بنجاح ✅',
-            'تم تسجيل بياناتك وإرسال رمز التحقق لهاتفك. يرجى تأكيد رقم هاتفك أولاً، ثم سيقوم فريق الإدارة بمراجعة الحساب والاعتماد.',
+            'تم تسجيل بياناتك وتجهيز رمز التحقق. يرجى تأكيد رقم هاتفك أولاً، ثم سيقوم فريق الإدارة بمراجعة الحساب والاعتماد.',
             [
               {
                 text: 'تأكيد رقم الهاتف',
                 onPress: () =>
-                  navigation.navigate('OTP', { phone: cleanPhone, flow: 'register' }),
+                  navigation.navigate('OTP', {
+                    phone: cleanPhone,
+                    flow: 'register',
+                    whatsappUrl: res.whatsappUrl,
+                    tempToken: res.tempToken,
+                  }),
               },
             ]
           );
