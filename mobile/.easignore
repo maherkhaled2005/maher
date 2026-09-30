@@ -1,0 +1,14 @@
+# EAS Build Ignore
+node_modules/
+.expo/
+dist/
+build/
+web-build/
+.gradle/
+android/.gradle/
+android/app/build/
+android/build/
+android/.idea/
+android/local.properties
+*.log
+.git/
