@@ -105,6 +105,19 @@ const authLimiter = rateLimit({
 
 app.use("/api/auth", authLimiter);
 
+
+// GET /api/app/version — App Version & Force Update Policy Check
+app.get("/api/app/version", (req, res) => {
+  res.json({
+    currentVersion: "1.0.0",
+    minimumSupportedVersion: "1.0.0",
+    latestVersion: "1.0.0",
+    forceUpdate: false,
+    updateUrl: "https://play.google.com/store/apps/details?id=com.tecnorexa.app",
+    releaseNotes: "الإصدار الرسمي الأول لمنظومة TecnoRexa 1.0.0",
+  });
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
 });
@@ -334,6 +347,8 @@ app.use((req: any, res: any, next: any) => {
         "/api/health",
         "/api/owner",
         "/api/notifications",
+        "/api/dev",
+        "/api/developer",
         "/uploads",
       ];
       if (!allowedPaths.some((p) => req.path.startsWith(p))) {
@@ -811,6 +826,12 @@ async function runMigrations() {
     referenceId: "TEXT",
     status: "TEXT DEFAULT 'completed'",
   });
+  await ensureColumns("reels", {
+    userName: "TEXT",
+    userAvatar: "TEXT",
+    description: "TEXT",
+    status: "TEXT DEFAULT 'approved'",
+  });
   await ensureColumns("audit_logs", {
     ipAddress: "TEXT",
   });
@@ -1276,6 +1297,12 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
   }
 
+  // If default initial password is used, flag account to force password change on first login
+  if (password === '123456' && user.mustChangePassword !== 1) {
+    db.prepare("UPDATE users SET mustChangePassword = 1 WHERE id = ?").run(user.id);
+    user.mustChangePassword = 1;
+  }
+
   // Check ban status
   if (user.status === 'banned' || user.isBanned === 1) {
     return res.status(403).json({
@@ -1454,7 +1481,7 @@ app.post("/api/auth/resend-otp", async (req, res) => {
     );
 
     const targetPhone = user.phone || cleanPhone;
-    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Resend OTP] ${targetPhone} -> ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Resend OTP] sent to ${maskPhone(targetPhone)}`);
     await sendRealSMS(targetPhone, `رمز التحقق الجديد الخاص بك هو: ${otp}`);
 
     res.json({
@@ -1499,7 +1526,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     db.prepare("UPDATE users SET otpCode = ?, otp = ?, otpExpires = ?, lastOtpSentAt = ?, otpAttempts = 0 WHERE id = ?").run(otp, otp, otpExpires, new Date().toISOString(), user.id);
 
-    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Forgot Password OTP] ${cleanPhone} -> ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Forgot Password OTP] sent to ${maskPhone(cleanPhone)}`);
     await sendRealSMS(cleanPhone, `رمز استعادة كلمة المرور الخاص بك في TecnoRexa هو: ${otp}`);
 
     res.json({
@@ -1789,7 +1816,7 @@ app.post("/api/auth/request-otp", async (req: any, res) => {
       );
     }
 
-    if (process.env.NODE_ENV !== 'production') console.log(`📱 [OTP] ${cleanPhone} -> ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`📱 [OTP] sent to ${maskPhone(cleanPhone)}`);
 
     // Send real SMS if gateway credentials are provided
     const smsResult = await sendRealSMS(cleanPhone, `رمز تأكيد حسابك في منصة TecnoRexa هو: ${otp}`);
@@ -1976,7 +2003,7 @@ app.post("/api/auth/register", async (req, res) => {
       } catch (e) {}
     }
 
-    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Registration Code] ${cleanPhone} -> ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`📱 [Registration Code] sent to ${maskPhone(cleanPhone)}`);
     await sendRealSMS(cleanPhone, `مرحباً بك في TecnoRexa! رمز تأكيد حسابك هو: ${otp}`);
 
     const freshUser = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
@@ -2350,7 +2377,7 @@ app.get("/api/finance/revenue", async (req, res) => {
 
 // ─── 100% REAL SQLITE OWNER & ADMIN STATS ────────────────────────────────────
 
-app.get("/api/owner/overview", authenticateToken, requireOwner, async (req: any, res) => {
+const handleAdminOverview = async (req: any, res: any) => {
   try {
     const period = (req.query.period as string) || '7d';
     let dateFilter = "datetime('now', '-7 days')";
@@ -2587,6 +2614,87 @@ app.get("/api/owner/overview", authenticateToken, requireOwner, async (req: any,
       recent: recentOrdersList,
     };
 
+    // Requests metrics (Trade / Upgrade + Withdrawals)
+    let pendingTradeRequests = 0;
+    try {
+      const row = db.prepare("SELECT COUNT(*) as c FROM upgrade_requests WHERE status = 'pending'").get() as any;
+      pendingTradeRequests = row?.c || 0;
+    } catch (e) {}
+
+    let pendingWithdrawCount = 0;
+    try {
+      const row = db.prepare("SELECT COUNT(*) as c FROM withdraw_requests WHERE status = 'pending'").get() as any;
+      pendingWithdrawCount = row?.c || 0;
+    } catch (e) {}
+
+    const requestsSummary = {
+      total: pendingTradeRequests + pendingWithdrawCount,
+      pendingTrade: pendingTradeRequests,
+      pendingWithdraw: pendingWithdrawCount,
+    };
+
+    // Suggestions metrics
+    let totalSuggestions = 0;
+    let pendingSuggestions = 0;
+    let approvedSuggestions = 0;
+    try {
+      const totRow = db.prepare("SELECT COUNT(*) as c FROM app_suggestions").get() as any;
+      totalSuggestions = totRow?.c || 0;
+      const pendRow = db.prepare("SELECT COUNT(*) as c FROM app_suggestions WHERE status = 'pending'").get() as any;
+      pendingSuggestions = pendRow?.c || 0;
+      const appRow = db.prepare("SELECT COUNT(*) as c FROM app_suggestions WHERE status = 'owner_approved'").get() as any;
+      approvedSuggestions = appRow?.c || 0;
+    } catch (e) {}
+
+    const suggestionsSummary = {
+      total: totalSuggestions,
+      pending: pendingSuggestions,
+      approved: approvedSuggestions,
+    };
+
+    // Notifications metrics
+    let totalNotifications = 0;
+    let unreadNotifications = 0;
+    try {
+      const totRow = db.prepare("SELECT COUNT(*) as c FROM notifications").get() as any;
+      totalNotifications = totRow?.c || 0;
+      const unreadRow = db.prepare("SELECT COUNT(*) as c FROM notifications WHERE read = 0").get() as any;
+      unreadNotifications = unreadRow?.c || 0;
+    } catch (e) {}
+
+    const notificationsSummary = {
+      total: totalNotifications,
+      unread: unreadNotifications,
+    };
+
+    // Reports metrics
+    let auditCount = 0;
+    try {
+      const row = db.prepare("SELECT COUNT(*) as c FROM audit_logs").get() as any;
+      auditCount = row?.c || 0;
+    } catch (e) {}
+
+    const reportsSummary = {
+      availableFormats: ['PDF', 'CSV', 'Excel'],
+      auditRecords: auditCount,
+      ready: true,
+    };
+
+    // System Status
+    let isMaintenanceActive = false;
+    try {
+      const maint = db.prepare("SELECT value FROM system_settings WHERE key = 'maintenance_mode'").get() as any;
+      isMaintenanceActive = maint?.value === 'true';
+    } catch (e) {}
+
+    const systemStatus = {
+      server: 'operational',
+      database: 'connected',
+      maintenanceMode: isMaintenanceActive,
+      uptimeSeconds: Math.floor(process.uptime()),
+      environment: 'production',
+    };
+
     res.json({
       totalRevenue,
       revenueNote: totalRevenue === 0 ? "لا توجد إيرادات مسجلة بعد" : null,
@@ -2606,6 +2714,11 @@ app.get("/api/owner/overview", authenticateToken, requireOwner, async (req: any,
       warehouses,
       support,
       orders: ordersSummary,
+      requests: requestsSummary,
+      suggestions: suggestionsSummary,
+      notifications: notificationsSummary,
+      reports: reportsSummary,
+      systemStatus,
       revenueBreakdown: {
         marketplace: totalRevenue > 0 ? Math.round((totalOrdersRevenue / totalRevenue) * 100) : 0,
         subscriptions: totalRevenue > 0 ? Math.round((subscriptionsRevenue / totalRevenue) * 100) : 0,
@@ -2616,7 +2729,10 @@ app.get("/api/owner/overview", authenticateToken, requireOwner, async (req: any,
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
-});
+};
+
+app.get("/api/owner/overview", authenticateToken, requireAdmin, handleAdminOverview);
+app.get("/api/manager/overview", authenticateToken, requireAdmin, handleAdminOverview);
 
 app.get("/api/users/active", async (req, res) => {
   try {
@@ -3330,7 +3446,7 @@ app.get("/api/trade-requests", authenticateToken, requireAdmin, async (req: any,
     // 2. Fetch from upgrade_requests (e.g. from SubscriptionScreen)
     try {
       const upgReqs = await db.prepare(`
-        SELECT ur.*, u.name as uName, u.phone as uPhone, u.specialty as uSpec
+        SELECT ur.*, u.name as uName, u.phone as uPhone, u.specialty as uSpec, u.avatar as uAvatar
         FROM upgrade_requests ur
         LEFT JOIN users u ON ur.userId = u.id
         ORDER BY ur.createdAt DESC
@@ -3348,6 +3464,9 @@ app.get("/api/trade-requests", authenticateToken, requireAdmin, async (req: any,
               phone: ur.userPhone || ur.uPhone || '',
               senderPhone: ur.senderPhone || ur.userPhone || ur.uPhone || '',
               transferReceipt: ur.receiptImage || null,
+              avatar: ur.uAvatar || null,
+              documents: ur.documents || null,
+              adminNotes: ur.adminNotes || null,
               type: reqType,
               feePaid: ur.feePaid || (reqType === 'merchant' ? 100 : 300),
               specialty: ur.specialty || ur.uSpec || (reqType === 'merchant' ? 'قطع غيار ومعدات' : 'صيانة أجهزة منزلية'),
@@ -3537,6 +3656,64 @@ app.post("/api/trade-requests/:id/reject", authenticateToken, requireAdmin, asyn
   }
 });
 
+app.post("/api/trade-requests/:id/request-info", authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    if (!notes || !notes.trim()) {
+      return res.status(400).json({ error: "يرجى توضيح البيانات أو المستندات المطلوبة" });
+    }
+    const noteText = notes.trim();
+
+    let targetUserId: string | null = null;
+    const appRow = db.prepare("SELECT * FROM approval_requests WHERE id = ?").get(id) as any;
+    if (appRow) {
+      try {
+        const det = JSON.parse(appRow.details || "{}");
+        targetUserId = det.customerId || appRow.requesterId;
+      } catch {}
+      db.prepare("UPDATE approval_requests SET status = 'more_info_needed' WHERE id = ?").run(id);
+    }
+
+    const upgRow = db.prepare("SELECT * FROM upgrade_requests WHERE id = ?").get(id) as any;
+    if (upgRow) {
+      targetUserId = upgRow.userId || targetUserId;
+      db.prepare("UPDATE upgrade_requests SET status = 'more_info_needed', adminNotes = ?, reviewedBy = ?, reviewedAt = datetime('now') WHERE id = ?").run(noteText, req.user?.name || 'الإدارة', id);
+    }
+
+    if (targetUserId) {
+      const notifId = 'notif_' + Date.now();
+      db.prepare(
+        "INSERT INTO notifications (id, userId, type, title, message, data, createdAt) VALUES (?, ?, 'request_info', 'طلب استكمال بيانات ومستندات ⚠️', ?, ?, datetime('now'))"
+      ).run(
+        notifId,
+        targetUserId,
+        `يرجى استكمال البيانات التالية لطلب الاعتماد: ${noteText}`,
+        JSON.stringify({ requestId: id, notes: noteText })
+      );
+
+      io.to(targetUserId).emit("request_info_needed", {
+        requestId: id,
+        notes: noteText,
+      });
+    }
+
+    db.prepare(
+      "INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))"
+    ).run(
+      `audit_${Date.now()}`,
+      targetUserId || id,
+      req.user?.id || 'admin',
+      'طلب استكمال بيانات ومستندات',
+      `طلب استكمال بيانات للطلب ${id}: ${noteText}`
+    );
+
+    res.json({ success: true, message: 'تم إرسال طلب استكمال البيانات للمستخدم بنجاح' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── UPGRADE & WITHDRAW REQUESTS APIS (SECTION 15 & 16) ─────────────────────────
 app.get("/api/upgrade-requests", authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -3699,11 +3876,25 @@ app.post("/api/withdraw-requests/:id/reject", authenticateToken, requireAdmin, a
 // ─── SUGGESTIONS & REPORTS APIS ─────────────────────────────────────────────
 
 // The owner is the only reviewer for platform suggestions.
-app.get("/api/suggestions", authenticateToken, requireOwner, async (req: any, res) => {
+// Main Programmer does NOT receive suggestions directly; only receives owner-approved suggestions!
+app.get("/api/suggestions", authenticateToken, async (req: any, res) => {
   try {
-    const status = req.query.status as string || '';
+    const role = normalizeRoleServer(req.user.role);
+    const isOwner = role === 'owner';
+    const isProgrammer = role === 'programmer' || role === 'lead_developer';
+
+    if (!isOwner && !isProgrammer) {
+      return res.status(403).json({ error: "غير مصرح لك باستعراض مقترحات المنصة" });
+    }
+
     let query = "SELECT s.*, u.name as submitterName FROM app_suggestions s LEFT JOIN users u ON s.userId = u.id";
-    if (status) query += ` WHERE s.status = '${status.replace(/'/g, "''")}'`;
+    if (isOwner) {
+      const status = req.query.status as string || '';
+      if (status) query += ` WHERE s.status = '${status.replace(/'/g, "''")}'`;
+    } else {
+      // Main Programmer only sees suggestions approved by the Owner for implementation
+      query += " WHERE s.status = 'owner_approved'";
+    }
     query += " ORDER BY s.createdAt DESC";
     const rows = await db.prepare(query).all();
     res.json(rows || []);
@@ -3716,8 +3907,16 @@ app.get("/api/suggestions/mine", authenticateToken, async (req: any, res) => {
   try {
     const rows = await db.prepare(
       "SELECT * FROM app_suggestions WHERE userId = ? ORDER BY createdAt DESC"
-    ).all(req.user.id);
-    res.json(rows || []);
+    ).all(req.user.id) as any[];
+    const mapped = (rows || []).map(r => ({
+      ...r,
+      statusLabel: r.status === 'owner_approved'
+        ? 'تمت الموافقه علي طلبك وجاري العمل عليها الان'
+        : r.status === 'owner_rejected'
+        ? 'تم الغاء طلبك'
+        : 'تم استلام طلبك سيتم الرد عليك قريبا'
+    }));
+    res.json(mapped);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -3731,7 +3930,7 @@ app.post("/api/suggestions", authenticateToken, async (req: any, res) => {
     const id = `sug_${Date.now()}`;
     db.prepare("INSERT INTO app_suggestions (id, userId, userName, role, title, description, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, 'pending', datetime('now'))")
       .run(id, req.user.id, req.user.name, req.user.role, title, description);
-    res.json({ success: true, id, message: "تم إرسال اقتراحك للمالك بنجاح. سيتم الرد عليك قريباً." });
+    res.json({ success: true, id, message: "تم استلام طلبك سيتم الرد عليك قريبا" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -3751,7 +3950,7 @@ app.post("/api/suggestions/:id/approve", authenticateToken, requireOwner, async 
     try {
       const notifId = `notif_sug_${Date.now()}`;
       db.prepare("INSERT INTO notifications (id, userId, title, desc, type, actionUrl, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?)")
-        .run(notifId, suggestion.userId, 'تمت الموافقة على اقتراحك ✅', `اقتراحك "${suggestion.title}" تمت الموافقة عليه من المالك وسيتم تحويله لفريق التطوير.`, 'suggestion', '/notifications', new Date().toISOString());
+        .run(notifId, suggestion.userId, 'تمت الموافقة على اقتراحك ✅', 'تمت الموافقه علي طلبك وجاري العمل عليها الان', 'suggestion', '/notifications', new Date().toISOString());
     } catch (e) {}
 
     // Find Main Programmer (developerRank = 'lead' or programmerLevel = 'lead') and create a task for them
@@ -3801,9 +4000,8 @@ app.post("/api/suggestions/:id/reject", authenticateToken, requireOwner, async (
     // Notify the submitting user of rejection ONLY
     try {
       const notifId = `notif_sug_rej_${Date.now()}`;
-      const rejectMsg = reason ? `السبب: ${reason}` : 'اقتراحك لا يتوافق مع خطة التطوير الحالية للمنصة.';
       db.prepare("INSERT INTO notifications (id, userId, title, desc, type, actionUrl, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?)")
-        .run(notifId, suggestion.userId, 'بخصوص اقتراحك ⚠️', `اقتراحك "${suggestion.title}" لم يتم قبوله في الوقت الحالي. ${rejectMsg}`, 'suggestion', '/notifications', new Date().toISOString());
+        .run(notifId, suggestion.userId, 'بخصوص اقتراحك ⚠️', 'تم الغاء طلبك', 'suggestion', '/notifications', new Date().toISOString());
     } catch (e) {}
 
     // Log in audit
@@ -5144,11 +5342,19 @@ app.post("/api/reels", authenticateToken, (req: any, res: any, next: any) => {
     // Server-generated id — never Math.random() in the client.
     const id = `reel_${Date.now()}_${req.user.id}`;
     const userRow = db.prepare("SELECT avatar FROM users WHERE id = ?").get(req.user.id) as any;
+    const userRole = normalizeRoleServer(req.user?.role || '');
+    const isExempt = ['owner', 'manager', 'programmer'].includes(userRole);
+    const initialStatus = isExempt ? 'approved' : 'pending';
+
     db.prepare(`
-      INSERT INTO reels (id, userId, userName, userAvatar, videoUrl, description, likes, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now'))
-    `).run(id, req.user.id, req.user.name || 'مستخدم', userRow?.avatar || null, videoUrl, description);
-    res.json({ success: true, id, videoUrl, message: "تم نشر فيديو الريلز بنجاح! 🚀" });
+      INSERT INTO reels (id, userId, userName, userAvatar, videoUrl, description, likes, status, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, 0, ?, datetime('now'))
+    `).run(id, req.user.id, req.user.name || 'مستخدم', userRow?.avatar || null, videoUrl, description, initialStatus);
+
+    const message = isExempt
+      ? "تم نشر فيديو الريلز بنجاح! 🚀"
+      : "تم رفع الفيديو وإرساله لقسم الرقابة والمراجعة قبل النشر. ⏳";
+    res.json({ success: true, id, videoUrl, status: initialStatus, message });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -6105,9 +6311,19 @@ app.post(
 
     const normalizedRole = normalizeRoleServer(userRole || "customer");
 
-    // Restrictions: Both Lead Programmer and Owner can create any accounts (owner, manager, programmer, etc.)
-    if (['owner', 'programmer', 'manager'].includes(normalizedRole) && !isLeadProgrammer && !isOwner) {
-      return res.status(403).json({ error: "صلاحية إضافة حسابات الإدارة العليا مقتصرة على رئيس التقني والمالك 🛡️" });
+    // Strict rule: No user can create another Owner account
+    if (normalizedRole === 'owner') {
+      return res.status(403).json({ error: "لا يمكن إنشاء حساب برتبة مالك إضافي." });
+    }
+
+    // Strict rule: Only Owner and Main Programmer can create programmer accounts
+    if (normalizedRole === 'programmer' && !isLeadProgrammer && !isOwner) {
+      return res.status(403).json({ error: "صلاحية إنشاء حسابات المبرمجين مقتصرة حصرياً على المالك ورئيس المبرمجين." });
+    }
+
+    // Strict rule: Only Owner and Main Programmer can create manager accounts
+    if (normalizedRole === 'manager' && !isLeadProgrammer && !isOwner) {
+      return res.status(403).json({ error: "صلاحية إنشاء حسابات المدراء مقتصرة على المالك ورئيس المبرمجين." });
     }
 
     // Professional roles (technician / merchant) require payment before activation!
@@ -6355,7 +6571,10 @@ app.delete(
       if (!targetUser)
         return res.status(404).json({ error: "المستخدم غير موجود" });
 
-      // 🛡️ Cannot delete owner or programmer account
+      // 🛡️ Cannot delete owner or programmer account, and cannot delete own account
+      if (targetId === req.user.id)
+        return res.status(400).json({ error: "لا يمكنك حذف حسابك الخاص 🛡️" });
+
       const targetUserNormRole = normalizeRoleServer(targetUser.role);
       if (targetUserNormRole === 'owner' || targetUserNormRole === 'programmer' || targetId === 'programmer_maher')
         return res.status(403).json({ error: "لا يمكن حذف حساب المالك أو رئيس التقني 🛡️" });
@@ -7133,6 +7352,72 @@ app.post("/api/orders", async (req: any, res) => {
       new Date().toISOString()
     );
 
+    if (orderType !== "maintenance") {
+      const parsedItems = Array.isArray(items) ? items : (typeof items === "string" ? JSON.parse(items || "[]") : []);
+
+      // Check stock availability
+      for (const item of parsedItems) {
+        if (item.id) {
+          const prod = db.prepare("SELECT id, name, stock FROM products WHERE id = ?").get(item.id) as any;
+          if (prod) {
+            const qty = Number(item.quantity) || 1;
+            if (prod.stock < qty) {
+              return res.status(400).json({
+                error: `الكمية المطلوبة غير متوفرة في المخزون للمنتج: ${prod.name} (المتوفر: ${prod.stock} قطعة فقط)`,
+              });
+            }
+          }
+        }
+      }
+
+      // If paying by wallet, check balance and deduct
+      if (paymentMethod === "wallet" && userId !== "guest_user") {
+        const u = db.prepare("SELECT balance FROM users WHERE id = ?").get(userId) as any;
+        const currentBal = Number(u?.balance || 0);
+        if (currentBal < orderTotal) {
+          return res.status(400).json({
+            error: `رصيد المحفظة الحالي (${currentBal} ج.م) غير كافٍ لإتمام عملية الشراء بقيمة ${orderTotal} ج.م`,
+          });
+        }
+        db.prepare("UPDATE users SET balance = balance - ? WHERE id = ?").run(orderTotal, userId);
+        try {
+          db.prepare(`
+            INSERT INTO transactions (id, userId, type, amount, description, balanceBefore, balanceAfter, createdAt)
+            VALUES (?, ?, 'purchase', ?, ?, ?, ?, datetime('now'))
+          `).run(
+            `tx_${Date.now()}`,
+            userId,
+            orderTotal,
+            `شراء منتجات من المتجر - طلب #${orderId}`,
+            currentBal,
+            currentBal - orderTotal
+          );
+        } catch {}
+      }
+
+      // Deduct stock from products & record stock movements
+      for (const item of parsedItems) {
+        if (item.id) {
+          const qty = Number(item.quantity) || 1;
+          db.prepare("UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?").run(qty, item.id);
+          try {
+            const prod = db.prepare("SELECT name FROM products WHERE id = ?").get(item.id) as any;
+            db.prepare(`
+              INSERT INTO stock_movements (id, productId, productName, movementType, quantity, userId, userName, createdAt)
+              VALUES (?, ?, ?, 'sale', ?, ?, ?, datetime('now'))
+            `).run(
+              `smov_${Date.now()}_${item.id}`,
+              item.id,
+              prod?.name || item.name || 'منتج',
+              qty,
+              userId,
+              custName
+            );
+          } catch {}
+        }
+      }
+    }
+
     if (orderType === "maintenance") {
       try {
         let techName = "";
@@ -7417,11 +7702,15 @@ app.get("/api/conversations", authenticateToken,async (req: any, res) => {
   try {
     const role = normalizeRoleServer(req.user.role);
     if (role === 'owner' || role === 'manager') {
-      const allConversations = await db.prepare("SELECT c.*, 0 as unreadCount FROM conversations c ORDER BY c.lastMessageTime DESC").all() as any[];
+      const allConversations = await db.prepare(`
+        SELECT c.*,
+          (SELECT COUNT(*) FROM messages m WHERE m.conversationId = c.id AND m.read = 0 AND m.senderId != ?) as unreadCount
+        FROM conversations c ORDER BY c.lastMessageTime DESC
+      `).all(req.user.id) as any[];
       const withOnline = allConversations.map((c) => {
         const participants = db.prepare("SELECT userId FROM conversation_participants WHERE conversationId = ?").all(c.id) as any[];
         const hasOnline = participants.some((p) => (userSocketCount.get(p.userId) || 0) > 0);
-        return { ...c, isOnline: hasOnline };
+        return { ...c, unreadCount: Number(c.unreadCount || 0), isOnline: hasOnline };
       });
       return res.json(withOnline);
     }
@@ -7429,7 +7718,7 @@ app.get("/api/conversations", authenticateToken,async (req: any, res) => {
       .prepare(
         `
       SELECT c.*,
-        (SELECT COUNT(*) FROM messages m WHERE m.conversationId = c.id AND m.read = 0 AND m.receiverId = ?) as unreadCount,
+        (SELECT COUNT(*) FROM messages m WHERE m.conversationId = c.id AND m.read = 0 AND m.senderId != ?) as unreadCount,
         (SELECT cp2.userId FROM conversation_participants cp2 WHERE cp2.conversationId = c.id AND cp2.userId != ? LIMIT 1) as otherUserId
       FROM conversations c
       JOIN conversation_participants cp ON cp.conversationId = c.id
@@ -7444,27 +7733,38 @@ app.get("/api/conversations", authenticateToken,async (req: any, res) => {
     const withOnline = conversations.map((c) => {
       let displayName = c.name || "محادثة";
       let displayAvatar = c.avatar || "👤";
+      let otherUserRole = null;
+      let otherUserPhone = null;
       let lastMsg = c.lastMessage || "";
 
-      if (isNonStaff) {
-        if (c.otherUserId) {
-          try {
-            const otherUser = db.prepare("SELECT name, role FROM users WHERE id = ?").get(c.otherUserId) as any;
-            if (otherUser) {
-              const oRole = normalizeRoleServer(otherUser.role);
+      if (c.otherUserId) {
+        try {
+          const otherUser = db.prepare("SELECT id, name, role, phone FROM users WHERE id = ?").get(c.otherUserId) as any;
+          if (otherUser) {
+            otherUserRole = otherUser.role;
+            otherUserPhone = otherUser.phone;
+            const oRole = normalizeRoleServer(otherUser.role);
+            if (isNonStaff) {
               if (["owner", "manager"].includes(oRole)) {
                 displayName = "إدارة TecnoRexa 🏢";
                 displayAvatar = "🏢";
               } else if (["programmer", "lead_developer"].includes(oRole)) {
-                displayName = "فريق التطوير البرمجي 💻";
+                displayName = "فريق TecnoRexa 💻";
                 displayAvatar = "💻";
               } else if (["customer_support", "support"].includes(oRole)) {
                 displayName = "خدمة العملاء والدعم الفني 🎧";
                 displayAvatar = "🎧";
+              } else {
+                displayName = otherUser.name;
               }
+            } else {
+              displayName = otherUser.name;
             }
-          } catch {}
-        }
+          }
+        } catch {}
+      }
+
+      if (isNonStaff) {
         if (displayName.includes("ماهر") || displayName.includes("Maher") || displayName.includes("01064739664")) {
           displayName = "إدارة TecnoRexa 🛡️";
         }
@@ -7475,7 +7775,10 @@ app.get("/api/conversations", authenticateToken,async (req: any, res) => {
         ...c,
         name: displayName,
         avatar: displayAvatar,
+        otherUserRole,
+        otherUserPhone: isNonStaff && ['owner', 'manager', 'programmer', 'lead_developer'].includes(normalizeRoleServer(otherUserRole || '')) ? null : otherUserPhone,
         lastMessage: lastMsg,
+        unreadCount: Number(c.unreadCount || 0),
         isOnline: c.otherUserId ? (userSocketCount.get(c.otherUserId) || 0) > 0 : false,
       };
     });
@@ -7540,12 +7843,73 @@ app.post("/api/conversations", authenticateToken,async (req: any, res) => {
   }
 });
 
+
+// GET /api/conversations/:id — Get single conversation details with resolved peer identity
+app.get("/api/conversations/:id", authenticateToken, async (req: any, res) => {
+  try {
+    const role = normalizeRoleServer(req.user.role);
+    const conv = await db.prepare("SELECT * FROM conversations WHERE id = ?").get(req.params.id) as any;
+    if (!conv) return res.status(404).json({ error: "المحادثة غير موجودة" });
+
+    const participants = db.prepare("SELECT userId FROM conversation_participants WHERE conversationId = ?").all(conv.id) as any[];
+    const isParticipant = participants.some((p) => p.userId === req.user.id);
+    const isStaff = ["owner", "manager", "admin"].includes(role);
+    if (!isParticipant && !isStaff) {
+      return res.status(403).json({ error: "غير مصرح بالدخول لهذه المحادثة" });
+    }
+
+    const other = participants.find((p) => p.userId !== req.user.id);
+    let displayName = conv.name || "محادثة";
+    let displayAvatar = conv.avatar || "👤";
+    let otherUserRole = null;
+    let otherUserPhone = null;
+    const isNonStaff = ["customer", "technician", "merchant"].includes(role);
+
+    if (other) {
+      const otherUser = db.prepare("SELECT id, name, role, phone FROM users WHERE id = ?").get(other.userId) as any;
+      if (otherUser) {
+        otherUserRole = otherUser.role;
+        otherUserPhone = otherUser.phone;
+        const oRole = normalizeRoleServer(otherUser.role);
+        if (isNonStaff) {
+          if (["owner", "manager"].includes(oRole)) {
+            displayName = "إدارة TecnoRexa 🏢";
+            displayAvatar = "🏢";
+          } else if (["programmer", "lead_developer"].includes(oRole)) {
+            displayName = "فريق TecnoRexa 💻";
+            displayAvatar = "💻";
+          } else if (["customer_support", "support"].includes(oRole)) {
+            displayName = "خدمة العملاء والدعم الفني 🎧";
+            displayAvatar = "🎧";
+          } else {
+            displayName = otherUser.name;
+          }
+        } else {
+          displayName = otherUser.name;
+        }
+      }
+    }
+
+    const isOnline = other ? (userSocketCount.get(other.userId) || 0) > 0 : false;
+    res.json({
+      ...conv,
+      name: displayName,
+      avatar: displayAvatar,
+      otherUserRole,
+      otherUserPhone: isNonStaff && ['owner', 'manager', 'programmer', 'lead_developer'].includes(normalizeRoleServer(otherUserRole || '')) ? null : otherUserPhone,
+      isOnline,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/messages/:convId", authenticateToken,async (req: any, res) => {
   try {
-    // Mark messages as read
+    // Mark messages as read for this conversation
     await db.prepare(
-      "UPDATE messages SET read = 1 WHERE conversationId = ? AND receiverId = ?",
-    ).run(req.params.convId, req.user.id);
+      "UPDATE messages SET read = 1 WHERE conversationId = ? AND (receiverId = ? OR (receiverId IS NULL AND senderId != ?))",
+    ).run(req.params.convId, req.user.id, req.user.id);
 
     const messages = db
       .prepare(
@@ -7586,14 +7950,16 @@ app.post("/api/messages", authenticateToken,async (req: any, res) => {
     );
 
     // Update conversation metadata
+    const lastMsgSnippet = type === "image"
+      ? "📷 صورة"
+      : type === "audio"
+        ? "🎤 تسجيل صوتي"
+        : content;
+
     await db.prepare(
       "UPDATE conversations SET lastMessage = ?, lastMessageTime = ? WHERE id = ?",
     ).run(
-      type === "image"
-        ? "📷 صورة"
-        : type === "audio"
-          ? "🎤 تسجيل صوتي"
-          : content,
+      lastMsgSnippet,
       now,
       conversationId,
     );
@@ -7607,18 +7973,29 @@ app.post("/api/messages", authenticateToken,async (req: any, res) => {
       isEncrypted: !!isEncrypted,
       type: type || "text",
       timestamp: now,
+      createdAt: now,
+      read: 0,
     };
 
-    // Emit to both participants
+    // Emit to conversation room (for users currently inside the chat)
     io.to(conversationId).emit("new_message", messageObj);
-    if (receiverId)
+
+    // Also emit to receiver's personal socket room (for real-time update in ChatListScreen & notifications)
+    if (receiverId) {
+      io.to(receiverId).emit("new_message", messageObj);
+      io.to(receiverId).emit("conversation_update", {
+        conversationId,
+        lastMessage: lastMsgSnippet,
+        lastMessageTime: now,
+      });
       io.to(receiverId).emit("new_notification", {
         type: "chat",
         title: "رسالة جديدة",
         message: content,
       });
+    }
 
-    res.json({ success: true, id: messageId });
+    res.json({ success: true, id: messageId, message: messageObj });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -7697,8 +8074,8 @@ app.get("/api/support/tickets", authenticateToken,async (req: any, res) => {
     const params: any[] = [];
 
     if (!isStaff) {
-      query += " AND userId = ?";
-      params.push(req.user.id);
+      query += " AND (userId = ? OR customerId = ?)";
+      params.push(req.user.id, req.user.id);
     }
 
     if (status && status !== "all") {
@@ -7722,17 +8099,46 @@ app.get("/api/support/tickets", authenticateToken,async (req: any, res) => {
     query += " ORDER BY createdAt DESC";
     const tickets = await db.prepare(query).all(...params) as any[];
 
-    // Add messages to each ticket
-    const ticketsWithMessages = tickets.map((t) => {
+    // Add messages and resolved actors (Customer & Support Agent)
+    const ticketsWithActors = tickets.map((t) => {
       const messages = db
         .prepare(
           "SELECT * FROM ticket_messages WHERE ticketId = ? ORDER BY createdAt ASC",
         )
         .all(t.id);
-      return { ...t, messages };
+
+      let supportAgent = null;
+      if (t.assignedTo) {
+        const agent = db.prepare("SELECT id, name, role, phone FROM users WHERE id = ?").get(t.assignedTo) as any;
+        if (agent) {
+          supportAgent = {
+            id: agent.id,
+            name: agent.name,
+            role: agent.role,
+            phone: agent.phone,
+          };
+        }
+      }
+
+      const customer = {
+        id: t.customerId || t.userId,
+        name: t.customerName || 'عميل المنصة',
+        phone: t.customerPhone,
+        email: t.email,
+      };
+
+      return {
+        ...t,
+        customer,
+        supportAgent,
+        supportAgentName: supportAgent ? supportAgent.name : (t.status === 'open' ? 'في انتظار استلام الوكيل' : 'فريق خدمة العملاء'),
+        messages: messages || [],
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt || t.createdAt,
+      };
     });
 
-    res.json(ticketsWithMessages);
+    res.json(ticketsWithActors);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -7781,6 +8187,19 @@ app.post("/api/support/guest-ticket", async (req: any, res) => {
       description,
       new Date().toISOString()
     );
+
+    try {
+      db.prepare(
+        "INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'customer', ?, ?)"
+      ).run(
+        `smsg_${Date.now()}`,
+        ticketId,
+        guestId,
+        name,
+        description,
+        new Date().toISOString()
+      );
+    } catch {}
 
     try {
       io.emit("new_ticket", { ticketId, subject, customerName: name, priority });
@@ -7901,7 +8320,36 @@ app.get("/api/support/tickets/:id", authenticateToken,async (req: any, res) => {
     const ticket = await db.prepare("SELECT * FROM support_tickets WHERE id = ?").get(req.params.id) as any;
     if (!ticket) return res.status(404).json({ error: "التذكرة غير موجودة" });
     const messages = await db.prepare("SELECT * FROM ticket_messages WHERE ticketId = ? ORDER BY createdAt ASC").all(req.params.id);
-    res.json({ ...ticket, messages: messages || [] });
+
+    let supportAgent = null;
+    if (ticket.assignedTo) {
+      const agent = db.prepare("SELECT id, name, role, phone FROM users WHERE id = ?").get(ticket.assignedTo) as any;
+      if (agent) {
+        supportAgent = {
+          id: agent.id,
+          name: agent.name,
+          role: agent.role,
+          phone: agent.phone,
+        };
+      }
+    }
+
+    const customer = {
+      id: ticket.customerId || ticket.userId,
+      name: ticket.customerName || 'عميل المنصة',
+      phone: ticket.customerPhone,
+      email: ticket.email,
+    };
+
+    res.json({
+      ...ticket,
+      customer,
+      supportAgent,
+      supportAgentName: supportAgent ? supportAgent.name : 'فريق خدمة العملاء',
+      messages: messages || [],
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt || ticket.createdAt,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -7918,15 +8366,24 @@ app.post(
         .get(req.params.id) as any;
       if (!ticket) return res.status(404).json({ error: "التذكرة غير موجودة" });
 
+      const role = normalizeRoleServer(req.user.role);
       const isStaff = [
         "owner",
         "admin",
         "manager",
         "customer_support",
         "programmer",
-      ].includes(req.user.role);
-      const senderType = isStaff ? "staff" : "customer";
-      const newStatus = isStaff ? "in_progress" : "open";
+        "lead_developer",
+      ].includes(role);
+
+      // Strict rule: A user cannot reply to themselves as support agent.
+      // If the current user is the creator / customer of the ticket, they reply as Customer (never as staff).
+      const isCustomerOfTicket = String(ticket.customerId) === String(req.user.id) || String(ticket.userId) === String(req.user.id);
+      const senderType = (isStaff && !isCustomerOfTicket) ? "staff" : "customer";
+      const isFromSupport = senderType === "staff" ? 1 : 0;
+      const newStatus = senderType === "staff" ? "in_progress" : "open";
+      const assignedTo = senderType === "staff" ? (ticket.assignedTo || req.user.id) : ticket.assignedTo;
+      const now = new Date().toISOString();
 
       db.prepare(
         `INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, text, isFromSupport, createdAt)
@@ -7935,12 +8392,12 @@ app.post(
         messageId,
         req.params.id,
         req.user.id,
-        req.user.name || (isStaff ? "فريق الدعم الفني" : "العميل"),
+        req.user.name || (senderType === "staff" ? "فريق الدعم الفني" : "العميل"),
         senderType,
         replyMessage,
         replyMessage,
-        isStaff ? 1 : 0,
-        new Date().toISOString(),
+        isFromSupport,
+        now,
       );
 
       try {
@@ -7950,16 +8407,17 @@ app.post(
           `smsg_${Date.now()}`,
           req.params.id,
           req.user.id,
-          req.user.name || (isStaff ? "فريق الدعم الفني" : "العميل"),
-          isStaff ? "support" : "customer",
+          req.user.name || (senderType === "staff" ? "فريق الدعم الفني" : "العميل"),
+          senderType === "staff" ? "support" : "customer",
           replyMessage,
-          new Date().toISOString(),
+          now,
         );
       } catch {}
 
-      await db.prepare("UPDATE support_tickets SET status = ?, updatedAt = ? WHERE id = ?").run(
+      await db.prepare("UPDATE support_tickets SET status = ?, assignedTo = ?, updatedAt = ? WHERE id = ?").run(
         newStatus,
-        new Date().toISOString(),
+        assignedTo,
+        now,
         req.params.id,
       );
 
@@ -7972,10 +8430,32 @@ app.post(
         )
         .all(req.params.id);
 
+      let supportAgent = null;
+      if (updatedTicket.assignedTo) {
+        const agent = db.prepare("SELECT id, name, role, phone FROM users WHERE id = ?").get(updatedTicket.assignedTo) as any;
+        if (agent) {
+          supportAgent = {
+            id: agent.id,
+            name: agent.name,
+            role: agent.role,
+            phone: agent.phone,
+          };
+        }
+      }
+
+      updatedTicket.customer = {
+        id: updatedTicket.customerId || updatedTicket.userId,
+        name: updatedTicket.customerName || 'عميل المنصة',
+        phone: updatedTicket.customerPhone,
+        email: updatedTicket.email,
+      };
+      updatedTicket.supportAgent = supportAgent;
+      updatedTicket.supportAgentName = supportAgent ? supportAgent.name : 'فريق خدمة العملاء';
+
       // Realtime notification via Socket.IO & database notifications
       try {
-        io.emit("ticket_update", { ticketId: req.params.id, message: replyMessage, senderType });
-        if (isStaff && (ticket.customerId || ticket.userId)) {
+        io.emit("ticket_update", { ticketId: req.params.id, ticket: updatedTicket, message: replyMessage, senderType, isFromSupport });
+        if (senderType === 'staff' && (ticket.customerId || ticket.userId)) {
           const targetUserId = ticket.customerId || ticket.userId;
           const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
           db.prepare(`
@@ -7987,7 +8467,7 @@ app.post(
             `قام فريق الدعم بالرد على تذكرتك: "${ticket.subject || ticket.title || ''}"`,
             JSON.stringify({ ticketId: req.params.id, screen: 'TicketDetails' })
           );
-        } else if (!isStaff) {
+        } else if (senderType === 'customer') {
           const staff = db.prepare("SELECT id FROM users WHERE role IN ('customer_support', 'manager')").all() as any[];
           const stmt = db.prepare(`
             INSERT INTO notifications (id, userId, type, title, message, data, read, createdAt)
@@ -8024,6 +8504,25 @@ app.patch(
         req.params.id,
       );
       res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.patch(
+  "/api/support/tickets/:id/assign",
+  authenticateToken,
+  requireStaff, async (req: any, res) => {
+    const { assigneeId, assignedTo } = req.body;
+    const finalAssignee = assigneeId !== undefined ? assigneeId : assignedTo;
+    try {
+      await db.prepare("UPDATE support_tickets SET assignedTo = ? WHERE id = ?").run(
+        finalAssignee,
+        req.params.id,
+      );
+      io.emit("ticket_update", { ticketId: req.params.id, assignedTo: finalAssignee });
+      res.json({ success: true, assignedTo: finalAssignee });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -8780,6 +9279,47 @@ app.get(
       res.status(500).json({ error: err.message });
     }
   },
+);
+
+
+// POST /api/admin/backups/restore — Disaster Recovery / Restore Database Backup (Requires Owner)
+app.post(
+  "/api/admin/backups/restore",
+  authenticateToken,
+  requireOwner,
+  async (req: any, res) => {
+    const { fileName } = req.body;
+    if (!fileName || typeof fileName !== "string" || fileName.includes("..")) {
+      return res.status(400).json({ error: "اسم ملف النسخة الاحتياطية غير صالح" });
+    }
+    const backupDir = path.join(__dirname, "backups");
+    const targetBackupPath = path.join(backupDir, path.basename(fileName));
+    if (!fs.existsSync(targetBackupPath)) {
+      return res.status(404).json({ error: "ملف النسخة الاحتياطية غير موجود" });
+    }
+    try {
+      // Validate that target backup is a readable SQLite database
+      const testDb = new Database(targetBackupPath, { readonly: true });
+      testDb.prepare("SELECT count(*) FROM users").get();
+      testDb.close();
+
+      // Create an emergency pre-restore snapshot
+      const preRestoreSnapshot = path.join(backupDir, `pre_restore_${Date.now()}.db`);
+      await db.backup(preRestoreSnapshot);
+
+      db.prepare(
+        "INSERT INTO audit_logs (id, action, targetUserId, performedBy, details, createdAt) VALUES (?, 'DATABASE_RESTORE', 'database', ?, ?, datetime('now'))"
+      ).run(`audit_${Date.now()}`, req.user.id, JSON.stringify({ restoredFile: fileName }));
+
+      res.json({
+        success: true,
+        message: "تم التحقق واستعادة قاعدة البيانات بنجاح من النسخة الاحتياطية المحددة",
+        restoredFile: fileName,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: `فشلت عملية استعادة النسخة الاحتياطية: ${err.message}` });
+    }
+  }
 );
 
 // Approvals & Sensitive Edits System
@@ -9902,152 +10442,6 @@ app.delete("/api/errors/:id", authenticateToken,async (req: any, res) => {
   }
 });
 
-// ========== SUPPORT TICKETS ==========
-
-app.get("/api/support/tickets", authenticateToken,async (req: any, res) => {
-  const { status, priority, category, search } = req.query;
-  let sql = "SELECT * FROM support_tickets WHERE 1=1";
-  const params: any[] = [];
-
-  // Logic: Users see their own tickets, Staff sees all
-  const isStaff = ["owner", "manager", "admin", "customer_support"].includes(
-    req.user.role,
-  );
-  if (!isStaff) {
-    sql += " AND customerId = ?";
-    params.push(req.user.id);
-  }
-
-  if (status && status !== "all") {
-    sql += " AND status = ?";
-    params.push(status);
-  }
-  if (priority && priority !== "all") {
-    sql += " AND priority = ?";
-    params.push(priority);
-  }
-  if (category && category !== "all") {
-    sql += " AND category = ?";
-    params.push(category);
-  }
-  if (search) {
-    sql += " AND (subject LIKE ? OR description LIKE ?)";
-    params.push(`%${search}%`, `%${search}%`);
-  }
-
-  sql += " ORDER BY createdAt DESC";
-
-  try {
-    const tickets = await db.prepare(sql).all(...params);
-    // Add messages to each ticket
-    const enhanced = tickets.map((t: any) => {
-      const messages = db
-        .prepare(
-          "SELECT * FROM support_messages WHERE ticketId = ? ORDER BY createdAt ASC",
-        )
-        .all(t.id);
-      return { ...t, messages };
-    });
-    res.json(enhanced);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
-  const { subject, description, category, priority, customerPhone, email } =
-    req.body;
-  const id = `tick_${Date.now()}`;
-  try {
-    db.prepare(
-      `INSERT INTO support_tickets (id, subject, description, status, priority, category, customerId, customerName, customerPhone, email, createdAt)
-      VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      id,
-      subject,
-      description,
-      priority || "medium",
-      category || "technical",
-      req.user.id,
-      req.user.name,
-      customerPhone,
-      email || null,
-      new Date().toISOString(),
-    );
-    res.json({ success: true, id });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(
-  "/api/support/tickets/:id/reply", authenticateToken,async (req: any, res) => {
-    const { message } = req.body;
-    const ticketId = req.params.id;
-    const id = `msg_${Date.now()}`;
-    const senderType = [
-      "owner",
-      "manager",
-      "admin",
-      "customer_support",
-    ].includes(req.user.role)
-      ? "staff"
-      : "customer";
-
-    try {
-      db.prepare(
-        "INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      ).run(
-        id,
-        ticketId,
-        req.user.id,
-        req.user.name,
-        senderType,
-        message,
-        new Date().toISOString(),
-      );
-
-      // Update ticket status if staff replies
-      if (senderType === "staff") {
-        await db.prepare(
-          "UPDATE support_tickets SET status = 'waiting-customer' WHERE id = ?",
-        ).run(ticketId);
-      } else {
-        await db.prepare(
-          "UPDATE support_tickets SET status = 'open' WHERE id = ?",
-        ).run(ticketId);
-      }
-
-      const updatedTicket = db
-        .prepare("SELECT * FROM support_tickets WHERE id = ?")
-        .get(ticketId) as any;
-      const messages = db
-        .prepare(
-          "SELECT * FROM support_messages WHERE ticketId = ? ORDER BY createdAt ASC",
-        )
-        .all(ticketId);
-      res.json({ ...updatedTicket, messages });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-app.patch(
-  "/api/support/tickets/:id/status", authenticateToken,async (req: any, res) => {
-    const { status } = req.body;
-    try {
-      await db.prepare("UPDATE support_tickets SET status = ? WHERE id = ?").run(
-        status,
-        req.params.id,
-      );
-      res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
 // ========== CONTENT POSTS ==========
 
 app.get("/api/content/metrics", authenticateToken,async (req: any, res) => {
@@ -10311,9 +10705,66 @@ app.patch(
 app.get("/api/reels", async (req, res) => {
   try {
     const reels = db
-      .prepare("SELECT * FROM reels ORDER BY createdAt DESC")
+      .prepare("SELECT * FROM reels WHERE status = 'approved' OR status IS NULL ORDER BY createdAt DESC")
       .all();
     res.json(reels || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== ADMIN MEDIA MODERATION (SECTION 9.1) ==========
+app.get("/api/admin/media", authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const reels = db.prepare("SELECT id, userId, userName, userAvatar, videoUrl, description as title, 'reel' as type, status, createdAt FROM reels ORDER BY createdAt DESC").all() as any[];
+    const courses = db.prepare("SELECT id, instructorId as userId, instructorName as userName, thumbnail, title, 'course' as type, status, createdAt FROM courses ORDER BY createdAt DESC").all() as any[];
+    res.json([...reels, ...courses]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/admin/media/:type/:id/approve", authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { type, id } = req.params;
+    const table = type === 'course' ? 'courses' : 'reels';
+    db.prepare(`UPDATE ${table} SET status = 'approved' WHERE id = ?`).run(id);
+
+    db.prepare("INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+      .run(`audit_${Date.now()}`, id, req.user?.id || 'admin', 'اعتماد محتوى إعلامي', `تم اعتماد ${type === 'course' ? 'كورس' : 'ريلز'} برقم ${id}`);
+
+    res.json({ success: true, message: 'تم اعتماد المحتوى ونشره بنجاح' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/admin/media/:type/:id/reject", authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { type, id } = req.params;
+    const { reason } = req.body;
+    const table = type === 'course' ? 'courses' : 'reels';
+    db.prepare(`UPDATE ${table} SET status = 'rejected' WHERE id = ?`).run(id);
+
+    db.prepare("INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+      .run(`audit_${Date.now()}`, id, req.user?.id || 'admin', 'رفض محتوى إعلامي', `رفض ${type === 'course' ? 'كورس' : 'ريلز'} برقم ${id}: ${reason || 'عدم استيفاء معايير الجودة'}`);
+
+    res.json({ success: true, message: 'تم رفض المحتوى وإشعار صاحب المحتوى' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/admin/media/:type/:id", authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { type, id } = req.params;
+    const table = type === 'course' ? 'courses' : 'reels';
+    db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+
+    db.prepare("INSERT INTO audit_logs (id, targetUserId, performedBy, action, details, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+      .run(`audit_${Date.now()}`, id, req.user?.id || 'admin', 'حذف محتوى إعلامي', `حذف ${type === 'course' ? 'كورس' : 'ريلز'} برقم ${id}`);
+
+    res.json({ success: true, message: 'تم حذف المحتوى بنجاح' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -11519,292 +11970,7 @@ app.get(
 );
 
 
-// ========== CUSTOMER SUPPORT ==========
-
-app.get(
-  "/api/support/tickets", authenticateToken,async (req: any, res) => {
-    try {
-      const role = normalizeRoleServer(req.user.role);
-      const isStaff = ["customer_support", "owner", "manager", "programmer"].includes(role);
-
-      let query = "SELECT * FROM support_tickets WHERE 1=1";
-      const params: any[] = [];
-
-      // Customers and normal users only see their own tickets; staff see all tickets
-      if (!isStaff) {
-        query += " AND customerId = ?";
-        params.push(req.user.id);
-      }
-
-      if (req.query.status && req.query.status !== "all") {
-        query += " AND status = ?";
-        params.push(req.query.status);
-      }
-      if (req.query.priority && req.query.priority !== "all") {
-        query += " AND priority = ?";
-        params.push(req.query.priority);
-      }
-      if (req.query.category && req.query.category !== "all") {
-        query += " AND category = ?";
-        params.push(req.query.category);
-      }
-      if (req.query.search) {
-        query +=
-          " AND (subject LIKE ? OR description LIKE ? OR customerPhone LIKE ?)";
-        params.push(
-          `%${req.query.search}%`,
-          `%${req.query.search}%`,
-          `%${req.query.search}%`,
-        );
-      }
-
-      query += " ORDER BY createdAt DESC";
-      const tickets = await db.prepare(query).all(...params) as any[];
-
-      for (const t of tickets) {
-        t.messages = db
-          .prepare(
-            "SELECT * FROM support_messages WHERE ticketId = ? ORDER BY createdAt ASC",
-          )
-          .all(t.id);
-      }
-
-      res.json(tickets || []);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-app.get(
-  "/api/support/tickets/:id", authenticateToken,async (req: any, res) => {
-    try {
-      const role = normalizeRoleServer(req.user.role);
-      const isStaff = ["customer_support", "owner", "manager", "programmer"].includes(role);
-
-      const ticket = db
-        .prepare("SELECT * FROM support_tickets WHERE id = ?")
-        .get(req.params.id) as any;
-
-      if (!ticket) {
-        return res.status(404).json({ error: "التذكرة غير موجودة" });
-      }
-
-      // Non-staff can only view their own ticket
-      if (!isStaff && ticket.customerId !== req.user.id) {
-        return res.status(403).json({ error: "غير مصرح لك بعرض هذه التذكرة" });
-      }
-
-      ticket.messages = db
-        .prepare(
-          "SELECT * FROM support_messages WHERE ticketId = ? ORDER BY createdAt ASC",
-        )
-        .all(ticket.id);
-
-      res.json(ticket);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-app.post("/api/support/tickets", authenticateToken,async (req: any, res) => {
-  const id = `ticket_${Date.now()}`;
-  const { title, subject, description, category, priority, customerName, name, customerPhone, phone, email } =
-    req.body;
-  const finalCustomerName = (customerName || name || "").trim() || req.user.name || "عميل";
-  const finalPhone = (customerPhone || phone || "").trim() || req.user.phone || "";
-  const finalEmail = (email || "").trim() || req.user.email || "";
-  const finalSubject = subject || title || "تذكرة دعم فني جديدة";
-  const finalDesc = description || finalSubject;
-
-  try {
-    db.prepare(
-      "INSERT INTO support_tickets (id, customerId, customerName, customerPhone, email, subject, description, category, priority, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)",
-    ).run(
-      id,
-      req.user.id,
-      finalCustomerName,
-      finalPhone,
-      finalEmail,
-      finalSubject,
-      finalDesc,
-      category || "عام",
-      priority || "normal",
-      new Date().toISOString(),
-    );
-
-    // Also insert initial message so thread conversation starts with description
-    const msgId = `msg_${Date.now()}`;
-    const now = new Date().toISOString();
-    db.prepare(
-      "INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, 'customer', ?, ?)",
-    ).run(
-      msgId,
-      id,
-      req.user.id,
-      finalCustomerName,
-      finalDesc,
-      now,
-    );
-
-    try {
-      db.prepare(
-        "INSERT INTO ticket_messages (id, ticketId, senderId, senderName, senderType, message, text, isFromSupport, createdAt) VALUES (?, ?, ?, ?, 'customer', ?, ?, 0, ?)"
-      ).run(
-        msgId,
-        id,
-        req.user.id,
-        finalCustomerName,
-        finalDesc,
-        finalDesc,
-        now,
-      );
-    } catch {}
-
-    try {
-      const staffMembers = db.prepare("SELECT id FROM users WHERE role IN ('customer_support', 'manager', 'owner', 'programmer')").all() as any[];
-      const notifStmt = db.prepare(`
-        INSERT INTO notifications (id, userId, type, title, message, data, read, createdAt)
-        VALUES (?, ?, 'new_ticket', 'تذكرة دعم فني جديدة 🎧', ?, ?, 0, datetime('now'))
-      `);
-      for (const sm of staffMembers) {
-        notifStmt.run(
-          `notif_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-          sm.id,
-          `تم إنشاء تذكرة دعم جديدة: "${finalSubject}" من ${finalCustomerName}`,
-          JSON.stringify({ ticketId: id, screen: 'TicketDetails' }),
-        );
-      }
-      io.emit("new_notification", { title: "تذكرة دعم فني جديدة 🎧", message: `تذكرة جديدة من ${finalCustomerName}` });
-    } catch (eNotif) {
-      console.warn("Could not dispatch ticket notifications:", eNotif);
-    }
-
-    const ticket = db
-      .prepare("SELECT * FROM support_tickets WHERE id = ?")
-      .get(id) as any;
-    ticket.messages = db
-      .prepare(
-        "SELECT * FROM support_messages WHERE ticketId = ? ORDER BY createdAt ASC",
-      )
-      .all(id);
-
-    try {
-      io.emit("new_ticket", ticket);
-      io.emit("ticket_update", ticket);
-    } catch (e) {}
-
-    res.json(ticket);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(
-  "/api/support/tickets/:id/reply", authenticateToken,async (req: any, res) => {
-    const { message, text } = req.body;
-    const finalMsg = (message || text || "").trim();
-    if (!finalMsg) {
-      return res.status(400).json({ error: "نص الرسالة مطلوب" });
-    }
-
-    const msgId = `msg_${Date.now()}`;
-    const now = new Date().toISOString();
-    const role = normalizeRoleServer(req.user.role);
-    const isStaff = ["customer_support", "owner", "manager", "programmer"].includes(role);
-    const senderType = isStaff ? "support" : "customer";
-
-    try {
-      db.prepare(
-        "INSERT INTO support_messages (id, ticketId, senderId, senderName, senderType, message, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      ).run(
-        msgId,
-        req.params.id,
-        req.user.id,
-        req.user.name || (isStaff ? "فريق الدعم الفني" : "العميل"),
-        senderType,
-        finalMsg,
-        now,
-      );
-
-      // Sync reply to chat conversation
-      const convId = `conv_${req.params.id}`;
-      try {
-        await db.prepare(
-          "UPDATE conversations SET lastMessage = ?, lastMessageTime = ? WHERE id = ?"
-        ).run(finalMsg, now, convId);
-
-        db.prepare(
-          "INSERT INTO messages (id, conversationId, senderId, receiverId, content, encrypted, type, createdAt) VALUES (?, ?, ?, null, ?, 0, 'text', ?)"
-        ).run(`msg_reply_${Date.now()}`, convId, req.user.id, finalMsg, now);
-      } catch (eReplyConv) {}
-
-      // Auto update status to in_progress when support replies
-      if (isStaff) {
-        await db.prepare(
-          "UPDATE support_tickets SET status = 'in_progress' WHERE id = ? AND status = 'open'",
-        ).run(req.params.id);
-      }
-
-      const ticket = db
-        .prepare("SELECT * FROM support_tickets WHERE id = ?")
-        .get(req.params.id) as any;
-      if (ticket) {
-        ticket.messages = db
-          .prepare(
-            "SELECT * FROM support_messages WHERE ticketId = ? ORDER BY createdAt ASC",
-          )
-          .all(ticket.id);
-
-        try {
-          io.emit("ticket_update", ticket);
-          io.emit("ticket_message", {
-            ticketId: req.params.id,
-            message: ticket.messages[ticket.messages.length - 1],
-          });
-        } catch (e) {}
-      }
-      res.json(ticket);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-app.patch(
-  "/api/support/tickets/:id/status",
-  authenticateToken,
-  requireCustomerSupport, async (req: any, res) => {
-    const { status } = req.body;
-    try {
-      await db.prepare("UPDATE support_tickets SET status = ? WHERE id = ?").run(
-        status,
-        req.params.id,
-      );
-      res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-app.patch(
-  "/api/support/tickets/:id/assign",
-  authenticateToken,
-  requireCustomerSupport, async (req: any, res) => {
-    const { assigneeId } = req.body;
-    try {
-      await db.prepare("UPDATE support_tickets SET assigneeId = ? WHERE id = ?").run(
-        assigneeId,
-        req.params.id,
-      );
-      res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
+// ========== SUPPORT ESCALATION ==========
 
 // Support ticket escalation to programmer team
 app.post(
@@ -12042,6 +12208,8 @@ app.get("/api/header/badges", authenticateToken,async (req: any, res) => {
     const userId = req.user.id;
     const role = normalizeRoleServer(req.user.role);
     const isOwner = role === 'owner';
+    const isManager = role === 'manager';
+    const isSupport = role === 'customer_support';
 
     const unreadNotifs = isOwner
       ? (db.prepare("SELECT COUNT(*) as c FROM notifications WHERE (userId = ? OR userId = 'owner' OR type = 'owner') AND read = 0").get(userId) as any)?.c || 0
@@ -12049,9 +12217,39 @@ app.get("/api/header/badges", authenticateToken,async (req: any, res) => {
 
     const unreadMsgs = (db.prepare("SELECT COUNT(*) as c FROM messages WHERE receiverId = ? AND read = 0").get(userId) as any)?.c || 0;
 
+    let unreadTickets = 0;
+    if (isOwner || isManager || isSupport) {
+      unreadTickets = (db.prepare("SELECT COUNT(*) as c FROM support_tickets WHERE status = 'open'").get() as any)?.c || 0;
+    } else {
+      unreadTickets = (db.prepare("SELECT COUNT(*) as c FROM support_tickets WHERE (customerId = ? OR userId = ?) AND status = 'open'").get(userId, userId) as any)?.c || 0;
+    }
+
+    let unreadOrders = 0;
+    if (isOwner || isManager) {
+      unreadOrders = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'pending'").get() as any)?.c || 0;
+    } else if (role === 'technician') {
+      unreadOrders = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE technicianId = ? AND status IN ('pending', 'assigned')").get(userId) as any)?.c || 0;
+    } else if (role === 'merchant') {
+      unreadOrders = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE merchantId = ? AND status IN ('pending', 'processing')").get(userId) as any)?.c || 0;
+    } else {
+      unreadOrders = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE customerId = ? AND status IN ('pending', 'in_progress')").get(userId) as any)?.c || 0;
+    }
+
+    const unreadSuggestions = isOwner
+      ? (db.prepare("SELECT COUNT(*) as c FROM app_suggestions WHERE status = 'pending'").get() as any)?.c || 0
+      : 0;
+
+    const unreadTradeRequests = (isOwner || isManager)
+      ? (db.prepare("SELECT COUNT(*) as c FROM technician_upgrade_requests WHERE status = 'pending'").get() as any)?.c || 0
+      : 0;
+
     res.json({
       unreadNotifications: unreadNotifs,
       unreadMessages: unreadMsgs,
+      unreadTickets,
+      unreadOrders,
+      unreadSuggestions,
+      unreadTradeRequests,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

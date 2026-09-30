@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch server.ts",
     "server": "tsx server.ts",
-    "test": "node tests/test_all_roles_end_to_end.cjs && node tests/test_workflows_e2e.cjs",
+    "test": "node tests/test_all_roles_end_to_end.cjs && node tests/test_workflows_e2e.cjs && node tests/test_suggestions_and_support.cjs",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

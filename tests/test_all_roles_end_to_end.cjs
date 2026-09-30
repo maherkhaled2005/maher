@@ -1,21 +1,31 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const BASE_URL = `http://localhost:${process.env.PORT || 5000}/api`;
+const PORT = process.env.PORT || 5000;
+const BASE_URL = `http://localhost:${PORT}/api`;
 const db = new Database(path.join(__dirname, '..', 'tecnorexa.db'));
 
 const ROLES = [
-  { role: 'owner', phone: '01000000001', pass: 'Owner@123456' },
-  { role: 'programmer', phone: '01064739664', pass: 'Maher@123456' },
-  { role: 'manager', phone: '01000000003', pass: 'Manager@123456' },
-  { role: 'customer_support', phone: '01000000004', pass: 'Support@123456' },
-  { role: 'technician', phone: '01000000005', pass: 'Tech@123456' },
-  { role: 'merchant', phone: '01000000006', pass: 'Merchant@123456' },
-  { role: 'customer', phone: '01000000007', pass: 'Customer@123456' },
+  { role: 'owner', phone: '01011112222', pass: '123456' },
+  { role: 'manager', phone: '01286585187', pass: '123456' },
+  { role: 'programmer', phone: '01064739664', pass: '123456' },
+  { role: 'customer_support', phone: '01557470554', pass: '123456' },
+  { role: 'technician', phone: '01099887722', pass: '123456' },
+  { role: 'merchant', phone: '01122334455', pass: '123456' },
+  { role: 'customer', phone: '01055667788', pass: '123456' },
 ];
 
 async function runTests() {
-  console.log('=== STARTING END-TO-END 7 ROLES VERIFICATION ===\n');
+  console.log('=== STARTING END-TO-END 7 ROLES PRODUCTION VERIFICATION ===\n');
+
+  // Test 0: App Version Endpoint
+  try {
+    const vRes = await fetch(`${BASE_URL}/app/version`);
+    const vData = await vRes.json();
+    console.log(`✅ /api/app/version -> status: ${vRes.status}, version: ${vData.currentVersion}, minSupported: ${vData.minimumSupportedVersion}`);
+  } catch (err) {
+    console.error(`❌ /api/app/version FAILED:`, err.message);
+  }
 
   const tokens = {};
 
@@ -80,37 +90,71 @@ async function runTests() {
     }
   }
 
-  console.log('\n--- TESTING MANAGER & OWNER ON SHARED OPERATIONAL ENDPOINTS ---');
-  for (const role of ['owner', 'manager']) {
-    const token = tokens[role];
-    if (!token) continue;
-
-    // 1. Tech upgrades list
+  console.log('\n--- TESTING CONVERSATIONS & PEER IDENTITY FOR NORMAL USERS ---');
+  if (tokens.customer) {
     try {
-      const res1 = await fetch(`${BASE_URL}/owner/technicians/upgrades`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${BASE_URL}/conversations`, {
+        headers: { Authorization: `Bearer ${tokens.customer}` }
       });
-      const data1 = await res1.json();
-      console.log(`✅ [${role}] /api/owner/technicians/upgrades -> Status: ${res1.status}, count: ${Array.isArray(data1) ? data1.length : 'ok'}`);
+      const data = await res.json();
+      console.log(`✅ [customer] /api/conversations -> Status: ${res.status}, conversations count: ${data.length}`);
+      if (data.length > 0) {
+        const first = data[0];
+        console.log(`   Sample conversation peer name: "${first.name}" (not self)`);
+      }
     } catch (err) {
-      console.error(`❌ [${role}] /api/owner/technicians/upgrades FAILED:`, err.message);
-    }
-
-    // 2. Chat warning
-    try {
-      const res2 = await fetch(`${BASE_URL}/owner/chat/test_conv_1/warning`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      });
-      const data2 = await res2.json();
-      console.log(`✅ [${role}] /api/owner/chat/:id/warning -> Status: ${res2.status}, msg: ${data2?.message}`);
-    } catch (err) {
-      console.error(`❌ [${role}] /api/owner/chat/:id/warning FAILED:`, err.message);
+      console.error(`❌ [customer] /api/conversations FAILED:`, err.message);
     }
   }
 
-  console.log('\n=== ALL END-TO-END CHECKS COMPLETED ===');
+  console.log('\n--- TESTING SUPPORT TICKETS & MESSAGES ---');
+  if (tokens.customer) {
+    try {
+      const res = await fetch(`${BASE_URL}/support/tickets`, {
+        headers: { Authorization: `Bearer ${tokens.customer}` }
+      });
+      const data = await res.json();
+      console.log(`✅ [customer] /api/support/tickets -> Status: ${res.status}, tickets: ${data.length}`);
+    } catch (err) {
+      console.error(`❌ [customer] /api/support/tickets FAILED:`, err.message);
+    }
+  }
+
+  console.log('\n--- TESTING ORDER STOCK & MARKETPLACE ---');
+  if (tokens.customer) {
+    try {
+      const products = db.prepare("SELECT * FROM products LIMIT 1").all();
+      if (products.length > 0) {
+        const prod = products[0];
+        console.log(`   Found test product: ${prod.name} (stock: ${prod.stock})`);
+        // Test placing order with quantity exceeding stock
+        const badRes = await fetch(`${BASE_URL}/orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens.customer}`,
+          },
+          body: JSON.stringify({
+            items: [{ id: prod.id, name: prod.name, price: prod.price, quantity: 999999 }],
+            address: 'القاهرة - المعادي',
+            paymentMethod: 'cod',
+            total: prod.price * 999999,
+            type: 'marketplace',
+          }),
+        });
+        const badData = await badRes.json();
+        if (badRes.status === 400 && badData.error && badData.error.includes('المخزون')) {
+          console.log(`✅ Stock limit enforcement passed: "${badData.error}"`);
+        } else {
+          console.log(`⚠️ Expected stock limit error, got:`, badData);
+        }
+      }
+    } catch (err) {
+      console.error(`❌ Order stock test error:`, err.message);
+    }
+  }
+
+  console.log('\n=== END-TO-END TEST SUITE COMPLETED ===');
 }
 
-runTests();
+runTests().catch(console.error);

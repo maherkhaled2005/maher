@@ -676,11 +676,11 @@ export default function AIChatScreen({ navigation }: any) {
                 ⚠️ استهلكت الـ 3 رسائل المجانية للاستشارة السريعة
               </Text>
               <Text style={{ color: colors.gray, fontSize: 11, textAlign: 'center', marginBottom: 10, lineHeight: 16 }}>
-                للحصول على فحص ميداني شامل لجهازك أو متابعة الأعطال المعقدة، يمكنك طلب فني معتمد أو التواصل مع الدعم الفني:
+                للحصول على مساعدة إضافية في تشخيص الأعطال أو الاستفسار عن كود الخطأ، يمكنك التواصل مع فريق الدعم الفني:
               </Text>
               <View style={{ flexDirection: 'row-reverse', gap: 8, width: '100%' }}>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('TechniciansTeam')}
+                  onPress={() => navigation.navigate('Tickets')}
                   style={{
                     flex: 1,
                     backgroundColor: colors.primary,
@@ -689,19 +689,7 @@ export default function AIChatScreen({ navigation }: any) {
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ color: '#0A0A0A', fontSize: 12, fontWeight: '900' }}>طلب فني صيانة 🔧</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Tickets')}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#27272A',
-                    paddingVertical: 10,
-                    borderRadius: borderRadius.md,
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={{ color: colors.white, fontSize: 12, fontWeight: '800' }}>خدمة العملاء 🎧</Text>
+                  <Text style={{ color: '#0A0A0A', fontSize: 12, fontWeight: '900' }}>خدمة العملاء والدعم الفني 🎧</Text>
                 </TouchableOpacity>
               </View>
             </View>

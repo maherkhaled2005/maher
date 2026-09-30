@@ -1,16 +1,30 @@
-import React, { Component, ErrorInfo, ReactNode, useEffect } from 'react';
-import { StatusBar, View, Text, TouchableOpacity, Platform, Animated, Image, ActivityIndicator, useWindowDimensions } from 'react-native';
+import React, { Component, ErrorInfo, ReactNode, useEffect, useState, useRef } from 'react';
+import {
+  StatusBar,
+  View,
+  Text,
+  TouchableOpacity,
+  Platform,
+  Animated,
+  Image,
+  ActivityIndicator,
+  useWindowDimensions,
+  Easing,
+  Alert,
+  Linking,
+  Modal,
+} from 'react-native';
 import { StripeProvider } from './src/components/StripeWrapper';
 import RootNavigation from './src/navigation/index';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import Logo from './src/components/Logo';
 import './global.css';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
 import { io } from 'socket.io-client';
-import { getActiveSocketURL } from './src/api/client';
+import { getActiveSocketURL, api } from './src/api/client';
 import { useAuthStore } from './src/store/authStore';
-import { Alert } from 'react-native';
+import { useNetwork } from './src/hooks/useNetwork';
+import NetInfo from '@react-native-community/netinfo';
+import { WifiOff, AlertTriangle } from 'lucide-react-native';
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.lang = 'ar';
@@ -71,9 +85,47 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 export default function App() {
   const { expoPushToken, notification } = usePushNotifications();
   const { user, logout } = useAuthStore();
-  const [appReady, setAppReady] = React.useState(false);
+  const [appReady, setAppReady] = useState(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const circleSize = Math.max(160, Math.min(Math.min(windowWidth * 0.55, windowHeight * 0.28), 200));
+  const circleSize = Math.max(130, Math.min(Math.min(windowWidth * 0.45, windowHeight * 0.22), 170));
+
+  // Network State
+  const { isConnected, isInternetReachable } = useNetwork();
+  const isOffline = isConnected === false || isInternetReachable === false;
+  const [retryingNetwork, setRetryingNetwork] = useState(false);
+
+  // Mandatory App Update Modal State
+  const [updateRequired, setUpdateRequired] = useState(false);
+  const [updateUrl, setUpdateUrl] = useState('https://play.google.com/store/apps/details?id=com.tecnorexa.app');
+
+  const handleRetryConnection = async () => {
+    setRetryingNetwork(true);
+    try {
+      const state = await NetInfo.refresh();
+      if (!state.isConnected) {
+        Alert.alert('تنبيه الاتصال', 'لا زال الاتصال بالإنترنت غير متوفر. يرجى التحقق من شبكة Wi-Fi أو بيانات الهاتف.');
+      }
+    } catch {}
+    finally {
+      setRetryingNetwork(false);
+    }
+  };
+
+  // App Version & Force Update Check
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const res = await api.get('/app/version');
+        if (res.data?.forceUpdate) {
+          setUpdateRequired(true);
+          if (res.data?.updateUrl) setUpdateUrl(res.data.updateUrl);
+        }
+      } catch {
+        // Non-blocking in case of offline or early startup
+      }
+    };
+    checkVersion();
+  }, []);
 
   // Live Socket connection for instant account ban & live role sync
   useEffect(() => {
@@ -92,8 +144,6 @@ export default function App() {
         logout();
       });
 
-      // A ban must take effect on this device right away, without the user
-      // having to log out and back in.
       socket.on('account_banned', (data: any) => {
         Alert.alert(
           'تم حظر الحساب ⛔',
@@ -143,38 +193,33 @@ export default function App() {
     }
   }, []);
 
-  // 1. Splash Screen Animation State
-  const logoOpacity = React.useRef(new Animated.Value(0)).current;
-  const logoScale = React.useRef(new Animated.Value(0.8)).current;
-  const subtitleOpacity = React.useRef(new Animated.Value(0)).current;
-  const loadingOpacity = React.useRef(new Animated.Value(0)).current;
-  const splashContainerOpacity = React.useRef(new Animated.Value(1)).current;
+  // 1. Splash Screen Animation State: Starts large circular logo and smoothly shrinks down
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(1.45)).current;
+  const subtitleOpacity = useRef(new Animated.Value(0)).current;
+  const loadingOpacity = useRef(new Animated.Value(0)).current;
+  const splashContainerOpacity = useRef(new Animated.Value(1)).current;
 
-  const [typedText, setTypedText] = React.useState('');
+  const [typedText, setTypedText] = useState('');
   const fullText = 'TecnoRexa';
 
   useEffect(() => {
-    if (notification) {
-      console.log('Received notification in App:', notification.request.content.title);
-    }
-  }, [notification]);
-
-  useEffect(() => {
-    // 0ms: Logo image fades in and scales
+    // Stage 1: Official Logo fades in and smoothly shrinks from large (1.45) down to 1.0
     Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
-        duration: 300,
+        duration: 350,
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(logoScale, {
         toValue: 1,
-        duration: 300,
+        duration: 550,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
 
-    // 300ms: typing 'TecnoRexa' letter by letter
+    // Stage 2: Typing 'TecnoRexa' letter by letter
     let typeIndex = 0;
     let typeInterval: ReturnType<typeof setInterval>;
     const typingDelay = setTimeout(() => {
@@ -184,37 +229,37 @@ export default function App() {
         if (typeIndex >= fullText.length) {
           clearInterval(typeInterval);
         }
-      }, 70);
-    }, 200);
+      }, 60);
+    }, 250);
 
-    // 800ms: Subtitle text fades in
+    // Stage 3: Subtitle text fades in
     const subtitleTimer = setTimeout(() => {
       Animated.timing(subtitleOpacity, {
         toValue: 1,
-        duration: 400,
+        duration: 350,
         useNativeDriver: Platform.OS !== 'web',
       }).start();
-    }, 800);
+    }, 650);
 
-    // 1100ms: 'جاري التحميل...' fades in
+    // Stage 4: Independent Loading indicator fades in
     const loadingTimer = setTimeout(() => {
       Animated.timing(loadingOpacity, {
         toValue: 1,
-        duration: 400,
+        duration: 350,
         useNativeDriver: Platform.OS !== 'web',
       }).start();
-    }, 1100);
+    }, 950);
 
-    // 1900ms: Splash fades out, app starts
+    // Stage 5: Smooth fade out transition to App/Login
     const transitionTimer = setTimeout(() => {
       Animated.timing(splashContainerOpacity, {
         toValue: 0,
-        duration: 250,
+        duration: 300,
         useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         setAppReady(true);
       });
-    }, 1900);
+    }, 1600);
 
     return () => {
       clearTimeout(typingDelay);
@@ -241,19 +286,37 @@ export default function App() {
         <StatusBar barStyle="light-content" backgroundColor="#070A0F" translucent />
 
         <View style={{ alignItems: 'center', width: '100%', paddingHorizontal: 16 }}>
-          {/* Official TR Logo (gold) — no blue sphere */}
-          <Animated.Image
-            source={require('./assets/tecnorexa_official_logo.jpg')}
-            resizeMode="contain"
+          {/* Official TR Logo in a circular container that starts large and smoothly shrinks */}
+          <Animated.View
             style={{
-              width: 128,
-              height: 128,
-              borderRadius: 28,
+              width: circleSize,
+              height: circleSize,
+              borderRadius: circleSize / 2,
+              borderWidth: 2.5,
+              borderColor: '#D4AF37',
+              overflow: 'hidden',
+              backgroundColor: '#000000',
               marginBottom: 20,
               opacity: logoOpacity,
               transform: [{ scale: logoScale }],
+              shadowColor: '#D4AF37',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.45,
+              shadowRadius: 14,
+              elevation: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
-          />
+          >
+            <Image
+              source={require('./assets/tecnorexa_official_logo.jpg')}
+              resizeMode="cover"
+              style={{
+                width: '100%',
+                height: '100%',
+              }}
+            />
+          </Animated.View>
 
           {/* Brand Typography in Royal Gold with Typing Effect */}
           <Text
@@ -268,7 +331,7 @@ export default function App() {
           <Animated.Text
             maxFontSizeMultiplier={1.15}
             numberOfLines={2}
-            style={{ opacity: subtitleOpacity, color: '#D4AF37', fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 20, paddingHorizontal: 8 }}
+            style={{ opacity: subtitleOpacity, color: '#D4AF37', fontSize: 13, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center', marginBottom: 22, paddingHorizontal: 8 }}
           >
             منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
           </Animated.Text>
@@ -306,8 +369,75 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <View style={[{ flex: 1 }, Platform.OS === 'web' && { height: '100%', maxHeight: '100%', overflow: 'hidden' } as any]}>
+        <View style={[{ flex: 1, backgroundColor: '#0A0A0A' }, Platform.OS === 'web' && { height: '100%', maxHeight: '100%', overflow: 'hidden' } as any]}>
           <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
+
+          {/* Global Offline Network Banner */}
+          {isOffline && (
+            <View
+              style={{
+                backgroundColor: '#DC2626',
+                paddingVertical: 9,
+                paddingHorizontal: 16,
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottomWidth: 1,
+                borderColor: '#B91C1C',
+                zIndex: 9999,
+              }}
+            >
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1 }}>
+                <WifiOff size={16} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
+                  لا يوجد اتصال بالإنترنت
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleRetryConnection}
+                disabled={retryingNetwork}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  paddingHorizontal: 12,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  flexDirection: 'row-reverse',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                {retryingNetwork ? (
+                  <ActivityIndicator size="small" color="#DC2626" />
+                ) : (
+                  <Text style={{ color: '#DC2626', fontSize: 11, fontWeight: '900' }}>
+                    إعادة المحاولة
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Mandatory Update Modal */}
+          <Modal visible={updateRequired} transparent animationType="fade">
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+              <View style={{ backgroundColor: '#141414', borderRadius: 20, padding: 24, width: '100%', maxWidth: 380, borderWidth: 1.5, borderColor: '#D4AF37', alignItems: 'center' }}>
+                <AlertTriangle size={48} color="#D4AF37" style={{ marginBottom: 16 }} />
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginBottom: 8, textAlign: 'center' }}>
+                  تحديث إجباري متوفر 🚀
+                </Text>
+                <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 20 }}>
+                  يجب تحديث تطبيق TecnoRexa إلى أحدث إصدار لمتابعة الاستخدام والاستفادة من الميزات الأمنية وتحسينات الأداء.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(updateUrl).catch(() => {})}
+                  style={{ backgroundColor: '#D4AF37', width: '100%', paddingVertical: 12, borderRadius: 12, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#0A0A0A', fontSize: 14, fontWeight: '900' }}>تحديث الآن عبر المتجر</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
           <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_KEY || ''}>
             <RootNavigation />
           </StripeProvider>

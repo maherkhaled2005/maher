@@ -42,6 +42,7 @@ import {
   Plus,
   BarChart2,
   CheckSquare,
+  Lightbulb,
 } from 'lucide-react-native';
 import { colors, spacing, borderRadius } from '../theme';
 import Logo from './Logo';
@@ -82,7 +83,8 @@ export const OWNER_SECTIONS: RoleSectionItem[] = [
   { id: 18, label: 'مركز الذكاء الاصطناعي (AI Hub)', sub: 'دماغ التطبيق والنماذج الذكية', screen: 'AIChat', icon: Bot, color: '#8B5CF6' },
   { id: 19, label: 'مركز الإشعارات (Notifications)', sub: 'إدارة التنبيهات الجماعية', screen: 'Notifications', icon: Bell, color: '#F97316' },
   { id: 20, label: 'الإعدادات العامة (Settings)', sub: 'غرفة التحكم والعمولات والصيانة', screen: 'Settings', icon: Settings, color: '#64748B' },
-  { id: 21, label: 'الملف الشخصي (Profile)', sub: 'صفحة الإدارة وخلاصة المنشورات', screen: 'Profile', icon: User, color: colors.primary },
+  { id: 21, label: 'المقترحات والأفكار (Suggestions)', sub: 'مراجعة أفكار واقتراحات الأعضاء', screen: 'Suggestions', icon: Lightbulb, color: '#F59E0B' },
+  { id: 22, label: 'الملف الشخصي (Profile)', sub: 'صفحة الإدارة وخلاصة المنشورات', screen: 'Profile', icon: User, color: colors.primary },
 ];
 
 // 👔 المدير (17 قسماً تشغيلياً)
@@ -197,7 +199,8 @@ export const CUSTOMER_SECTIONS: RoleSectionItem[] = [
   { id: 9, label: 'الأكاديمية والكورسات التعليمية', sub: 'تعلم أساسيات صيانة الأجهزة المنزلية', screen: 'Courses', icon: BookOpen, color: '#F59E0B' },
   { id: 10, label: 'مساعد تشخيص الأعطال الذكي', sub: 'اكتشف سبب عطل جهازك بالذكاء الاصطناعي', screen: 'AIChat', icon: Bot, color: '#8B5CF6' },
   { id: 11, label: 'الدعم الفني وفتح شكوى', sub: 'فريق TecnoRexa جاهز لحل أي مشكلة', screen: 'Tickets', icon: Headphones, color: '#EF4444' },
-  { id: 12, label: 'الملف الشخصي والإعدادات', sub: 'بيانات حسابك وعناوينك المفضلة', screen: 'Profile', icon: User, color: '#06B6D4' },
+  { id: 12, label: 'المقترحات والأفكار 💡', sub: 'شاركنا أفكارك لتطوير تطبيق TecnoRexa', screen: 'Suggestions', icon: Lightbulb, color: '#F59E0B' },
+  { id: 13, label: 'الملف الشخصي والإعدادات', sub: 'بيانات حسابك وعناوينك المفضلة', screen: 'Profile', icon: User, color: '#06B6D4' },
 ];
 
 export interface RoleDrawerConfig {

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, Alert, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, Alert, Platform, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import {
   Video,
   Play,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
+import { api } from '../../api/client';
 
 interface MediaItem {
   id: string;
@@ -24,59 +25,118 @@ interface MediaItem {
   role: string;
   type: 'reel' | 'course' | 'tutorial';
   thumbnail: string;
+  videoUrl?: string;
   duration: string;
   status: 'pending' | 'approved' | 'rejected';
   date: string;
-}
-
 export default function MediaApprovalScreen({ navigation }: any) {
   const [filter, setFilter] = useState<'pending' | 'approved'>('pending');
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Reject Modal State
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
-  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [selectedMediaItem, setSelectedMediaItem] = useState<MediaItem | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   // Video Player Modal State
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<MediaItem | null>(null);
 
-  const handleApprove = (id: string) => {
-    setMediaList(mediaList.map((m) => (m.id === id ? { ...m, status: 'approved' } : m)));
-    Alert.alert('✅ تمت الموافقة', 'تم اعتماد الفيديو ونشره فوراً في المجتمع والريلز.');
+  const loadMedia = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/media');
+      if (Array.isArray(res.data)) {
+        setMediaList(
+          res.data.map((item: any) => ({
+            id: String(item.id),
+            title: item.title || item.description || 'محتوى بدون عنوان',
+            author: item.userName || 'مستخدم المنظومة',
+            role: item.type === 'course' ? 'مدرب معتمد 🎓' : 'فني معتمد 🔧',
+            type: item.type || 'reel',
+            thumbnail: item.thumbnail || item.videoUrl || '',
+            videoUrl: item.videoUrl,
+            duration: item.duration || '0:45',
+            status: item.status === 'approved' ? 'approved' : item.status === 'rejected' ? 'rejected' : 'pending',
+            date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('ar-EG') : 'اليوم',
+          }))
+        );
+      }
+    } catch {
+      // Keep existing list on error
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMedia();
+  }, [loadMedia]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadMedia();
+  }, [loadMedia]);
+
+  const handleApprove = async (item: MediaItem) => {
+    try {
+      await api.post(`/admin/media/${item.type}/${item.id}/approve`);
+      setMediaList(prev => prev.map((m) => (m.id === item.id ? { ...m, status: 'approved' } : m)));
+      Alert.alert('✅ تمت الموافقة', 'تم اعتماد المحتوى ونشره فوراً في المنظومة.');
+    } catch {
+      Alert.alert('خطأ', 'تعذر اعتماد المحتوى. حاول مرة أخرى.');
+    }
   };
 
-  const handleOpenReject = (id: string) => {
-    setSelectedMediaId(id);
+  const handleOpenReject = (item: MediaItem) => {
+    setSelectedMediaItem(item);
     setRejectReason('');
     setRejectModalVisible(true);
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!rejectReason.trim()) {
-      Alert.alert('تنبيه', 'يرجى كتابة سبب الرفض ليظهر للفني.');
+      Alert.alert('تنبيه', 'يرجى كتابة سبب الرفض ليظهر للمستخدم.');
       return;
     }
-    if (selectedMediaId) {
-      setMediaList(mediaList.filter((m) => m.id !== selectedMediaId));
-      setRejectModalVisible(false);
-      Alert.alert('تم الرفض', 'تم رفض الفيديو وإرسال إشعار لصاحب المحتوى بالسبب.');
+    if (selectedMediaItem) {
+      try {
+        await api.post(`/admin/media/${selectedMediaItem.type}/${selectedMediaItem.id}/reject`, {
+          reason: rejectReason.trim(),
+        });
+        setMediaList(prev => prev.filter((m) => m.id !== selectedMediaItem.id));
+        setRejectModalVisible(false);
+        Alert.alert('تم الرفض', 'تم رفض المحتوى وإرسال إشعار لصاحب المحتوى بالسبب.');
+      } catch {
+        Alert.alert('خطأ', 'تعذر تسجيل الرفض. حاول مرة أخرى.');
+      }
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (item: MediaItem) => {
+    const performDelete = async () => {
+      try {
+        await api.delete(`/admin/media/${item.type}/${item.id}`);
+        setMediaList(prev => prev.filter((m) => m.id !== item.id));
+        Alert.alert('تم الحذف', 'تم حذف المحتوى بنجاح.');
+      } catch {
+        Alert.alert('خطأ', 'تعذر حذف المحتوى.');
+      }
+    };
+
     if (Platform.OS === 'web') {
       if (window.confirm('هل أنت متأكد من حذف هذا المحتوى نهائياً؟')) {
-        setMediaList(mediaList.filter((m) => m.id !== id));
+        await performDelete();
       }
     } else {
-      Alert.alert('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الفيديو؟', [
+      Alert.alert('تأكيد الحذف', 'هل أنت متأكد من حذف هذا المحتوى نهائياً؟', [
         { text: 'إلغاء', style: 'cancel' },
         {
           text: 'حذف',
           style: 'destructive',
-          onPress: () => setMediaList(mediaList.filter((m) => m.id !== id)),
+          onPress: performDelete,
         },
       ]);
     }
@@ -121,8 +181,26 @@ export default function MediaApprovalScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 150 }}>
-        {filtered.length === 0 ? (
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: 150 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {loading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 60 }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={{ color: colors.gray, marginTop: spacing.md, fontSize: 13, fontWeight: '700' }}>
+              جاري فحص المحتوى الإعلامي المعلق...
+            </Text>
+          </View>
+        ) : filtered.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
             <Film size={48} color={colors.gray} />
             <Text style={{ color: colors.gray, marginTop: spacing.md, fontSize: 15 }}>لا توجد فيديوهات في هذه القائمة حالياً.</Text>
@@ -160,14 +238,14 @@ export default function MediaApprovalScreen({ navigation }: any) {
                   {item.status === 'pending' ? (
                     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                       <TouchableOpacity
-                        onPress={() => handleOpenReject(item.id)}
+                        onPress={() => handleOpenReject(item)}
                         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: '#EF4444', paddingVertical: spacing.sm, borderRadius: borderRadius.md, gap: 6 }}
                       >
                         <XCircle size={16} color="#EF4444" />
                         <Text style={{ color: '#EF4444', fontWeight: '900', fontSize: 13 }}>رفض المحتوى</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={() => handleApprove(item.id)}
+                        onPress={() => handleApprove(item)}
                         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: spacing.sm, borderRadius: borderRadius.md, gap: 6 }}
                       >
                         <CheckCircle2 size={16} color={colors.dark} />
@@ -176,7 +254,7 @@ export default function MediaApprovalScreen({ navigation }: any) {
                     </View>
                   ) : (
                     <TouchableOpacity
-                      onPress={() => handleDelete(item.id)}
+                      onPress={() => handleDelete(item)}
                       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: '#EF4444', paddingVertical: spacing.sm, borderRadius: borderRadius.md, gap: 6 }}
                     >
                       <Trash2 size={16} color="#EF4444" />

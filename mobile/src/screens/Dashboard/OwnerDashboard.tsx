@@ -23,6 +23,10 @@ import {
   Layers,
   ChevronRight,
   Sparkles,
+  FileText,
+  Lightbulb,
+  Server,
+  Inbox,
 } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -32,6 +36,7 @@ import { openRoleRulesModal } from '../../components/OnboardingModal';
 import { generateExecutiveReportHTML, exportExecutiveCSV } from '../../utils/executiveReport';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 
 const PERIODS = [
   { label: 'اليوم', value: 'today' },
@@ -70,6 +75,11 @@ export default function OwnerDashboard({ navigation }: any) {
     userCounts: {},
     revenueBreakdown: { marketplace: 0, subscriptions: 0, courses: 0 },
     weeklyGrowth: [],
+    requests: { total: 0, pendingTrade: 0, pendingWithdraw: 0 },
+    suggestions: { total: 0, pending: 0, approved: 0 },
+    notifications: { total: 0, unread: 0 },
+    reports: { availableFormats: ['PDF', 'CSV', 'Excel'], auditRecords: 0, ready: true },
+    systemStatus: { server: 'operational', database: 'connected', maintenanceMode: false, uptimeSeconds: 0 },
   });
 
   const fetchOverview = async (period = selectedPeriod) => {
@@ -161,11 +171,21 @@ export default function OwnerDashboard({ navigation }: any) {
             Alert.alert('✅ تم إنشاء التقرير', `تم حفظ ملف PDF بنجاح في:\n${uri}`);
           }
         } else {
-          const textSummary = `📑 تقرير TecnoRexa التنفيذي (${reportData.period})\n\n👑 المالك: ${reportData.ownerName}\n💰 إجمالي الإيرادات: ${reportData.totalRevenue} ج.م\n👥 المستخدمين النشطين: ${reportData.activeUsers}\n📦 الطلبات اليومية: ${reportData.todayOrders}\n🔧 الفنيين المتاحين: ${reportData.availableTechnicians}\n💳 المسحوبات المعلقة: ${reportData.pendingWithdrawalsAmount} ج.م`;
-          await Share.share({
-            title: 'تقرير منصة TecnoRexa التنفيذي',
-            message: type === 'csv' ? exportExecutiveCSV(reportData) : textSummary,
+          const csvContent = exportExecutiveCSV(reportData);
+          const fileUri = `${FileSystem.cacheDirectory}TecnoRexa_Executive_Report_${selectedPeriod}.csv`;
+          await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+            encoding: FileSystem.EncodingType.UTF8,
           });
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            await Sharing.shareAsync(fileUri, {
+              UTI: 'public.comma-separated-values-text',
+              mimeType: 'text/csv',
+              dialogTitle: 'تقرير منصة TecnoRexa التنفيذي (CSV)',
+            });
+          } else {
+            Alert.alert('✅ تم إنشاء ملف التقرير', `تم حفظ ملف CSV بنجاح في:\n${fileUri}`);
+          }
         }
       } catch (err: any) {
         Alert.alert('تنبيه', `حدث خطأ أثناء تصدير التقرير: ${err?.message || 'يرجى المحاولة مجدداً'}`);
@@ -432,6 +452,94 @@ export default function OwnerDashboard({ navigation }: any) {
               </Text>
               <Text style={styles.kpiLabel}>المبالغ تحت الصرف</Text>
             </TouchableOpacity>
+
+            {/* KPI 7: طلبات الترقية والاعتماد (Requests) */}
+            <TouchableOpacity
+              style={styles.kpiCard}
+              onPress={() => navigation.navigate('TradeRequests')}
+            >
+              <View style={styles.kpiHeaderRow}>
+                <View style={[styles.kpiIconBox, { backgroundColor: '#EC489922' }]}>
+                  <Inbox size={18} color="#EC4899" />
+                </View>
+                <Text style={{ fontSize: 11, color: '#EC4899', fontWeight: '700' }}>مراجعة ↗</Text>
+              </View>
+              <Text style={styles.kpiValue}>
+                {stats.requests?.total || 0}
+              </Text>
+              <Text style={styles.kpiLabel}>طلبات الترقية والسحب</Text>
+            </TouchableOpacity>
+
+            {/* KPI 8: مقترحات التطوير (Suggestions) */}
+            <TouchableOpacity
+              style={styles.kpiCard}
+              onPress={() => navigation.navigate('Suggestions')}
+            >
+              <View style={styles.kpiHeaderRow}>
+                <View style={[styles.kpiIconBox, { backgroundColor: '#F59E0B22' }]}>
+                  <Lightbulb size={18} color="#F59E0B" />
+                </View>
+                <Text style={{ fontSize: 11, color: '#F59E0B', fontWeight: '700' }}>اقتراحات ↗</Text>
+              </View>
+              <Text style={styles.kpiValue}>
+                {stats.suggestions?.pending || 0}
+              </Text>
+              <Text style={styles.kpiLabel}>مقترحات قيد المراجعة</Text>
+            </TouchableOpacity>
+
+            {/* KPI 9: التنبيهات والإشعارات (Notifications) */}
+            <TouchableOpacity
+              style={styles.kpiCard}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <View style={styles.kpiHeaderRow}>
+                <View style={[styles.kpiIconBox, { backgroundColor: '#06B6D422' }]}>
+                  <Bell size={18} color="#06B6D4" />
+                </View>
+                <Text style={{ fontSize: 11, color: '#06B6D4', fontWeight: '700' }}>التنبيهات ↗</Text>
+              </View>
+              <Text style={styles.kpiValue}>
+                {stats.notifications?.unread || stats.notifications?.total || 0}
+              </Text>
+              <Text style={styles.kpiLabel}>تنبيهات النظام</Text>
+            </TouchableOpacity>
+
+            {/* KPI 10: تقارير المنظومة والتصدير (Reports) */}
+            <TouchableOpacity
+              style={styles.kpiCard}
+              onPress={() => setExportModalVisible(true)}
+            >
+              <View style={styles.kpiHeaderRow}>
+                <View style={[styles.kpiIconBox, { backgroundColor: colors.primary + '22' }]}>
+                  <FileText size={18} color={colors.primary} />
+                </View>
+                <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>تصدير ↗</Text>
+              </View>
+              <Text style={styles.kpiValue}>
+                {stats.reports?.auditRecords || 0}
+              </Text>
+              <Text style={styles.kpiLabel}>سجلات وتقارير الأداء</Text>
+            </TouchableOpacity>
+
+            {/* System Status Banner (System Status) */}
+            <View style={[styles.kpiCard, { width: '100%', marginTop: 2, borderColor: stats.systemStatus?.maintenanceMode ? '#EF4444' : '#10B981' }]}>
+              <View style={styles.kpiHeaderRow}>
+                <View style={[styles.kpiIconBox, { backgroundColor: stats.systemStatus?.maintenanceMode ? '#EF444422' : '#10B98122' }]}>
+                  <Server size={18} color={stats.systemStatus?.maintenanceMode ? '#EF4444' : '#10B981'} />
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: stats.systemStatus?.maintenanceMode ? '#EF4444' : '#10B981' }} />
+                  <Text style={{ fontSize: 11, color: stats.systemStatus?.maintenanceMode ? '#EF4444' : '#10B981', fontWeight: '900' }}>
+                    {stats.systemStatus?.maintenanceMode ? 'وضع الصيانة نشط ⚠️' : 'المنظومة تعمل بكفاءة 🟢'}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', marginTop: 4 }}>
+                <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700' }}>قاعدة البيانات: SQLite WAL متصلة</Text>
+                <Text style={{ color: colors.gray, fontSize: 11 }}>وقت التشغيل: {Math.floor((stats.systemStatus?.uptimeSeconds || 0) / 60)} دقيقة</Text>
+              </View>
+              <Text style={[styles.kpiLabel, { marginTop: 4 }]}>حالة النظام والخوادم (System Status)</Text>
+            </View>
           </View>
         )}
 

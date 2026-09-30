@@ -19,3 +19,4 @@ cloudflared.exe
 *.keystore 
 *.pem 
 *.key 
+backups/

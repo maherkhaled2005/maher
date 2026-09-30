@@ -96,9 +96,12 @@ function sanitizeErrorMessage(error: any): string {
     const isTechRaw =
       raw.toLowerCase().includes('sql') ||
       raw.toLowerCase().includes('jwt') ||
+      raw.toLowerCase().includes('axios') ||
       raw.toLowerCase().includes('syntaxerror') ||
       raw.toLowerCase().includes('unauthorized') ||
       raw.toLowerCase().includes('internal server') ||
+      raw.toLowerCase().includes('stack') ||
+      raw.toLowerCase().includes('uncaught') ||
       raw.startsWith('<!doctype') ||
       raw.startsWith('<html');
 

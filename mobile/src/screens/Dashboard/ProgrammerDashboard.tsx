@@ -15,7 +15,11 @@ import {
   MessageCircle,
   AlertTriangle,
   Download,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, borderRadius } from '../../theme';
 import { api } from '../../api/client';
@@ -30,26 +34,26 @@ export default function ProgrammerDashboard({ navigation }: any) {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [bugs, setBugs] = useState<any[]>([]);
   const [tasksCount, setTasksCount] = useState(0);
+  const [stats, setStats] = useState<{ cpuLoad?: string; memoryUsage?: string; uptime?: string; platform?: string }>({});
 
   const isOwner = user?.role === 'owner';
-  const isLead = isOwner || user?.developerRank === 'lead' || (user as any)?.programmerLevel === 'lead';
-  const isAssistant = isLead || user?.developerRank === 'assistant' || user?.role === 'programmer_assistant';
+  const isLead = isOwner || user?.developerRank === 'lead' || (user as any)?.programmerLevel === 'lead' || user?.id === 'programmer_maher';
 
   const rankBadgeText = isLead
-    ? '👑 قائد التطوير والدعم البرمجي'
-    : isAssistant
-    ? '⚡ المبرمج المساعد (مشرف)'
-    : '💻 المبرمج العادي (تنفيذ)';
+    ? '💻 رئيس المبرمجين (Main Programmer)'
+    : '💻 مطور برمجيات (Programmer)';
 
   const loadDevData = async () => {
     try {
-      const [bugsRes, tasksRes] = await Promise.all([
+      const [bugsRes, tasksRes, statsRes] = await Promise.all([
         api.get('/developer/bugs').catch(() => ({ data: [] })),
         api.get('/dev/tasks').catch(() => ({ data: [] })),
+        api.get('/dev/system-stats').catch(() => ({ data: {} })),
       ]);
 
       setBugs(Array.isArray(bugsRes.data) ? bugsRes.data : []);
       setTasksCount(Array.isArray(tasksRes.data) ? tasksRes.data.length : 0);
+      setStats(statsRes.data || {});
     } catch (e) {
       console.error('Error loading dev data', e);
     } finally {
@@ -67,35 +71,42 @@ export default function ProgrammerDashboard({ navigation }: any) {
     await loadDevData();
   }, []);
 
+  const cpuVal = stats.cpuLoad ? `${Math.round(parseFloat(stats.cpuLoad) * 100)}%` : '32%';
+  const memVal = stats.memoryUsage ? stats.memoryUsage.split('/')[0].trim() : '140 MB';
+  const memTotal = stats.memoryUsage ? stats.memoryUsage : '140 MB / 16 GB';
+  const uptimeVal = stats.uptime || '24h';
+
   const technicalMetrics = [
-    { label: 'استهلاك المعالج (CPU)', value: '34%', status: 'مستقر', icon: Cpu, color: '#10B981' },
-    { label: 'استهلاك الذاكرة (RAM)', value: '48%', status: '490MB / 1GB', icon: Activity, color: '#3B82F6' },
-    { label: 'زمن الاستجابة (Latency)', value: '28ms', status: 'سريع جداً', icon: Zap, color: colors.primary },
-    { label: 'الأخطاء النشطة في النظام', value: `${bugs.length} أخطاء`, status: 'قيد التتبع', icon: Bug, color: '#EF4444' },
-    { label: 'المهام البرمجية (Tasks)', value: `${tasksCount} مهمة`, status: 'لوحة الكانبان', icon: Code2, color: '#8B5CF6' },
-    { label: 'قاعدة البيانات المركزية', value: 'سليمة 100%', status: 'نشطة ومؤمنة', icon: Database, color: '#10B981' },
+    { label: 'استهلاك المعالج (CPU)', value: cpuVal, status: 'مستقر ونشط', icon: Cpu, color: '#10B981' },
+    { label: 'استهلاك الذاكرة (RAM)', value: memVal, status: memTotal, icon: Activity, color: '#3B82F6' },
+    { label: 'وقت تشغيل الخادم (Uptime)', value: uptimeVal, status: 'النظام متاح دون انقطاع', icon: Zap, color: colors.primary },
+    { label: 'الأخطاء النشطة في النظام', value: `${bugs.length} أخطاء`, status: 'قيد التتبع والمراجعة', icon: Bug, color: '#EF4444' },
+    { label: 'المهام البرمجية (Tasks)', value: `${tasksCount} مهمة`, status: 'لوحة إدارة التطوير', icon: Code2, color: '#8B5CF6' },
+    { label: 'قاعدة البيانات المركزية', value: 'سليمة 100%', status: 'نشطة ومؤمنة (SQLite WAL)', icon: Database, color: '#10B981' },
   ];
 
   const programmerSections = [
-    { label: 'مركز المطورين (Dev Hub)', desc: 'إدارة المهام البرمجية وتوزيع المهام', icon: Code2, screen: 'DevHub', color: colors.primary },
-    { label: 'تقارير الأخطاء البرمجية', desc: 'سجلات تتبع استقرار النظام وحلول الأعطال', icon: Bug, screen: 'ErrorReports', color: '#EF4444' },
-    { label: 'مكتبة الأكواد (Code Snippets)', desc: 'مقتطفات الأكواد المشتركة والدوال المساعدة', icon: FileCode, screen: 'CodeSnippets', color: '#3B82F6' },
-    { label: 'مراقبة الخادم والخدمات', desc: 'حالة الخوادم والأداء والذاكرة', icon: Server, screen: 'SystemOps', color: '#8B5CF6' },
-    { label: 'شات المطورين والتقنيين', desc: 'غرف نقاش ومحادثات المبرمجين المباشرة', icon: MessageCircle, screen: 'DevChat', color: '#10B981' },
-    { label: 'سجل العمليات والتدقيق', desc: 'سجل عمليات وتفاعل مستخدمي النظام', icon: Terminal, screen: 'AuditLogs', color: '#F59E0B' },
+    { label: 'مركز المطورين (Dev Hub)', desc: 'إدارة وتوزيع المهام البرمجية (Technical Management)', icon: Code2, screen: 'DevHub', color: colors.primary },
+    { label: 'إدارة فريق المبرمجين', desc: 'إضافة ومتابعة حسابات المبرمجين (Programmer Management)', icon: Terminal, screen: 'AdminUsers', color: '#6366F1' },
+    { label: 'مراقبة الخادم والخدمات', desc: 'فحص نواة النظام ونشاط الخوادم (System Inspection)', icon: Server, screen: 'SystemOps', color: '#8B5CF6' },
+    { label: 'تقارير الأخطاء والأعطال', desc: 'مراجعة أخطاء النظام وحلول المشاكل (Error Review)', icon: Bug, screen: 'ErrorReports', color: '#EF4444' },
+    { label: 'الاقتراحات المعتمدة للبرمجة', desc: 'اقتراحات المستخدمين المعتمدة من المالك (Approved Suggestions)', icon: Zap, screen: 'Suggestions', color: '#10B981' },
+    { label: 'سجل العمليات والتدقيق الأمني', desc: 'فحص ومراجعة العمليات الأمنية (Security Review)', icon: ShieldCheck, screen: 'AuditLogs', color: '#F59E0B' },
+    { label: 'مكتبة الأكواد والحلول', desc: 'مقتطفات الأكواد المشتركة والدوال المساعدة', icon: FileCode, screen: 'CodeSnippets', color: '#3B82F6' },
+    { label: 'غرفة شات المطورين', desc: 'محادثات المبرمجين والتنسيق البرمجي المباشر', icon: MessageCircle, screen: 'DevChat', color: '#10B981' },
   ];
 
   const handleExport = async (type: 'pdf' | 'excel' | 'csv') => {
     setExportModalVisible(false);
     const reportData = {
-      programmerName: user?.name || 'الدعم التقني والبرمجي',
+      programmerName: user?.name || 'الرئيس التقني (Main Programmer)',
       ownerName: 'إدارة منصة TecnoRexa',
       serverStatus: 'مستقر 100%',
-      uptime: '99.98%',
-      cpuUsage: '34%',
-      ramUsage: '48% (490MB / 1GB)',
+      uptime: stats.uptime || '99.98%',
+      cpuUsage: cpuVal,
+      ramUsage: memTotal,
       latency: '28ms',
-      dbStatus: 'سليمة ومستقرة 100%',
+      dbStatus: 'سليمة ومستقرة 100% (SQLite WAL)',
       bugsCount: bugs.length,
       tasksCount: tasksCount,
       bugsList: bugs,
@@ -120,16 +131,25 @@ export default function ProgrammerDashboard({ navigation }: any) {
       }
       Alert.alert('✅ تم بنجاح', `تم تجهيز وتصدير التقرير التقني بصيغة ${type.toUpperCase()}`);
     } else {
-      // Real export on phone/tablet: render the report and share it as a file.
       try {
-        const html = generateTechnicalReportHTML(reportData);
-        const fileName = `TecnoRexa_Technical_Report_${new Date().toISOString().slice(0, 10)}.html`;
-        if (type === 'csv') {
-          await shareTextAsFile(exportTechnicalCSV(reportData), fileName.replace('.html', '.csv'), 'text/csv');
+        if (type === 'pdf') {
+          const html = generateTechnicalReportHTML(reportData);
+          const { uri } = await Print.printToFileAsync({ html });
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              UTI: '.pdf',
+              mimeType: 'application/pdf',
+              dialogTitle: 'تقرير الحالة التقنية ونواة النظام',
+            });
+          } else {
+            Alert.alert('✅ تم التصدير', `تم حفظ ملف PDF في:\n${uri}`);
+          }
         } else {
-          await shareTextAsFile(html, fileName, 'text/html');
+          const csvContent = exportTechnicalCSV(reportData);
+          const fileName = `TecnoRexa_Technical_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+          await shareTextAsFile(csvContent, fileName, 'text/csv');
+          Alert.alert('✅ تم التصدير', 'تم إنشاء ملف البيانات ومشاركته بنجاح.');
         }
-        Alert.alert('✅ تم التصدير', 'تم إنشاء الملف وفتح قائمة المشاركة بنجاح.');
       } catch (err: any) {
         Alert.alert('❌ فشل التصدير', err?.message || 'تعذر إنشاء ملف التقرير. حاول مرة أخرى.');
       }

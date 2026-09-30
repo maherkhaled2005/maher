@@ -337,9 +337,9 @@ export default function AdminUsersScreen({ navigation }: any) {
       return;
     }
 
-    // Manager privilege escalation check
-    if (isManager && (formRole === 'owner' || formRole === 'manager')) {
-      Alert.alert('غير مصرح', 'لا يمكنك تعيين رتبة المالك أو المدير.');
+    // Manager privilege escalation check: Manager cannot assign owner, manager, or programmer
+    if (isManager && (formRole === 'owner' || formRole === 'manager' || formRole === 'programmer')) {
+      Alert.alert('غير مصرح', 'لا يمكنك تعيين رتبة المالك أو المدير أو المبرمج.');
       return;
     }
 
@@ -1126,12 +1126,10 @@ export default function AdminUsersScreen({ navigation }: any) {
                     <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
                       {ALL_ROLES.filter((r) => {
                         if (r.key === 'all') return false;
-                        // Lead Programmer can assign ANY role including owner and programmer
-                        if (isLeadProgrammer) return true;
-                        // Owner can assign all roles
-                        if (isOwner) return true;
-                        // Manager cannot assign owner, manager, or programmer
-                        if (isManager && (r.key === 'owner' || r.key === 'manager' || r.key === 'programmer')) return false;
+                        // Owner cannot be assigned or created from user management
+                        if (r.key === 'owner') return false;
+                        // Manager cannot assign manager or programmer
+                        if (isManager && (r.key === 'manager' || r.key === 'programmer')) return false;
                         return true;
                       }).map((r) => (
                         <TouchableOpacity

@@ -230,13 +230,14 @@ export async function exportUsersToPDF({
       page-break-inside: avoid;
     }
     th {
-      background-color: #0F172A !important;
-      color: #FFFFFF !important;
+      background-color: #F8FAFC !important;
+      color: #0F172A !important;
       font-weight: 800;
-      padding: 8px 6px;
+      padding: 9px 8px;
       font-size: 11px;
       text-align: right;
-      border: 1px solid #0F172A;
+      border: 1px solid #E2E8F0;
+      border-bottom: 2px solid #D4AF37 !important;
     }
     td {
       padding: 6px 8px;
@@ -442,11 +443,11 @@ export async function exportOrderInvoiceToPDF({ order }: OrderInvoiceOptions): P
     .info-label { color: #64748b; font-weight: 600; }
     .info-value { color: #0f172a; font-weight: 800; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
-    th { background: #0f172a; color: #ffffff; padding: 12px; font-size: 12px; font-weight: 800; text-align: right; }
+    th { background: #f8fafc; color: #0f172a; border-bottom: 2.5px solid #D4AF37; padding: 12px; font-size: 12px; font-weight: 800; text-align: right; }
     td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; text-align: right; }
     .total-box { display: flex; justify-content: flex-end; margin-bottom: 25px; }
-    .total-card { background: #0f172a; color: #ffffff; padding: 15px 25px; border-radius: 10px; text-align: left; }
-    .total-card span { color: #D4AF37; font-size: 20px; font-weight: 900; }
+    .total-card { background: #f8fafc; color: #0f172a; border: 1.5px solid #D4AF37; padding: 15px 25px; border-radius: 10px; text-align: left; }
+    .total-card span { color: #B45309; font-size: 20px; font-weight: 900; }
     .warranty-box { background: #f0fdf4; border: 1.5px solid #22c55e; border-radius: 10px; padding: 15px; margin-bottom: 25px; text-align: right; }
     .warranty-title { color: #15803d; font-weight: 900; font-size: 14px; margin-bottom: 5px; }
     .warranty-desc { color: #166534; font-size: 11px; line-height: 18px; }
@@ -489,7 +490,7 @@ export async function exportOrderInvoiceToPDF({ order }: OrderInvoiceOptions): P
 
   <div class="total-box">
     <div class="total-card">
-      <div style="font-size: 12px; color: #cbd5e1;">المبلغ الإجمالي النهائي:</div>
+      <div style="font-size: 12px; color: #475569; font-weight: bold;">المبلغ الإجمالي النهائي:</div>
       <div style="margin-top: 4px;"><span>${total} ج.م</span></div>
     </div>
   </div>

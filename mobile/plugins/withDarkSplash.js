@@ -18,7 +18,7 @@ const stylesContent = `<resources xmlns:tools="http://schemas.android.com/tools"
     <item name="android:statusBarColor">${DARK_BG}</item>
     <item name="android:navigationBarColor">${DARK_BG}</item>
     <item name="android:windowSplashScreenBackground" tools:targetApi="31">${DARK_BG}</item>
-    <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@drawable/splashscreen_logo</item>
+    <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@mipmap/ic_launcher</item>
     <item name="android:windowSplashScreenIconBackgroundColor" tools:targetApi="31">${DARK_BG}</item>
   </style>
 </resources>
@@ -38,7 +38,7 @@ const stylesV31Content = `<?xml version="1.0" encoding="utf-8"?>
     <item name="android:statusBarColor">${DARK_BG}</item>
     <item name="android:navigationBarColor">${DARK_BG}</item>
     <item name="android:windowSplashScreenBackground">${DARK_BG}</item>
-    <item name="android:windowSplashScreenAnimatedIcon">@drawable/splashscreen_logo</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     <item name="android:windowSplashScreenIconBackgroundColor">${DARK_BG}</item>
   </style>
 </resources>

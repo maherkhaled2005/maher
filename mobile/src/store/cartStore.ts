@@ -9,6 +9,7 @@ interface CartItem {
   price: number;
   quantity: number;
   image?: string;
+  stock?: number;
 }
 
 interface CartState {
@@ -54,6 +55,10 @@ export const useCartStore = create<CartState>()(
       updateQuantity: (id, quantity) => {
         const qty = Number(quantity) || 0;
         if (qty <= 0) { get().removeItem(id); return; }
+        const item = get().items.find(i => i.id === id);
+        if (item && typeof item.stock === 'number' && qty > item.stock) {
+          return;
+        }
         const newItems = get().items.map(i => i.id === id ? { ...i, quantity: qty } : i);
         set({ items: newItems, ...calcTotals(newItems) });
       },

@@ -281,15 +281,44 @@ const SettingsScreen = ({ navigation }: any) => {
                 </View>
               </View>
               <View style={[styles.divider, { marginVertical: 10 }]} />
-              <View style={{ alignItems: 'flex-end' }}>
+              <View style={{ alignItems: 'flex-end', marginBottom: 8 }}>
                 <Text style={styles.toggleLabel}>التخصصات المعتمدة (أجهزة منزلية حصراً):</Text>
                 <Text style={{ color: '#F59E0B', fontSize: 11, fontWeight: '700', marginTop: 4 }}>
-                  {user?.specialties || 'ثلاجات، غسالات، بوتاجازات، تكييفات، سخانات، ميكروويف'}
+                  {user?.specialties || user?.specialty || 'ثلاجات، غسالات، بوتاجازات، تكييفات، سخانات، ميكروويف'}
                 </Text>
                 <Text style={{ color: colors.gray, fontSize: 10, marginTop: 2 }}>
                   * نطاق صيانة الأجهزة المنزلية حصراً وفق ميثاق TecnoRexa المعتمد
                 </Text>
               </View>
+              <View style={[styles.divider, { marginVertical: 10 }]} />
+              <View style={{ alignItems: 'flex-end', marginBottom: 8 }}>
+                <Text style={styles.toggleLabel}>ساعات العمل والتغطية اليومية (Working Hours):</Text>
+                <Text style={{ color: colors.white, fontSize: 11, fontWeight: '700', marginTop: 2 }}>
+                  9:00 ص - 10:00 م (طوال أيام الأسبوع)
+                </Text>
+              </View>
+              <View style={[styles.divider, { marginVertical: 10 }]} />
+              <View style={{ alignItems: 'flex-end', marginBottom: 10 }}>
+                <Text style={styles.toggleLabel}>نطاق ومناطق الخدمة (Service Areas):</Text>
+                <Text style={{ color: colors.white, fontSize: 11, fontWeight: '700', marginTop: 2 }}>
+                  {user?.governorate ? `محافظة ${user.governorate} ومحيط 30 كم` : 'جميع مراكز ومناطق محافظة التسجيل (نطاق 30 كم)'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('EditProfile')}
+                style={{
+                  backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                  borderWidth: 1,
+                  borderColor: '#F59E0B',
+                  borderRadius: borderRadius.md,
+                  paddingVertical: 8,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '900' }}>
+                  تعديل الملف الشخصي ونطاق التغطية ✏️
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 

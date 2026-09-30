@@ -1,78 +1,149 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, TextInput, FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, RefreshControl, Linking, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import {
-  Send, User, ArrowLeft, ChevronRight, Shield, Wrench, Code, Phone, Mail
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+  Linking,
+  useWindowDimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Send,
+  User,
+  ChevronRight,
+  Shield,
+  Wrench,
+  Code,
+  Phone,
+  Mail,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { fetchApi } from '../../api/client';
+import useSocket from '../../hooks/useSocket';
 
 export default function TicketDetailsScreen({ route, navigation }: any) {
   const { user } = useAuthStore();
-  const ticketData = route?.params?.ticket || {};
-  const isStaff = ['owner', 'manager', 'customer_support'].includes(user?.role || '');
+  const ticketParam = route?.params?.ticket || {};
+  const isStaff = ['owner', 'manager', 'customer_support', 'programmer'].includes(user?.role || '');
 
+  const [ticket, setTicket] = useState<any>(ticketParam);
   const [messages, setMessages] = useState<any[]>(
-    ticketData.messages && Array.isArray(ticketData.messages) && ticketData.messages.length > 0
-      ? ticketData.messages
-      : (ticketData.description
+    ticketParam.messages && Array.isArray(ticketParam.messages) && ticketParam.messages.length > 0
+      ? ticketParam.messages
+      : (ticketParam.description
         ? [
             {
               id: 'init_msg',
               senderType: 'customer',
-              senderName: ticketData.client || ticketData.customerName || 'العميل',
-              message: ticketData.description,
-              createdAt: ticketData.createdAt || new Date().toISOString(),
+              senderId: ticketParam.customerId || ticketParam.userId,
+              senderName: ticketParam.customerName || ticketParam.client || 'العميل',
+              message: ticketParam.description,
+              createdAt: ticketParam.createdAt || new Date().toISOString(),
             },
           ]
         : [])
   );
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
-  const keyboardHeight = useKeyboardHeight(insets.bottom);
+  const { width } = useWindowDimensions();
+  const compact = width < 360;
 
-  const loadTicketDetails = async () => {
-    if (!ticketData?.id) return;
+  // Real-time Socket.io integration
+  const { socket } = useSocket(user?.id || null);
+
+  const loadTicketDetails = async (isManualRefresh = false) => {
+    const ticketId = ticket?.id || ticketParam?.id;
+    if (!ticketId) return;
     try {
-      const data = await fetchApi(`/support/tickets/${ticketData.id}`);
-      if (data?.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-        setMessages(data.messages);
+      if (isManualRefresh) setRefreshing(true);
+      const data = await fetchApi(`/support/tickets/${ticketId}`);
+      if (data?.id) {
+        setTicket((prev: any) => ({ ...prev, ...data }));
+        if (Array.isArray(data.messages)) {
+          setMessages(data.messages);
+        }
       }
-    } catch {}
+    } catch (err: any) {
+      console.warn('Error loading ticket details:', err.message);
+    } finally {
+      if (isManualRefresh) setRefreshing(false);
+    }
   };
 
   useEffect(() => {
     loadTicketDetails();
-  }, [ticketData?.id]);
+  }, [ticketParam?.id]);
+
+  // Listen to instant real-time updates via Socket.io
+  useEffect(() => {
+    if (!socket) return;
+    const ticketId = ticket?.id || ticketParam?.id;
+    if (!ticketId) return;
+
+    const handleTicketMessage = (payload: any) => {
+      if (String(payload?.ticketId) === String(ticketId) && payload?.message) {
+        setMessages((prev) => {
+          const exists = prev.some((m) => String(m.id) === String(payload.message.id));
+          if (exists) return prev;
+          return [...prev, payload.message];
+        });
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+      }
+    };
+
+    const handleTicketUpdate = (updatedTicket: any) => {
+      if (String(updatedTicket?.id || updatedTicket?.ticketId) === String(ticketId)) {
+        setTicket((prev: any) => ({ ...prev, ...updatedTicket }));
+        if (Array.isArray(updatedTicket.messages) && updatedTicket.messages.length > 0) {
+          setMessages(updatedTicket.messages);
+        }
+      }
+    };
+
+    socket.on('ticket_message', handleTicketMessage);
+    socket.on('ticket_update', handleTicketUpdate);
+
+    return () => {
+      socket.off('ticket_message', handleTicketMessage);
+      socket.off('ticket_update', handleTicketUpdate);
+    };
+  }, [socket, ticket?.id, ticketParam?.id]);
 
   const handleSendReply = async () => {
     if (!inputText.trim() || sending) return;
+    const ticketId = ticket?.id || ticketParam?.id;
+    if (!ticketId) return;
+
     const textToSend = inputText.trim();
     setInputText('');
     setSending(true);
 
     try {
-      const res = await fetchApi(`/support/tickets/${ticketData.id}/reply`, {
+      const res = await fetchApi(`/support/tickets/${ticketId}/reply`, {
         method: 'POST',
         data: { message: textToSend, text: textToSend },
       });
+
       if (res?.messages && Array.isArray(res.messages)) {
         setMessages(res.messages);
-      } else {
-        const newMsg = {
-          id: `msg_${Date.now()}`,
-          senderId: user?.id,
-          senderType: isStaff ? 'staff' : 'customer',
-          senderName: user?.name || (isStaff ? 'فريق الدعم الفني' : 'العميل'),
-          message: textToSend,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, newMsg]);
+      }
+      if (res?.id) {
+        setTicket((prev: any) => ({ ...prev, ...res }));
       }
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (err: any) {
@@ -84,8 +155,10 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
   };
 
   const handleTicketAction = async (action: 'transfer_tech' | 'transfer_programmer' | 'close') => {
+    const ticketId = ticket?.id || ticketParam?.id;
+    if (!ticketId) return;
     try {
-      const res = await fetchApi(`/support/tickets/${ticketData.id}/actions`, {
+      const res = await fetchApi(`/support/tickets/${ticketId}/actions`, {
         method: 'POST',
         data: { action },
       });
@@ -105,13 +178,23 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
     }
   };
 
-  return (
-    <SafeAreaView
-      style={[
-        { flex: 1, backgroundColor: colors.dark },
+  // Status badge styling and text
+  const statusConfig = (() => {
+    const st = ticket?.status || 'open';
+    if (st === 'closed') return { label: 'مغلقة ✓', bg: 'rgba(16, 185, 129, 0.15)', color: '#10B981' };
+    if (st === 'in_progress') return { label: 'قيد المتابعة ⏳', bg: 'rgba(59, 130, 246, 0.15)', color: '#3B82F6' };
+    if (st === 'escalated') return { label: 'مُصعدة للمبرمجين 💻', bg: 'rgba(124, 58, 237, 0.15)', color: '#A78BFA' };
+    return { label: 'مفتوحة ⚡', bg: 'rgba(212, 175, 55, 0.15)', color: colors.primary };
+  })();
 
-      ]}
-    >
+  const isTicketCreator = String(ticket?.customerId || ticket?.userId) === String(user?.id);
+  const customerName = ticket?.customer?.name || ticket?.customerName || ticket?.client || 'العميل';
+  const customerPhone = ticket?.customer?.phone || ticket?.customerPhone || ticket?.phone;
+  const customerEmail = ticket?.customer?.email || ticket?.email || ticket?.userEmail;
+  const supportAgentName = ticket?.supportAgentName || ticket?.supportAgent?.name || (isStaff ? 'أنت وفريق الدعم' : 'فريق الدعم الفني 🎧');
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.dark }} edges={['top', 'bottom']}>
       {/* Header */}
       <View
         style={{
@@ -119,7 +202,7 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: spacing.md,
-          paddingVertical: spacing.md,
+          paddingVertical: spacing.sm,
           backgroundColor: '#141414',
           borderBottomWidth: 1,
           borderColor: '#222',
@@ -134,8 +217,8 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
             }
           }}
           style={{
-            width: 40,
-            height: 40,
+            width: 38,
+            height: 38,
             borderRadius: 12,
             backgroundColor: '#1E1E1E',
             alignItems: 'center',
@@ -147,16 +230,68 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
           <ChevronRight color={colors.white} size={22} />
         </TouchableOpacity>
 
-        <View style={{ alignItems: 'center' }}>
-          <Text style={{ color: colors.primary, fontSize: typography.sizes.md, fontWeight: '900' }}>
-            #{ticketData.id || 'تذكرة دعم'}
-          </Text>
-          <Text style={{ color: colors.gray, fontSize: typography.sizes.sm, marginTop: 2 }}>
-            {ticketData.client || ticketData.customerName || ticketData.subject || 'محادثة الدعم الفني'}
+        <View style={{ alignItems: 'center', flex: 1, marginHorizontal: 8 }}>
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+            <Text style={{ color: colors.primary, fontSize: typography.sizes.md, fontWeight: '900' }}>
+              #{ticket?.id || 'تذكرة دعم'}
+            </Text>
+            <View style={{ backgroundColor: statusConfig.bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+              <Text style={{ color: statusConfig.color, fontSize: 11, fontWeight: '700' }}>
+                {statusConfig.label}
+              </Text>
+            </View>
+          </View>
+          <Text numberOfLines={1} style={{ color: colors.gray, fontSize: typography.sizes.xs, marginTop: 2 }}>
+            {ticket?.subject || ticket?.title || 'محادثة الدعم الفني'}
           </Text>
         </View>
 
-        <View style={{ width: 40 }} />
+        <View style={{ width: 38 }} />
+      </View>
+
+      {/* Ticket Routing Meta Banner: Customer & Support Agent */}
+      <View
+        style={{
+          backgroundColor: '#18181B',
+          paddingHorizontal: spacing.md,
+          paddingVertical: 8,
+          borderBottomWidth: 1,
+          borderColor: '#27272A',
+          flexDirection: 'row-reverse',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <View style={{ alignItems: 'flex-end', flex: 1 }}>
+          <Text style={{ color: colors.white, fontSize: 12, fontWeight: '800' }}>
+            العميل: {customerName}
+          </Text>
+          <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700', marginTop: 1 }}>
+            المسؤول: {supportAgentName}
+          </Text>
+        </View>
+
+        <View style={{ alignItems: 'flex-start' }}>
+          {customerPhone ? (
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`tel:${customerPhone}`)}
+              style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}
+            >
+              <Phone size={12} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '800' }}>
+                {customerPhone}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          {ticket?.createdAt ? (
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3, marginTop: 2 }}>
+              <Clock size={10} color={colors.gray} />
+              <Text style={{ color: colors.gray, fontSize: 10 }}>
+                {new Date(ticket.createdAt).toLocaleDateString('ar-EG')}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {/* Staff Action Toolbar */}
@@ -207,13 +342,13 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
             }}
           >
             <Code size={13} color="#7C3AED" />
-            <Text style={{ color: '#7C3AED', fontSize: 11, fontWeight: 'bold' }}>تحويل لمبرمج (خطأ) 💻</Text>
+            <Text style={{ color: '#7C3AED', fontSize: 11, fontWeight: 'bold' }}>تصعيد لمبرمج 💻</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => handleTicketAction('close')}
             style={{
-              paddingHorizontal: 10,
+              paddingHorizontal: 12,
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -222,123 +357,100 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
               borderRadius: borderRadius.md,
             }}
           >
-            <Text style={{ color: '#10B981', fontSize: 11, fontWeight: 'bold' }}>إغلاق التذكرة ✓</Text>
+            <Text style={{ color: '#10B981', fontSize: 11, fontWeight: 'bold' }}>إغلاق ✓</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Customer Contact Details for Customer Support / Staff */}
-      {(ticketData.customerPhone || ticketData.phone || ticketData.email || ticketData.userEmail || ticketData.customerName || ticketData.client) ? (
-        <View
-          style={{
-            backgroundColor: '#18181B',
-            paddingHorizontal: spacing.md,
-            paddingVertical: 10,
-            borderBottomWidth: 1,
-            borderColor: '#27272A',
-            flexDirection: 'row-reverse',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <View style={{ alignItems: 'flex-end', flex: 1 }}>
-            <Text style={{ color: colors.white, fontSize: 13, fontWeight: '800' }}>
-              المرسل: {ticketData.customerName || ticketData.client || 'عميل'}
-            </Text>
-            <View style={{ flexDirection: 'row-reverse', gap: 14, marginTop: 4 }}>
-              {(ticketData.customerPhone || ticketData.phone) ? (
-                <TouchableOpacity
-                  onPress={() => Linking.openURL(`tel:${ticketData.customerPhone || ticketData.phone}`)}
-                  style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}
-                >
-                  <Phone size={13} color={colors.primary} />
-                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '800' }}>
-                    {ticketData.customerPhone || ticketData.phone}
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-              {(ticketData.email || ticketData.userEmail) ? (
-                <TouchableOpacity
-                  onPress={() => Linking.openURL(`mailto:${ticketData.email || ticketData.userEmail}`)}
-                  style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}
-                >
-                  <Mail size={13} color="#3B82F6" />
-                  <Text style={{ color: '#3B82F6', fontSize: 11, fontWeight: '600' }}>
-                    {ticketData.email || ticketData.userEmail}
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          </View>
-        </View>
-      ) : null}
-
+      {/* Messages Thread */}
       <FlatList
         ref={flatListRef}
         data={messages}
-        keyExtractor={item => item.id}
+        keyExtractor={(item, index) => String(item.id || `msg_${index}`)}
         refreshControl={
           <RefreshControl
-            refreshing={sending}
-            onRefresh={() => {
-              if (ticketData.id) {
-                fetchApi(`/support/tickets/${ticketData.id}`)
-                  .then(data => {
-                    if (data && data.messages) setMessages(data.messages);
-                  })
-                  .catch(() => {});
-              }
-            }}
+            refreshing={refreshing}
+            onRefresh={() => loadTicketDetails(true)}
             tintColor={colors.primary}
             colors={[colors.primary]}
           />
         }
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }}
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: 24 }}
         renderItem={({ item }) => {
-          const isStaffMsg = item.senderType === 'staff' || item.isFromSupport === 1 || item.sender === 'agent';
+          const isStaffMsg = item.senderType === 'staff' || item.senderType === 'support' || item.isFromSupport === 1 || item.sender === 'agent';
           const msgText = item.message || item.text || '';
 
-          // Alignment must follow WHO actually sent the row, not who is reading.
-          // Using "not staff => mine" made support replies render as if the
-          // support agent had sent them to themselves.
-          const sentByMe = item.senderId ? String(item.senderId) === String(user?.id) : !isStaffMsg;
+          // Anti-Self-Reply & Identity Resolution:
+          // A user must NEVER reply to themselves or see the other party labeled as "أنت".
+          let sentByMe = false;
+          if (item.senderId && user?.id) {
+            sentByMe = String(item.senderId) === String(user?.id);
+          } else if (isTicketCreator) {
+            // Ticket creator sees customer messages as mine, staff messages as support
+            sentByMe = !isStaffMsg;
+          } else if (isStaff) {
+            // Staff sees staff messages as mine, customer messages as client
+            sentByMe = isStaffMsg;
+          }
+
           const senderLabel = sentByMe
             ? 'أنت'
-            : isStaffMsg
-            ? 'فريق الدعم الفني'
-            : 'العميل';
+            : (isStaffMsg
+                ? (item.senderName || supportAgentName)
+                : (item.senderName || customerName));
+
           const timeLabel = item.createdAt
             ? new Date(item.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
             : (item.time || '');
 
           return (
-            <View style={{
-              alignSelf: sentByMe ? 'flex-end' : 'flex-start',
-              backgroundColor: sentByMe ? colors.primary : colors.darkCard,
-              maxWidth: '85%',
-              width: '100%',
-              padding: spacing.md,
-              borderRadius: borderRadius.lg,
-              marginBottom: spacing.md,
-              borderBottomRightRadius: sentByMe ? 0 : borderRadius.lg,
-              borderBottomLeftRadius: !sentByMe ? 0 : borderRadius.lg,
-            }}>
+            <View
+              style={{
+                alignSelf: sentByMe ? 'flex-end' : 'flex-start',
+                backgroundColor: sentByMe ? colors.primary : '#1E1E1E',
+                maxWidth: '85%',
+                width: '100%',
+                padding: spacing.md,
+                borderRadius: borderRadius.lg,
+                marginBottom: spacing.sm,
+                borderBottomRightRadius: sentByMe ? 2 : borderRadius.lg,
+                borderBottomLeftRadius: !sentByMe ? 2 : borderRadius.lg,
+                borderWidth: 1,
+                borderColor: sentByMe ? colors.primary : '#333',
+              }}
+            >
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 {isStaffMsg ? (
-                  <Shield color={sentByMe ? colors.dark : colors.support} size={14} />
+                  <Shield color={sentByMe ? colors.dark : colors.primary} size={14} />
                 ) : (
                   <User color={sentByMe ? colors.dark : colors.white} size={14} />
                 )}
-                <Text style={{ color: sentByMe ? colors.dark : colors.white, fontSize: typography.sizes.xs, fontWeight: '900' }}>
+                <Text
+                  style={{
+                    color: sentByMe ? colors.dark : colors.white,
+                    fontSize: typography.sizes.xs,
+                    fontWeight: '900',
+                  }}
+                >
                   {senderLabel}
                 </Text>
               </View>
-              <Text style={{ color: sentByMe ? colors.dark : colors.white, fontSize: typography.sizes.md, textAlign: 'right', lineHeight: 22 }}>
+              <Text
+                style={{
+                  color: sentByMe ? colors.dark : colors.white,
+                  fontSize: typography.sizes.sm,
+                  textAlign: 'right',
+                  lineHeight: 20,
+                  fontWeight: sentByMe ? '700' : '400',
+                }}
+              >
                 {msgText}
               </Text>
               {timeLabel ? (
                 <View style={{ flexDirection: 'row', justifyContent: sentByMe ? 'flex-start' : 'flex-end', marginTop: 4 }}>
-                  <Text style={{ color: sentByMe ? 'rgba(0,0,0,0.6)' : colors.gray, fontSize: 10 }}>{timeLabel}</Text>
+                  <Text style={{ color: sentByMe ? 'rgba(0,0,0,0.6)' : colors.gray, fontSize: 10 }}>
+                    {timeLabel}
+                  </Text>
                 </View>
               ) : null}
             </View>
@@ -347,7 +459,7 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
-      {/* Canned Quick Replies (for Staff) */}
+      {/* Quick Replies for Staff */}
       {isStaff && (
         <View style={{ backgroundColor: '#111', paddingVertical: 6, borderTopWidth: 1, borderColor: '#222' }}>
           <FlatList
@@ -369,8 +481,8 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
                   backgroundColor: 'rgba(212, 175, 55, 0.12)',
                   borderWidth: 1,
                   borderColor: colors.primary,
-                  paddingHorizontal: 12,
-                  paddingVertical: 5,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
                   borderRadius: borderRadius.full,
                 }}
               >
@@ -381,17 +493,57 @@ export default function TicketDetailsScreen({ route, navigation }: any) {
         </View>
       )}
 
-      {/* Input */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: keyboardHeight > 0 ? spacing.sm : (Platform.OS === 'ios' ? 24 : 12), marginBottom: keyboardHeight, backgroundColor: colors.darkCard, borderTopWidth: 1, borderColor: colors.border }}>
-          <TouchableOpacity 
+      {/* Input Bar with Responsive Keyboard Fix */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: spacing.md,
+            paddingTop: spacing.sm,
+            paddingBottom: Math.max(10, insets.bottom || 10),
+            backgroundColor: '#121212',
+            borderTopWidth: 1,
+            borderColor: '#222',
+            gap: 8,
+          }}
+        >
+          <TouchableOpacity
             onPress={handleSendReply}
-            style={{ backgroundColor: colors.primary, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
+            disabled={!inputText.trim() || sending}
+            style={{
+              backgroundColor: inputText.trim() ? colors.primary : '#222',
+              width: 42,
+              height: 42,
+              borderRadius: 21,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <Send color={colors.dark} size={20} />
+            {sending ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <Send color={inputText.trim() ? colors.dark : colors.gray} size={18} />
+            )}
           </TouchableOpacity>
+
           <TextInput
-            style={{ flex: 1, backgroundColor: colors.dark, color: colors.white, borderRadius: borderRadius.full, paddingHorizontal: spacing.md, paddingVertical: 10, marginLeft: spacing.md, textAlign: 'right', borderWidth: 1, borderColor: colors.border }}
+            style={{
+              flex: 1,
+              backgroundColor: '#1C1C1C',
+              color: colors.white,
+              borderRadius: 21,
+              paddingHorizontal: spacing.md,
+              paddingVertical: Platform.OS === 'ios' ? 10 : 8,
+              textAlign: 'right',
+              borderWidth: 1,
+              borderColor: '#333',
+              fontSize: compact ? 13 : 14,
+              maxHeight: 90,
+            }}
             placeholder="اكتب ردك هنا..."
             placeholderTextColor={colors.gray}
             value={inputText}

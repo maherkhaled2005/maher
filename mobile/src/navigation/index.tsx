@@ -5,6 +5,7 @@ import { navigationRef } from './navigationRef';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, ActivityIndicator, Platform, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
 import { normalizeRole } from '../utils/permissions';
 import { colors, typography, spacing, borderRadius } from '../theme';
@@ -64,6 +65,7 @@ import FAQScreen from '../screens/Support/FAQScreen';
 // ===== المحفظة والإشعارات =====
 import WalletScreen from '../screens/Wallet/WalletScreen';
 import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
+import SuggestionsScreen from '../screens/Support/SuggestionsScreen';
 
 // ===== الملف الشخصي =====
 import ProfileScreen from '../screens/Profile/ProfileScreen';
@@ -207,10 +209,14 @@ const Tab = createBottomTabNavigator();
 
 function BottomTabs() {
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const role = user?.role || 'customer';
   const tabs = getTabsForRole(role);
   const normalizedRole = normalizeRole(role);
   const activeColor = ROLE_COLORS[normalizedRole] || colors.primary;
+
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'ios' ? 16 : 6);
+  const barHeight = 56 + safeBottom;
 
   return (
     <>
@@ -230,8 +236,8 @@ function BottomTabs() {
               backgroundColor: '#121212',
               borderTopColor: activeColor + '44',
               borderTopWidth: 1,
-              height: Platform.OS === 'ios' ? 76 : 60,
-              paddingBottom: Platform.OS === 'ios' ? 18 : 6,
+              height: barHeight,
+              paddingBottom: safeBottom,
               paddingTop: 6,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: -2 },
@@ -395,6 +401,7 @@ export default function AppNavigator() {
             <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
             <Stack.Screen name="Terms" component={TermsScreen} />
             <Stack.Screen name="OfflineLibrary" component={OfflineLibraryScreen} />
+            <Stack.Screen name="Suggestions" component={SuggestionsScreen} />
           </>
         )}
       </Stack.Navigator>

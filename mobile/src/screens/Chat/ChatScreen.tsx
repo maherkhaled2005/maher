@@ -58,13 +58,29 @@ export default function ChatScreen({ route, navigation }: any) {
 
   // Never render the caller's own name as the peer, and never expose a
   // privileged staff identity (owner / manager / lead programmer) to regular users.
+  const rawParamName = (params.userName && params.userName !== user?.name) ? params.userName : '';
   const peerName = maskConversationName({
-    otherUserName: params.userName,
+    otherUserName: rawParamName,
     otherUserRole: params.userRole,
     viewerRole: user?.role,
     isGroup: params.isGroup,
   });
   const userName = peerName;
+  const [resolvedPeerName, setResolvedPeerName] = useState<string>('');
+  const displayName = resolvedPeerName || userName || 'محادثة الدعم 💬';
+
+  useEffect(() => {
+    if (chatId && chatId !== 'default') {
+      if (!rawParamName || rawParamName === 'محادثة' || rawParamName === user?.name) {
+        api.get(`/conversations/${chatId}`).then((res) => {
+          if (res.data?.name && res.data.name !== user?.name) {
+            setResolvedPeerName(res.data.name);
+          }
+        }).catch(() => {});
+      }
+    }
+  }, [chatId, rawParamName, user?.name]);
+
 
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -78,6 +94,37 @@ export default function ChatScreen({ route, navigation }: any) {
 
   const [onlineState, setOnlineState] = useState<boolean>(params.isOnline !== false);
   const { socket } = useSocket(user?.id || null);
+
+  // Real-time instant message arrival via Socket.io
+  useEffect(() => {
+    if (!socket || !chatId || chatId === 'default') return;
+
+    socket.emit('join_conversation', chatId);
+
+    const handleNewMessage = (newMsg: any) => {
+      if (!newMsg) return;
+      if (String(newMsg.conversationId) === String(chatId)) {
+        setMessages((prev) => {
+          const exists = prev.some((m) => String(m.id) === String(newMsg.id));
+          if (exists) return prev;
+          const myId = user?.id;
+          const formatted: MessageItem = {
+            ...newMsg,
+            isMe: String(newMsg.senderId) === String(myId),
+          };
+          return [...prev, formatted];
+        });
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 60);
+      }
+    };
+
+    socket.on('new_message', handleNewMessage);
+    return () => {
+      socket.off('new_message', handleNewMessage);
+    };
+  }, [socket, chatId, user?.id]);
 
   useEffect(() => {
     if (!socket || !chatId) return;
@@ -147,6 +194,15 @@ export default function ChatScreen({ route, navigation }: any) {
       if (!silent) setLoading(false);
     }
   }, [chatId, user?.id]);
+
+
+  useEffect(() => {
+    if (keyboardHeight > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    }
+  }, [keyboardHeight]);
 
   useEffect(() => {
     loadMessages();
@@ -222,7 +278,7 @@ export default function ChatScreen({ route, navigation }: any) {
     >
       <KeyboardAvoidingView
         style={{ flex: 1, width: '100%', maxWidth: '100%' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
       >
       {/* Header */}
@@ -284,7 +340,7 @@ export default function ChatScreen({ route, navigation }: any) {
               numberOfLines={1}
               style={{ color: colors.white, fontSize: compact ? 13 : 15, fontWeight: '800', maxWidth: '100%' }}
             >
-              {userName}
+              {displayName}
             </Text>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
               <View
@@ -467,15 +523,13 @@ export default function ChatScreen({ route, navigation }: any) {
             alignItems: 'flex-end',
             paddingHorizontal: spacing.md,
             paddingTop: spacing.sm,
-            paddingBottom: keyboardHeight > 0 ? spacing.sm : Math.max(insets.bottom, inputBarPaddingBottom()),
+            paddingBottom: Math.max(10, insets.bottom || 10),
             backgroundColor: '#121212',
             borderTopWidth: 1,
             borderColor: '#222222',
             gap: 8,
             width: '100%',
             maxWidth: '100%',
-            // Lift the whole bar above the keyboard on every platform
-            marginBottom: keyboardHeight,
             zIndex: 20,
           }}
         >

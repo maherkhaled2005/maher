@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Platform, RefreshControl } from 'react-native';
-import { ChevronDown, CheckCircle2, ArrowLeft, ChevronRight, Send } from 'lucide-react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Platform, RefreshControl, Modal } from 'react-native';
+import { ChevronDown, CheckCircle2, ArrowLeft, ChevronRight, Send, AlertTriangle, Phone } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
 
@@ -29,10 +29,21 @@ export default function SupportScreen({ navigation }: any) {
   const [success, setSuccess] = useState(false);
   const [showDeviceSelect, setShowDeviceSelect] = useState(false);
   const [showGovSelect, setShowGovSelect] = useState(false);
+  const [showNoPhoneModal, setShowNoPhoneModal] = useState(false);
+
+  useEffect(() => {
+    if (user && (!user.phone || !user.phone.trim())) {
+      setShowNoPhoneModal(true);
+    }
+  }, [user]);
 
   const handleSubmit = async () => {
-    if (!desc.trim() || !address.trim() || !phone.trim()) {
-      Alert.alert('تنبيه', 'يرجى إكمال جميع الحقول المطلوبة (الوصف، الهاتف، العنوان)');
+    if (!phone || !phone.trim()) {
+      setShowNoPhoneModal(true);
+      return;
+    }
+    if (!desc.trim() || !address.trim()) {
+      Alert.alert('تنبيه', 'يرجى إكمال جميع الحقول المطلوبة (الوصف، والعنوان)');
       return;
     }
     setSubmitting(true);
@@ -258,6 +269,118 @@ export default function SupportScreen({ navigation }: any) {
         </TouchableOpacity>
 
       </ScrollView>
+
+      {/* Center Modal Dialog for Missing Phone Number */}
+      <Modal
+        visible={showNoPhoneModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNoPhoneModal(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: spacing.xl,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.darkCard,
+              borderRadius: borderRadius.xl,
+              padding: spacing.xl,
+              width: '90%',
+              maxWidth: 420,
+              alignItems: 'center',
+              borderWidth: 1.5,
+              borderColor: colors.primary,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.5,
+              shadowRadius: 20,
+              elevation: 10,
+            }}
+          >
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: spacing.md,
+                borderWidth: 1,
+                borderColor: colors.primary,
+              }}
+            >
+              <Phone color={colors.primary} size={32} />
+            </View>
+
+            <Text
+              style={{
+                color: colors.white,
+                fontSize: 18,
+                fontWeight: '900',
+                marginBottom: spacing.sm,
+                textAlign: 'center',
+              }}
+            >
+              تنبيه هام
+            </Text>
+
+            <Text
+              style={{
+                color: '#E2E8F0',
+                fontSize: 14,
+                lineHeight: 22,
+                textAlign: 'center',
+                marginBottom: spacing.xl,
+              }}
+            >
+              رقم الهاتف غير متوفر، يرجى إضافة رقم الهاتف في الملف الشخصي للتواصل
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => {
+                setShowNoPhoneModal(false);
+                if (navigation?.navigate) {
+                  navigation.navigate('EditProfile');
+                }
+              }}
+              style={{
+                backgroundColor: colors.primary,
+                paddingVertical: 14,
+                paddingHorizontal: spacing.xl,
+                borderRadius: borderRadius.lg,
+                width: '100%',
+                alignItems: 'center',
+                marginBottom: spacing.sm,
+              }}
+            >
+              <Text style={{ color: colors.dark, fontWeight: '900', fontSize: 15 }}>
+                الانتقال للملف الشخصي
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowNoPhoneModal(false)}
+              style={{
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.md,
+                width: '100%',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: colors.gray, fontWeight: '700', fontSize: 13 }}>
+                إلغاء
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

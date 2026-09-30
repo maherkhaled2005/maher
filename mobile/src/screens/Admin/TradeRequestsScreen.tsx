@@ -27,8 +27,11 @@ export default function TradeRequestsScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [rejectingReq, setRejectingReq] = useState<any>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [requestingInfoReq, setRequestingInfoReq] = useState<any>(null);
+  const [requestInfoNotes, setRequestInfoNotes] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string>('معاينة المرفق');
 
   const loadTradeRequests = async () => {
     try {
@@ -104,6 +107,26 @@ export default function TradeRequestsScreen({ navigation }: any) {
     }
   };
 
+  const submitRequestInfo = async () => {
+    if (!requestInfoNotes.trim()) {
+      Alert.alert('تنبيه', 'يرجى توضيح البيانات أو المستندات المطلوبة ⚠️');
+      return;
+    }
+    try {
+      const reqId = requestingInfoReq.id;
+      setProcessingId(reqId);
+      await api.post(`/trade-requests/${reqId}/request-info`, { notes: requestInfoNotes.trim() });
+      setRequests(prev => prev.filter(r => r.id !== reqId));
+      setRequestingInfoReq(null);
+      setRequestInfoNotes('');
+      Alert.alert('تم بنجاح', 'تم إرسال إشعار للمستخدم باستكمال البيانات والمستندات المطلوبة ✅');
+    } catch (err: any) {
+      Alert.alert('خطأ', err.message || 'تعذر إرسال طلب استكمال البيانات');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   return (
     <SafeAreaView
       style={[
@@ -164,24 +187,37 @@ export default function TradeRequestsScreen({ navigation }: any) {
             >
               <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: spacing.sm }}>
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: req.type === 'technician' ? 'rgba(234, 88, 12, 0.15)' : 'rgba(21, 128, 61, 0.15)',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: req.type === 'technician' ? colors.technician : colors.merchant,
-                    }}
-                  >
-                    {req.type === 'technician' ? (
-                      <Wrench size={22} color={colors.technician} />
-                    ) : (
-                      <Building2 size={22} color={colors.merchant} />
-                    )}
-                  </View>
+                  {req.avatar ? (
+                    <Image
+                      source={{ uri: req.avatar }}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        borderWidth: 1.5,
+                        borderColor: req.type === 'technician' ? colors.technician : colors.merchant,
+                      }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: req.type === 'technician' ? 'rgba(234, 88, 12, 0.15)' : 'rgba(21, 128, 61, 0.15)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: req.type === 'technician' ? colors.technician : colors.merchant,
+                      }}
+                    >
+                      {req.type === 'technician' ? (
+                        <Wrench size={22} color={colors.technician} />
+                      ) : (
+                        <Building2 size={22} color={colors.merchant} />
+                      )}
+                    </View>
+                  )}
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={{ color: colors.white, fontWeight: '900', fontSize: 16 }}>{req.customerName}</Text>
                     <Text style={{ color: colors.gray, fontSize: 12 }}>{req.phone}</Text>
@@ -228,7 +264,10 @@ export default function TradeRequestsScreen({ navigation }: any) {
                 {req.transferReceipt && (
                   <View style={{ marginTop: 8, alignItems: 'center' }}>
                     <TouchableOpacity
-                      onPress={() => setPreviewImage(req.transferReceipt)}
+                      onPress={() => {
+                        setPreviewTitle('صورة إيصال تحويل الرسوم 🧾');
+                        setPreviewImage(req.transferReceipt);
+                      }}
                       style={{
                         flexDirection: 'row-reverse',
                         alignItems: 'center',
@@ -248,6 +287,32 @@ export default function TradeRequestsScreen({ navigation }: any) {
                     </TouchableOpacity>
                   </View>
                 )}
+                {req.documents && (
+                  <View style={{ marginTop: 6, alignItems: 'center' }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPreviewTitle('مستندات وبطاقة هوية المتقدم 📄');
+                        setPreviewImage(req.documents);
+                      }}
+                      style={{
+                        flexDirection: 'row-reverse',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: '#222',
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: '#3B82F666',
+                      }}
+                    >
+                      <Eye size={14} color="#3B82F6" />
+                      <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: 'bold' }}>
+                        معاينة مستندات / بطاقة المتقدم 📄
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 {req.experience && (
                   <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
                     <Text style={{ color: colors.gray, fontSize: 12 }}>الخبرة / الاعتماد:</Text>
@@ -262,21 +327,41 @@ export default function TradeRequestsScreen({ navigation }: any) {
                 )}
               </View>
 
-              <View style={{ flexDirection: 'row-reverse', gap: spacing.sm }}>
+              <View style={{ flexDirection: 'row-reverse', gap: spacing.xs, flexWrap: 'wrap' }}>
                 <TouchableOpacity
                   onPress={() => handleApprove(req)}
                   disabled={processingId === req.id}
                   style={{
                     flex: 1,
+                    minWidth: 90,
                     backgroundColor: colors.primary,
-                    padding: spacing.md,
+                    padding: spacing.sm,
                     borderRadius: borderRadius.lg,
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: processingId === req.id ? 0.6 : 1,
                   }}
                 >
-                  <Text style={{ color: '#000', fontWeight: '900', fontSize: 14 }}>موافقة وترقية ✓</Text>
+                  <Text style={{ color: '#000', fontWeight: '900', fontSize: 13 }}>اعتماد ✓</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setRequestingInfoReq(req)}
+                  disabled={processingId === req.id}
+                  style={{
+                    flex: 1,
+                    minWidth: 100,
+                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                    padding: spacing.sm,
+                    borderRadius: borderRadius.lg,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: '#3B82F6',
+                    opacity: processingId === req.id ? 0.6 : 1,
+                  }}
+                >
+                  <Text style={{ color: '#60A5FA', fontWeight: '900', fontSize: 13 }}>طلب بيانات 📝</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -284,8 +369,9 @@ export default function TradeRequestsScreen({ navigation }: any) {
                   disabled={processingId === req.id}
                   style={{
                     flex: 1,
+                    minWidth: 80,
                     backgroundColor: 'rgba(239,68,68,0.1)',
-                    padding: spacing.md,
+                    padding: spacing.sm,
                     borderRadius: borderRadius.lg,
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -294,7 +380,7 @@ export default function TradeRequestsScreen({ navigation }: any) {
                     opacity: processingId === req.id ? 0.6 : 1,
                   }}
                 >
-                  <Text style={{ color: colors.danger, fontWeight: '900', fontSize: 14 }}>رفض واسترجاع ✕</Text>
+                  <Text style={{ color: colors.danger, fontWeight: '900', fontSize: 13 }}>رفض ✕</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -357,12 +443,73 @@ export default function TradeRequestsScreen({ navigation }: any) {
         </View>
       </Modal>
 
+      {/* Request More Information Modal */}
+      <Modal visible={!!requestingInfoReq} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: spacing.md }}>
+          <View style={{ backgroundColor: '#141414', padding: spacing.xl, borderRadius: borderRadius.xl, borderWidth: 1, borderColor: '#3B82F6', width: '100%', maxWidth: 460 }}>
+            <Text style={{ color: '#60A5FA', fontSize: typography.sizes.lg, fontWeight: '900', textAlign: 'right', marginBottom: spacing.xs }}>
+              طلب استكمال بيانات ومستندات 📝
+            </Text>
+            <Text style={{ color: colors.gray, fontSize: 13, textAlign: 'right', marginBottom: spacing.md }}>
+              سيتم إرسال إشعار فوري للمستخدم بالمستندات أو التوضيحات الناقصة ليقوم بإرفاقها:
+            </Text>
+            <TextInput
+              style={{
+                backgroundColor: '#1A1A1A',
+                color: colors.white,
+                borderWidth: 1,
+                borderColor: 'rgba(59, 130, 246, 0.4)',
+                borderRadius: borderRadius.md,
+                padding: spacing.md,
+                textAlign: 'right',
+                marginBottom: spacing.lg,
+                minHeight: 100,
+              }}
+              placeholder="مثال: يرجى رفع صورة واضحة لبطاقة الرقم القومي أو إيصال السداد..."
+              placeholderTextColor={colors.gray}
+              multiline
+              value={requestInfoNotes}
+              onChangeText={setRequestInfoNotes}
+            />
+            <View style={{ flexDirection: 'row-reverse', gap: spacing.md }}>
+              <TouchableOpacity
+                onPress={submitRequestInfo}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#2563EB',
+                  padding: spacing.md,
+                  borderRadius: borderRadius.lg,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: colors.white, fontWeight: '900' }}>إرسال الطلب للمستخدم</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setRequestingInfoReq(null);
+                  setRequestInfoNotes('');
+                }}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#222222',
+                  padding: spacing.md,
+                  borderRadius: borderRadius.lg,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: colors.gray, fontWeight: '900' }}>إلغاء</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Receipt Image Preview Modal */}
       <Modal visible={!!previewImage} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 450, backgroundColor: '#18181B', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.primary }}>
             <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 14 }}>صورة إيصال التحويل المرفق</Text>
+              <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 14 }}>{previewTitle}</Text>
               <TouchableOpacity onPress={() => setPreviewImage(null)} style={{ padding: 4 }}>
                 <X size={20} color={colors.gray} />
               </TouchableOpacity>

@@ -60,6 +60,10 @@ export default function CartScreen({ navigation }: any) {
       if (newQty <= 0) {
         storeRemoveItem(id);
       } else {
+        if (delta > 0 && typeof (item as any).stock === 'number' && newQty > (item as any).stock) {
+          Alert.alert('الحد الأقصى للمخزون ⚠️', `الكمية المتوفرة في المخزون لهذا المنتج هي ${(item as any).stock} قطع فقط.`);
+          return;
+        }
         storeUpdateQty(id, newQty);
       }
     }

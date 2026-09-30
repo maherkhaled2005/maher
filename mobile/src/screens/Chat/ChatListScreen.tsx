@@ -20,6 +20,7 @@ import { colors, spacing, borderRadius, MAX_CHAT_WIDTH } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
 import { useAuthStore } from '../../store/authStore';
 import { maskConversationName, maskPhoneNumbers } from '../../utils/conversationPrivacy';
+import useSocket from '../../hooks/useSocket';
 
 interface ConvItem {
   id: string;
@@ -30,6 +31,7 @@ interface ConvItem {
   lastMessageTime?: string;
   createdAt: string;
   isOnline?: boolean;
+  unreadCount?: number;
 }
 
 export default function ChatListScreen({ navigation }: any) {
@@ -48,6 +50,8 @@ export default function ChatListScreen({ navigation }: any) {
   const [messages, setMessages] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
+  const { socket } = useSocket(user?.id || null);
+
   const loadConversations = async () => {
     try {
       setLoading(true);
@@ -65,6 +69,62 @@ export default function ChatListScreen({ navigation }: any) {
   useEffect(() => {
     loadConversations();
   }, []);
+
+  // Reload when returning from a conversation so read status updates
+  useEffect(() => {
+    if (!navigation?.addListener) return;
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadConversations();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  // Real-time socket listener for incoming messages and conversation updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = (msg: any) => {
+      if (!msg) return;
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => String(c.id) === String(msg.conversationId));
+        if (idx !== -1) {
+          const updated = [...prev];
+          const conv = updated[idx];
+          const isFromMe = String(msg.senderId) === String(user?.id);
+          updated[idx] = {
+            ...conv,
+            lastMessage: msg.content,
+            lastMessageTime: msg.createdAt || new Date().toISOString(),
+            unreadCount: isFromMe ? (conv.unreadCount || 0) : ((conv.unreadCount || 0) + 1),
+          };
+          const [target] = updated.splice(idx, 1);
+          return [target, ...updated];
+        } else {
+          loadConversations();
+          return prev;
+        }
+      });
+    };
+
+    const handleConvUpdate = (update: any) => {
+      if (!update) return;
+      setConversations((prev) =>
+        prev.map((c) =>
+          String(c.id) === String(update.conversationId)
+            ? { ...c, lastMessage: update.lastMessage, lastMessageTime: update.lastMessageTime }
+            : c
+        )
+      );
+    };
+
+    socket.on('new_message', handleNewMessage);
+    socket.on('conversation_update', handleConvUpdate);
+
+    return () => {
+      socket.off('new_message', handleNewMessage);
+      socket.off('conversation_update', handleConvUpdate);
+    };
+  }, [socket, user?.id]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -312,34 +372,54 @@ export default function ChatListScreen({ navigation }: any) {
                 </View>
               </View>
 
-              {/* Observer / Chat badge */}
+              {/* Right side: Unread badge & Observer/Chat badge */}
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                {Boolean((item.unreadCount || 0) > 0) && (
                   <View
                     style={{
-                      flexDirection: 'row-reverse',
+                      backgroundColor: '#EF4444',
+                      borderRadius: 10,
+                      minWidth: 20,
+                      height: 20,
+                      paddingHorizontal: 6,
                       alignItems: 'center',
-                      gap: 4,
-                      backgroundColor: 'rgba(212, 175, 55, 0.12)',
-                      borderWidth: 1,
-                      borderColor: colors.primary,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: borderRadius.md,
-                      flexShrink: 0,
+                      justifyContent: 'center',
                     }}
                   >
-                {isObserver ? (
-                  <>
-                    <Eye size={12} color={colors.primary} />
-                    <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>مراقب</Text>
-                  </>
-                ) : (
-                  <>
-                    <MessageCircle size={12} color={colors.primary} />
-                          <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>محادثة</Text>
-                        </>
-                      )}
-                      </View>
-                    </TouchableOpacity>
+                    <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '900' }}>
+                      {item.unreadCount! > 99 ? '+99' : item.unreadCount}
+                    </Text>
+                  </View>
+                )}
+
+                <View
+                  style={{
+                    flexDirection: 'row-reverse',
+                    alignItems: 'center',
+                    gap: 4,
+                    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+                    borderWidth: 1,
+                    borderColor: colors.primary,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: borderRadius.md,
+                    flexShrink: 0,
+                  }}
+                >
+                  {isObserver ? (
+                    <>
+                      <Eye size={12} color={colors.primary} />
+                      <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>مراقب</Text>
+                    </>
+                  ) : (
+                    <>
+                      <MessageCircle size={12} color={colors.primary} />
+                      <Text style={{ color: colors.primary, fontSize: 11, fontWeight: 'bold' }}>محادثة</Text>
+                    </>
+                  )}
+                </View>
+              </View>
+            </TouchableOpacity>
           )}
         />
       )}

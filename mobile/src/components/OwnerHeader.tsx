@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, PanResponder, StatusBar, Image, useWindowDimensions } from 'react-native';
 import {
   Menu,
   ChevronRight,
@@ -61,6 +61,9 @@ export default function OwnerHeader({
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const { user } = useAuthStore();
+  const { width: screenWidth } = useWindowDimensions();
+  const isSmallScreen = screenWidth < 380;
+  const isTinyScreen = screenWidth < 340;
   const effectiveRole = propRole || user?.role || 'owner';
   const normRole = normalizeRole(effectiveRole);
   const meta = ROLE_HEADER_META[normRole] || ROLE_HEADER_META.owner;
@@ -130,7 +133,7 @@ export default function OwnerHeader({
                   <Text style={[styles.numText, { color: activeColor }]}>#{sectionNumber}</Text>
                 </View>
               ) : null}
-              <Text style={styles.titleText} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={[styles.titleText, isTinyScreen && { fontSize: 12 }, isSmallScreen && { fontSize: 13 }]} numberOfLines={1} ellipsizeMode="tail">
                 {title}
               </Text>
             </View>
@@ -150,7 +153,7 @@ export default function OwnerHeader({
               activeOpacity={0.8}
               accessibilityLabel="الإشعارات"
             >
-              <Bell size={17} color={colors.gray} />
+              <Bell size={isSmallScreen ? 15 : 17} color={colors.gray} />
               {unreadNotifications > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
@@ -167,7 +170,7 @@ export default function OwnerHeader({
               activeOpacity={0.8}
               accessibilityLabel="المحادثات"
             >
-              <MessageCircle size={17} color={colors.gray} />
+              <MessageCircle size={isSmallScreen ? 15 : 17} color={colors.gray} />
               {unreadMessages > 0 && (
                 <View style={[styles.badge, { backgroundColor: colors.primary }]}>
                   <Text style={[styles.badgeText, { color: '#0A0A0A' }]}>
@@ -179,7 +182,7 @@ export default function OwnerHeader({
 
             {rightAction}
 
-            {onRefresh && showBack && (
+            {onRefresh && showBack && !isTinyScreen && (
               <TouchableOpacity style={styles.iconBtn} onPress={onRefresh} activeOpacity={0.8} accessibilityLabel="تحديث">
                 <RefreshCw size={15} color={colors.gray} />
               </TouchableOpacity>
@@ -202,7 +205,7 @@ export default function OwnerHeader({
                 activeOpacity={0.8}
                 accessibilityLabel="العوده للخلف"
               >
-                <ChevronRight size={20} color={activeColor} />
+                <ChevronRight size={isSmallScreen ? 18 : 20} color={activeColor} />
               </TouchableOpacity>
             )}
           </View>
@@ -242,7 +245,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 6,
     paddingTop: 8,
     paddingBottom: 8,
     backgroundColor: '#0A0A0A',

@@ -28,12 +28,14 @@ import OwnerHeader from '../../components/OwnerHeader';
 import { generateExecutiveReportHTML, exportExecutiveCSV } from '../../utils/executiveReport';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 
 export default function ManagerDashboard({ navigation }: any) {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [overviewStats, setOverviewStats] = useState<any>(null);
 
   const [stats, setStats] = useState({
     todayOrders: 0,
@@ -84,6 +86,12 @@ export default function ManagerDashboard({ navigation }: any) {
 
       setPendingProductsList(pendingProds.slice(0, 3));
       setPendingUpgradesList(pendingUpgs.slice(0, 3));
+
+      // 7. Fetch live database overview stats for Manager
+      const overviewRes = await api.get('/manager/overview').catch(() => null);
+      if (overviewRes?.data) {
+        setOverviewStats(overviewRes.data);
+      }
     } catch (e) {
       console.error('Failed to load manager data', e);
     } finally {
@@ -158,13 +166,21 @@ export default function ManagerDashboard({ navigation }: any) {
     setExportModalVisible(false);
     const reportData = {
       period: '30d',
-      totalRevenue: 0,
-      activeUsers: stats.activeTechs,
-      todayOrders: stats.todayOrders,
-      availableTechnicians: stats.activeTechs,
-      pendingTickets: stats.openTickets,
-      pendingWithdrawalsAmount: 0,
-      ownerName: 'إدارة منصة TecnoRexa',
+      totalRevenue: overviewStats?.totalRevenue || 0,
+      activeUsers: overviewStats?.activeUsers || stats.activeTechs,
+      todayOrders: overviewStats?.todayOrders || stats.todayOrders,
+      availableTechnicians: overviewStats?.availableTechnicians || stats.activeTechs,
+      pendingTickets: overviewStats?.pendingTickets || stats.openTickets,
+      pendingWithdrawalsAmount: overviewStats?.pendingWithdrawalsAmount || 0,
+      revenueBreakdown: overviewStats?.revenueBreakdown,
+      treasury: overviewStats?.treasury,
+      warehouses: overviewStats?.warehouses,
+      support: overviewStats?.support,
+      orders: overviewStats?.orders,
+      topTechnicians: overviewStats?.topTechnicians || [],
+      topProducts: overviewStats?.topProducts || [],
+      liveActivities: overviewStats?.liveActivities || [],
+      ownerName: user?.name ? `${user.name} (المدير العام)` : 'المدير العام لمنصة TecnoRexa',
       programmerName: 'الدعم التقني والبرمجي',
     };
 
@@ -203,11 +219,21 @@ export default function ManagerDashboard({ navigation }: any) {
             Alert.alert('✅ تم إنشاء التقرير', `تم حفظ ملف PDF بنجاح في:\n${uri}`);
           }
         } else {
-          const textSummary = `📑 تقرير غرفة العمليات والرقابة - TecnoRexa\n\n👔 المسؤول: المدير العام\n📦 الطلبات قيد المتابعة: ${reportData.todayOrders}\n🔧 الفنيين النشطين: ${reportData.availableTechnicians}\n🎧 تذاكر الدعم المفتوحة: ${reportData.pendingTickets}`;
-          await Share.share({
-            title: 'تقرير غرفة العمليات التشغيلي',
-            message: type === 'csv' ? exportExecutiveCSV(reportData) : textSummary,
+          const csvContent = exportExecutiveCSV(reportData);
+          const fileUri = `${FileSystem.cacheDirectory}TecnoRexa_Operations_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+          await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+            encoding: FileSystem.EncodingType.UTF8,
           });
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            await Sharing.shareAsync(fileUri, {
+              UTI: 'public.comma-separated-values-text',
+              mimeType: 'text/csv',
+              dialogTitle: 'تقرير غرفة العمليات التشغيلي (CSV)',
+            });
+          } else {
+            Alert.alert('✅ تم إنشاء ملف التقرير', `تم حفظ ملف CSV بنجاح في:\n${fileUri}`);
+          }
         }
       } catch (err: any) {
         Alert.alert('تنبيه', `حدث خطأ أثناء تصدير التقرير: ${err?.message || 'يرجى المحاولة مجدداً'}`);

@@ -18,6 +18,8 @@ import {
   ChevronLeft,
   Volume2,
   VolumeX,
+  Play,
+  Pause,
 } from 'lucide-react-native';
 import { colors, MAX_CONTENT_WIDTH } from '../../theme';
 import { api } from '../../api/client';
@@ -71,17 +73,33 @@ function ReelPlayer({
     player.muted = muted;
   }, [muted, player]);
 
+  const [isUserPaused, setIsUserPaused] = useState(false);
+
   useEffect(() => {
     try {
-      if (active) player.play();
+      if (active && !isUserPaused) player.play();
       else player.pause();
     } catch {
       /* player not ready yet */
     }
-  }, [active, player]);
+  }, [active, isUserPaused, player]);
+
+  const togglePlayPause = () => {
+    try {
+      if (isUserPaused) {
+        player.play();
+        setIsUserPaused(false);
+      } else {
+        player.pause();
+        setIsUserPaused(true);
+      }
+    } catch {}
+  };
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.95}
+      onPress={togglePlayPause}
       style={{
         width: stageWidth,
         height: stageHeight,
@@ -102,6 +120,36 @@ function ReelPlayer({
       ) : (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: '#666' }}>لا يوجد فيديو</Text>
+        </View>
+      )}
+
+      {isUserPaused && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.3)',
+          }}
+        >
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: 'rgba(0,0,0,0.65)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1.5,
+              borderColor: colors.primary,
+            }}
+          >
+            <Play size={28} color={colors.primary} style={{ marginLeft: 3 }} />
+          </View>
         </View>
       )}
 

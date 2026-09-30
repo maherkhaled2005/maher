@@ -38,13 +38,13 @@ const path = require('path');
 const db = new Database(path.join(__dirname, '..', 'tecnorexa.db'));
 
 const CREDENTIALS = {
-  owner: { phone: '01000000001', password: 'Owner@123456' },
-  manager: { phone: '01000000003', password: 'Manager@123456' },
-  programmer: { phone: '01064739664', password: 'Maher@123456' },
-  customer_support: { phone: '01000000004', password: 'Support@123456' },
-  technician: { phone: '01000000005', password: 'Tech@123456' },
-  merchant: { phone: '01000000006', password: 'Merchant@123456' },
-  customer: { phone: '01000000007', password: 'Customer@123456' },
+  owner: { phone: '01011112222', password: '123456' },
+  manager: { phone: '01286585187', password: '123456' },
+  programmer: { phone: '01064739664', password: '123456' },
+  customer_support: { phone: '01557470554', password: '123456' },
+  technician: { phone: '01099887722', password: '123456' },
+  merchant: { phone: '01122334455', password: '123456' },
+  customer: { phone: '01055667788', password: '123456' },
 };
 
 async function loginRole(role) {
