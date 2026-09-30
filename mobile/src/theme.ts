@@ -56,6 +56,8 @@ export const colors = {
   purpleLight: '#EDE9FE',
   orange: '#EA580C',
   orangeLight: '#FFEDD5',
+  textSecondary: '#A1A1AA',
+  background: '#0A0A0A',
 } as const;
 
 export const spacing = {
@@ -76,10 +78,22 @@ export const typography = {
     extrabold: '800' as const,
     black: '900' as const,
   },
+  body1: { fontSize: 16, fontFamily: 'Cairo' },
+  body2: { fontSize: 14, fontFamily: 'Cairo' },
+  h1: { fontSize: 28, fontWeight: '700' as const, fontFamily: 'Cairo' },
+  h2: { fontSize: 22, fontWeight: '700' as const, fontFamily: 'Cairo' },
+  h3: { fontSize: 18, fontWeight: '700' as const, fontFamily: 'Cairo' },
+  caption: { fontSize: 12, fontFamily: 'Cairo' },
+  fonts: {
+    regular: 'Cairo',
+    medium: 'Cairo',
+    bold: 'Cairo',
+    black: 'Cairo',
+  },
 } as const;
 
 export const borderRadius = {
-  sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, full: 9999,
+  sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, full: 9999, round: 9999,
 } as const;
 
 export const shadows = {

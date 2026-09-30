@@ -29,6 +29,8 @@ interface MediaItem {
   duration: string;
   status: 'pending' | 'approved' | 'rejected';
   date: string;
+}
+
 export default function MediaApprovalScreen({ navigation }: any) {
   const [filter, setFilter] = useState<'pending' | 'approved'>('pending');
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);

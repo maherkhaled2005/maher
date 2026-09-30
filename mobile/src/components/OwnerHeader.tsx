@@ -25,7 +25,7 @@ interface OwnerHeaderProps {
   title: string;
   subtitle?: string;
   sectionNumber?: number;
-  navigation: any;
+  navigation?: any;
   currentScreen?: string;
   showBack?: boolean;
   onRefresh?: () => void;

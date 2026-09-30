@@ -170,7 +170,7 @@ function ReelPlayer({
           {item.description}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
