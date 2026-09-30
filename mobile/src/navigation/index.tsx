@@ -105,6 +105,12 @@ import OfflineLibraryScreen from '../screens/Media/OfflineLibraryScreen';
 import OnboardingModal from '../components/OnboardingModal';
 import FloatingAIButton from '../components/FloatingAIButton';
 
+// ===== خدمات الصيانة (Section 6) =====
+import CreateServiceRequestScreen from '../screens/ServiceRequest/CreateServiceRequestScreen';
+import ServiceRequestsListScreen from '../screens/ServiceRequest/ServiceRequestsListScreen';
+import ServiceRequestDetailsScreen from '../screens/ServiceRequest/ServiceRequestDetailsScreen';
+import MerchantOrdersScreen from '../screens/ServiceRequest/MerchantOrdersScreen';
+
 // ─────────────────────────────────────────────────────────────
 // Tab definitions per role
 // ─────────────────────────────────────────────────────────────
@@ -165,27 +171,28 @@ const getTabsForRole = (role: string): TabDef[] => {
     // 🔧 الفني: الرئيسية | الطلبات | الكورسات | المحفظة | حسابي
     technician: [
       { name: 'Home', label: 'الرئيسية', Icon: Home, screen: HomeScreen },
-      { name: 'Orders', label: 'الطلبات', Icon: Package, screen: OrdersScreen },
+      { name: 'ServiceRequestsList', label: 'طلبات الصيانة', Icon: Wrench, screen: ServiceRequestsListScreen },
       { name: 'Courses', label: 'الكورسات', Icon: BookOpen, screen: CoursesScreen },
       { name: 'Wallet', label: 'المحفظة', Icon: Wallet, screen: WalletScreen },
       { name: 'Profile', label: 'حسابي', Icon: User, screen: ProfileScreen },
     ],
-    // 🏪 التاجر: الرئيسية | منتجاتي | الطلبات | المحفظة | حسابي
+    // 🏪 التاجر: الرئيسية | منتجاتي | طلبات القطع | المحفظة | حسابي
     merchant: [
       { name: 'Home', label: 'الرئيسية', Icon: Home, screen: HomeScreen },
       { name: 'MyProducts', label: 'منتجاتي', Icon: Box, screen: MyProductsScreen },
-      { name: 'Orders', label: 'الطلبات', Icon: Truck, screen: OrdersScreen },
+      { name: 'MerchantOrders', label: 'طلبات القطع', Icon: Package, screen: MerchantOrdersScreen },
       { name: 'Wallet', label: 'المحفظة', Icon: Wallet, screen: WalletScreen },
       { name: 'Profile', label: 'حسابي', Icon: User, screen: ProfileScreen },
     ],
-    // 👤 العميل: الرئيسية | السوق | الطلبات | الفنيين | حسابي
+    // 👤 العميل: الرئيسية | السوق | طلبات الصيانة | الفنيين | حسابي
     customer: [
       { name: 'Home', label: 'الرئيسية', Icon: Home, screen: HomeScreen },
       { name: 'Marketplace', label: 'السوق', Icon: ShoppingBag, screen: MarketplaceScreen },
-      { name: 'Orders', label: 'الطلبات', Icon: Package, screen: OrdersScreen },
+      { name: 'ServiceRequestsList', label: 'صيانتي', Icon: Wrench, screen: ServiceRequestsListScreen },
       { name: 'TechniciansTeam', label: 'الفنيين', Icon: Wrench, screen: TechniciansTeamScreen },
       { name: 'Profile', label: 'حسابي', Icon: User, screen: ProfileScreen },
     ],
+
   };
 
   return tabSets[r] || tabSets.customer;
@@ -402,6 +409,11 @@ export default function AppNavigator() {
             <Stack.Screen name="Terms" component={TermsScreen} />
             <Stack.Screen name="OfflineLibrary" component={OfflineLibraryScreen} />
             <Stack.Screen name="Suggestions" component={SuggestionsScreen} />
+            {/* ── Section 6: خدمات الصيانة ── */}
+            <Stack.Screen name="CreateServiceRequest" component={CreateServiceRequestScreen} />
+            <Stack.Screen name="ServiceRequestsList" component={ServiceRequestsListScreen} />
+            <Stack.Screen name="ServiceRequestDetails" component={ServiceRequestDetailsScreen} />
+            <Stack.Screen name="MerchantOrders" component={MerchantOrdersScreen} />
           </>
         )}
       </Stack.Navigator>

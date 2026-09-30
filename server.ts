@@ -574,6 +574,117 @@ async function runMigrations() {
     CREATE TABLE IF NOT EXISTS service_quotes (id TEXT PRIMARY KEY, orderId TEXT NOT NULL, technicianId TEXT NOT NULL, laborCost REAL DEFAULT 0, partsCost REAL DEFAULT 0, inspectionFee REAL DEFAULT 0, totalAmount REAL NOT NULL, notes TEXT, status TEXT DEFAULT 'pending', createdAt TEXT, updatedAt TEXT);
     CREATE TABLE IF NOT EXISTS service_reports (id TEXT PRIMARY KEY, orderId TEXT NOT NULL, technicianId TEXT NOT NULL, deviceType TEXT, deviceBrand TEXT, deviceModel TEXT, diagnosis TEXT NOT NULL, repairAction TEXT NOT NULL, partsUsed TEXT, beforePhotos TEXT, afterPhotos TEXT, warrantyDays INTEGER DEFAULT 30, customerSignature TEXT, createdAt TEXT);
 
+    -- ========== SECTION 6: SERVICE REQUESTS (Customer ↔ Technician ↔ Merchant) ==========
+    CREATE TABLE IF NOT EXISTS service_requests (
+      id TEXT PRIMARY KEY,
+      referenceNumber TEXT UNIQUE,
+      customerId TEXT NOT NULL,
+      customerName TEXT,
+      customerPhone TEXT,
+      customerGovernorate TEXT,
+      customerAddress TEXT,
+      deviceType TEXT NOT NULL,
+      deviceBrand TEXT,
+      deviceModel TEXT,
+      problemDescription TEXT NOT NULL,
+      photos TEXT,
+      videos TEXT,
+      status TEXT DEFAULT 'new',
+      technicianId TEXT,
+      technicianName TEXT,
+      technicianPhone TEXT,
+      laborCost REAL DEFAULT 0,
+      travelCost REAL DEFAULT 0,
+      partsCost REAL DEFAULT 0,
+      inspectionFee REAL DEFAULT 0,
+      totalAmount REAL DEFAULT 0,
+      commission REAL DEFAULT 0,
+      technicianEarning REAL DEFAULT 0,
+      priceBreakdown TEXT,
+      paymentMethod TEXT,
+      paymentReference TEXT,
+      paymentStatus TEXT DEFAULT 'unpaid',
+      paidAt TEXT,
+      startedAt TEXT,
+      completedAt TEXT,
+      customerConfirmedAt TEXT,
+      rating REAL,
+      ratingComment TEXT,
+      warrantyDays INTEGER DEFAULT 30,
+      cancelReason TEXT,
+      notes TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS service_request_logs (
+      id TEXT PRIMARY KEY,
+      serviceRequestId TEXT NOT NULL,
+      action TEXT NOT NULL,
+      performedBy TEXT,
+      performedByName TEXT,
+      performedByRole TEXT,
+      details TEXT,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (serviceRequestId) REFERENCES service_requests(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS spare_part_orders (
+      id TEXT PRIMARY KEY,
+      serviceRequestId TEXT NOT NULL,
+      technicianId TEXT NOT NULL,
+      merchantId TEXT,
+      merchantName TEXT,
+      productId TEXT,
+      productName TEXT NOT NULL,
+      quantity INTEGER DEFAULT 1,
+      unitPrice REAL DEFAULT 0,
+      totalPrice REAL DEFAULT 0,
+      technicianDiscount REAL DEFAULT 0,
+      finalPrice REAL DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      notes TEXT,
+      deliveredAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT,
+      FOREIGN KEY (serviceRequestId) REFERENCES service_requests(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS price_rules (
+      id TEXT PRIMARY KEY,
+      deviceType TEXT NOT NULL,
+      minLaborCost REAL DEFAULT 0,
+      maxLaborCost REAL DEFAULT 10000,
+      minTravelCost REAL DEFAULT 0,
+      maxTravelCost REAL DEFAULT 500,
+      inspectionFee REAL DEFAULT 50,
+      isActive INTEGER DEFAULT 1,
+      createdAt TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_references (
+      id TEXT PRIMARY KEY,
+      referenceCode TEXT UNIQUE NOT NULL,
+      serviceRequestId TEXT NOT NULL,
+      amount REAL NOT NULL,
+      method TEXT,
+      status TEXT DEFAULT 'pending',
+      createdAt TEXT NOT NULL,
+      expiresAt TEXT,
+      usedAt TEXT,
+      FOREIGN KEY (serviceRequestId) REFERENCES service_requests(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_service_requests_customerId ON service_requests(customerId);
+    CREATE INDEX IF NOT EXISTS idx_service_requests_technicianId ON service_requests(technicianId);
+    CREATE INDEX IF NOT EXISTS idx_service_requests_status ON service_requests(status);
+    CREATE INDEX IF NOT EXISTS idx_service_request_logs_requestId ON service_request_logs(serviceRequestId);
+    CREATE INDEX IF NOT EXISTS idx_spare_part_orders_requestId ON spare_part_orders(serviceRequestId);
+    CREATE INDEX IF NOT EXISTS idx_spare_part_orders_technicianId ON spare_part_orders(technicianId);
+    CREATE INDEX IF NOT EXISTS idx_spare_part_orders_merchantId ON spare_part_orders(merchantId);
+    CREATE INDEX IF NOT EXISTS idx_payment_references_code ON payment_references(referenceCode);
+    CREATE INDEX IF NOT EXISTS idx_payment_references_requestId ON payment_references(serviceRequestId);
+
     CREATE VIEW IF NOT EXISTS tickets AS SELECT * FROM support_tickets;
     CREATE VIEW IF NOT EXISTS reviews AS SELECT * FROM technician_reviews;
     CREATE VIEW IF NOT EXISTS favorites AS SELECT * FROM wishlist;
@@ -12344,7 +12455,914 @@ app.get("/api/technicians/:id/specialties", authenticateToken,async (req, res) =
 });
 
 
+// ============================================================
+// SECTION 6: SERVICE REQUESTS — Full Operational Cycle
+// Customer ↔ Technician ↔ Merchant
+// ============================================================
+
+// ─── Helper: log service request action ───
+function logServiceRequest(serviceRequestId: string, action: string, performedBy: string, performedByName: string, performedByRole: string, details?: string) {
+  const id = `srl_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+  db.prepare(`INSERT INTO service_request_logs (id, serviceRequestId, action, performedBy, performedByName, performedByRole, details, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, serviceRequestId, action, performedBy, performedByName, performedByRole, details || null, new Date().toISOString());
+}
+
+// ─── Helper: generate reference number ───
+function generateRef(prefix: string): string {
+  const num = Math.floor(100000 + Math.random() * 900000);
+  return `${prefix}-${num}`;
+}
+
+// ─── Helper: send notification ───
+function sendNotificationToUser(userId: string, title: string, message: string, type: string, data?: any) {
+  const nId = `notif_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+  db.prepare(`INSERT INTO notifications (id, userId, type, title, message, data, read, createdAt) VALUES (?, ?, ?, ?, ?, ?, 0, ?)`).run(nId, userId, type, title, message, data ? JSON.stringify(data) : null, new Date().toISOString());
+  (global as any).io?.to(`user_${userId}`).emit('new_notification', { id: nId, title, message, type });
+}
+
+// ─── Device types (home appliances only) ───
+const HOME_APPLIANCE_TYPES = [
+  'ثلاجة', 'ديب فريزر', 'غسالة ملابس', 'غسالة أطباق', 'ميكروويف',
+  'بوتجاز', 'فرن كهربائي', 'فرن غاز', 'تكييف منزلي', 'شفاط مطبخ',
+  'سخان مياه', 'خلاط', 'عجان', 'محضرة طعام', 'عصارة', 'مكنسة كهربائية',
+  'مكواة', 'مروحة', 'مروحة سقف', 'غلاية مياه', 'ماكينة قهوة'
+];
+
+// ─── Egyptian governorates ───
+const EGYPTIAN_GOVERNORATES = [
+  'القاهرة','الجيزة','الإسكندرية','الدقهلية','البحر الأحمر','البحيرة',
+  'الفيوم','الغربية','الإسماعيلية','المنوفية','المنيا','القليوبية',
+  'الوادي الجديد','السويس','أسوان','أسيوط','بني سويف','بورسعيد',
+  'دمياط','الشرقية','جنوب سيناء','كفر الشيخ','مطروح','الأقصر',
+  'قنا','شمال سيناء','سوهاج'
+];
+
+// ─── Commission rate (configurable via system_settings) ───
+function getCommissionRate(): number {
+  const setting = db.prepare(`SELECT value FROM system_settings WHERE key = 'commission_rate'`).get() as any;
+  return setting ? parseFloat(setting.value) : 0.15; // default 15%
+}
+
+function getTechnicianDiscount(): number {
+  const setting = db.prepare(`SELECT value FROM system_settings WHERE key = 'technician_parts_discount'`).get() as any;
+  return setting ? parseFloat(setting.value) : 0.10; // default 10%
+}
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests — Customer creates a request
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    if (!['customer', 'technician', 'merchant'].includes(normalizeRoleServer(user.role))) {
+      // Allow customer role only; technicians/merchants are staff who handle requests
+      if (normalizeRoleServer(user.role) !== 'customer') {
+        return res.status(403).json({ error: "فقط العملاء يمكنهم إنشاء طلبات صيانة" });
+      }
+    }
+    // Actually allow any authenticated user to create a service request as customer
+    const { deviceType, deviceBrand, deviceModel, problemDescription, governorate, address, photos, videos } = req.body;
+
+    if (!deviceType || !problemDescription || !governorate || !address) {
+      return res.status(400).json({ error: "يرجى تعبئة جميع البيانات المطلوبة" });
+    }
+    if (!HOME_APPLIANCE_TYPES.includes(deviceType)) {
+      return res.status(400).json({ error: "نوع الجهاز غير مدعوم حالياً" });
+    }
+    if (!EGYPTIAN_GOVERNORATES.includes(governorate)) {
+      return res.status(400).json({ error: "المحافظة غير صحيحة" });
+    }
+
+    const id = `sr_${Date.now()}_${Math.random().toString(36).substr(2,8)}`;
+    const referenceNumber = generateRef('REQ');
+    const now = new Date().toISOString();
+
+    const customerInfo = db.prepare(`SELECT name, phone FROM users WHERE id = ?`).get(user.id) as any;
+
+    db.prepare(`
+      INSERT INTO service_requests (id, referenceNumber, customerId, customerName, customerPhone, customerGovernorate, customerAddress, deviceType, deviceBrand, deviceModel, problemDescription, photos, videos, status, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)
+    `).run(id, referenceNumber, user.id, customerInfo?.name || user.name, customerInfo?.phone || user.phone, governorate, address, deviceType, deviceBrand || null, deviceModel || null, problemDescription, photos ? JSON.stringify(photos) : null, videos ? JSON.stringify(videos) : null, now, now);
+
+    logServiceRequest(id, 'CREATED', user.id, customerInfo?.name || user.name, user.role, `طلب صيانة جديد: ${deviceType}`);
+
+    // Auto-match technicians by specialty and governorate
+    const matchedTechs = db.prepare(`
+      SELECT u.id, u.name, u.phone, u.governorate, u.rating, u.ratingCount, u.available, u.availabilityStatus
+      FROM users u
+      WHERE u.role = 'technician'
+        AND (u.governorate = ? OR u.governorate IS NULL)
+        AND (u.banned = 0 OR u.banned IS NULL)
+        AND (u.available = 1 OR u.available IS NULL)
+        AND u.status != 'banned'
+      ORDER BY u.rating DESC, u.ratingCount DESC
+      LIMIT 10
+    `).all(governorate) as any[];
+
+    // Update status to waiting for technician
+    db.prepare(`UPDATE service_requests SET status = 'waiting_for_technician', updatedAt = ? WHERE id = ?`).run(now, id);
+    logServiceRequest(id, 'WAITING_FOR_TECHNICIAN', 'system', 'النظام', 'system', `تم إرسال الطلب لـ ${matchedTechs.length} فنيين`);
+
+    // Notify matched technicians
+    for (const tech of matchedTechs) {
+      sendNotificationToUser(tech.id, '🔧 طلب صيانة جديد', `طلب صيانة ${deviceType} في ${governorate} — انقر للقبول`, 'new_service_request', { serviceRequestId: id, referenceNumber });
+      (global as any).io?.to(`user_${tech.id}`).emit('new_service_request', {
+        serviceRequestId: id,
+        referenceNumber,
+        deviceType,
+        governorate,
+        problemDescription,
+        customerName: customerInfo?.name || user.name,
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      serviceRequest: { id, referenceNumber, status: 'waiting_for_technician' },
+      message: "تم إرسال طلبك، جارٍ البحث عن فني مناسب"
+    });
+  } catch (err: any) {
+    console.error('[SR] Create error:', err);
+    return res.status(500).json({ error: "خطأ في إنشاء الطلب" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/service-requests — Role-filtered list
+// ─────────────────────────────────────────────────────────────
+app.get("/api/service-requests", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const role = normalizeRoleServer(user.role);
+    const { status, page = '1', limit = '20' } = req.query as any;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    let whereClause = '';
+    let params: any[] = [];
+
+    if (role === 'customer') {
+      whereClause = 'WHERE sr.customerId = ?';
+      params = [user.id];
+    } else if (role === 'technician') {
+      whereClause = 'WHERE (sr.technicianId = ? OR sr.status IN (\'waiting_for_technician\', \'new\'))';
+      params = [user.id];
+    } else if (role === 'merchant') {
+      // Merchant sees spare part orders for their products
+      const spareOrders = db.prepare(`
+        SELECT spo.*, sr.referenceNumber, sr.deviceType, sr.customerGovernorate
+        FROM spare_part_orders spo
+        JOIN service_requests sr ON spo.serviceRequestId = sr.id
+        WHERE spo.merchantId = ? OR spo.merchantId IS NULL
+        ORDER BY spo.createdAt DESC
+        LIMIT ? OFFSET ?
+      `).all(user.id, parseInt(limit), offset);
+      return res.json({ requests: spareOrders, role: 'merchant' });
+    } else if (['owner', 'manager', 'customer_support'].includes(role)) {
+      whereClause = '';
+      params = [];
+    } else {
+      return res.status(403).json({ error: "غير مصرح" });
+    }
+
+    if (status) {
+      whereClause += (whereClause ? ' AND' : 'WHERE') + ' sr.status = ?';
+      params.push(status);
+    }
+
+    const requests = db.prepare(`
+      SELECT sr.*,
+        u.name as customerNameFull, u.phone as customerPhoneFull,
+        t.name as technicianNameFull, t.phone as technicianPhoneFull, t.avatar as technicianAvatar, t.rating as technicianRating
+      FROM service_requests sr
+      LEFT JOIN users u ON sr.customerId = u.id
+      LEFT JOIN users t ON sr.technicianId = t.id
+      ${whereClause}
+      ORDER BY sr.createdAt DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, parseInt(limit), offset);
+
+    const total = (db.prepare(`SELECT COUNT(*) as c FROM service_requests sr ${whereClause}`).get(...params) as any)?.c || 0;
+
+    return res.json({ requests, total, page: parseInt(page), limit: parseInt(limit) });
+  } catch (err: any) {
+    console.error('[SR] List error:', err);
+    return res.status(500).json({ error: "خطأ في جلب الطلبات" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/service-requests/:id — Get single request details
+// ─────────────────────────────────────────────────────────────
+app.get("/api/service-requests/:id", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    const role = normalizeRoleServer(user.role);
+
+    const sr = db.prepare(`
+      SELECT sr.*,
+        u.name as customerNameFull, u.phone as customerPhoneFull, u.avatar as customerAvatar,
+        t.name as technicianNameFull, t.phone as technicianPhoneFull, t.avatar as technicianAvatar, t.rating as technicianRating
+      FROM service_requests sr
+      LEFT JOIN users u ON sr.customerId = u.id
+      LEFT JOIN users t ON sr.technicianId = t.id
+      WHERE sr.id = ?
+    `).get(id) as any;
+
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+
+    // Authorization check
+    if (role === 'customer' && sr.customerId !== user.id) return res.status(403).json({ error: "غير مصرح" });
+    if (role === 'technician' && sr.technicianId && sr.technicianId !== user.id) return res.status(403).json({ error: "غير مصرح" });
+
+    // Parse JSON fields
+    if (sr.photos) try { sr.photos = JSON.parse(sr.photos); } catch {}
+    if (sr.videos) try { sr.videos = JSON.parse(sr.videos); } catch {}
+    if (sr.priceBreakdown) try { sr.priceBreakdown = JSON.parse(sr.priceBreakdown); } catch {}
+
+    // Get logs
+    const logs = db.prepare(`SELECT * FROM service_request_logs WHERE serviceRequestId = ? ORDER BY createdAt ASC`).all(id);
+    // Get spare part orders
+    const spareParts = db.prepare(`SELECT * FROM spare_part_orders WHERE serviceRequestId = ? ORDER BY createdAt DESC`).all(id);
+
+    return res.json({ ...sr, logs, spareParts });
+  } catch (err: any) {
+    console.error('[SR] Get error:', err);
+    return res.status(500).json({ error: "خطأ في جلب الطلب" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/accept — Technician accepts (atomic)
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/accept", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    if (normalizeRoleServer(user.role) !== 'technician') {
+      return res.status(403).json({ error: "فقط الفنيون يمكنهم قبول الطلبات" });
+    }
+
+    const { id } = req.params;
+    const now = new Date().toISOString();
+    const techInfo = db.prepare(`SELECT name, phone FROM users WHERE id = ?`).get(user.id) as any;
+
+    // Atomic: use SQLite transaction to prevent race condition
+    const result = db.transaction(() => {
+      const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+
+      if (!sr) return { error: "الطلب غير موجود", status: 404 };
+      if (sr.status !== 'waiting_for_technician' && sr.status !== 'new') {
+        return { error: "الطلب لم يعد متاحاً للقبول", status: 409 };
+      }
+      if (sr.technicianId && sr.technicianId !== user.id) {
+        return { error: "تم قبول الطلب من فني آخر بالفعل", status: 409 };
+      }
+
+      db.prepare(`
+        UPDATE service_requests
+        SET technicianId = ?, technicianName = ?, technicianPhone = ?, status = 'assigned', updatedAt = ?
+        WHERE id = ? AND (status = 'waiting_for_technician' OR status = 'new') AND (technicianId IS NULL OR technicianId = ?)
+      `).run(user.id, techInfo?.name || user.name, techInfo?.phone, now, id, user.id);
+
+      const updated = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+      if (updated.technicianId !== user.id) {
+        return { error: "تم قبول الطلب من فني آخر في نفس الوقت", status: 409 };
+      }
+      return { success: true, sr: updated };
+    })();
+
+    if ((result as any).error) {
+      return res.status((result as any).status).json({ error: (result as any).error });
+    }
+
+    const sr = (result as any).sr;
+    logServiceRequest(id, 'ASSIGNED', user.id, techInfo?.name || user.name, 'technician', `الفني ${techInfo?.name} قبل الطلب`);
+
+    // Notify customer
+    sendNotificationToUser(sr.customerId, '✅ فني في الطريق', `تم تعيين الفني ${techInfo?.name || user.name} لطلبك. سيتواصل معك قريباً بتفاصيل السعر`, 'service_assigned', { serviceRequestId: id });
+    (global as any).io?.to(`user_${sr.customerId}`).emit('service_request_update', { serviceRequestId: id, status: 'assigned', technicianName: techInfo?.name });
+
+    return res.json({ success: true, message: "تم قبول الطلب بنجاح", status: 'assigned' });
+  } catch (err: any) {
+    console.error('[SR] Accept error:', err);
+    return res.status(500).json({ error: "خطأ في قبول الطلب" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/price — Technician submits price quote
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/price", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    if (normalizeRoleServer(user.role) !== 'technician') {
+      return res.status(403).json({ error: "فقط الفنيون يمكنهم تحديد السعر" });
+    }
+
+    const { id } = req.params;
+    const { laborCost, travelCost, partsCost, inspectionFee, notes } = req.body;
+
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (sr.technicianId !== user.id) return res.status(403).json({ error: "لست الفني المعين لهذا الطلب" });
+    if (!['assigned', 'waiting_for_price'].includes(sr.status)) {
+      return res.status(400).json({ error: "لا يمكن تحديد السعر في الحالة الحالية" });
+    }
+
+    // Backend price validation
+    const priceRule = db.prepare(`SELECT * FROM price_rules WHERE deviceType = ? AND isActive = 1`).get(sr.deviceType) as any;
+    const labor = parseFloat(laborCost) || 0;
+    const travel = parseFloat(travelCost) || 0;
+    const parts = parseFloat(partsCost) || 0;
+    const inspection = parseFloat(inspectionFee) || priceRule?.inspectionFee || 50;
+
+    if (priceRule) {
+      if (labor < priceRule.minLaborCost || labor > priceRule.maxLaborCost) {
+        return res.status(400).json({ error: `تكلفة العمالة يجب أن تكون بين ${priceRule.minLaborCost} و ${priceRule.maxLaborCost} ج.م` });
+      }
+    }
+
+    const subtotal = labor + travel + parts + inspection;
+    const commissionRate = getCommissionRate();
+    const commission = Math.round(subtotal * commissionRate);
+    const total = subtotal + commission;
+    const technicianEarning = subtotal - commission;
+
+    const priceBreakdown = {
+      laborCost: labor,
+      travelCost: travel,
+      partsCost: parts,
+      inspectionFee: inspection,
+      subtotal,
+      commissionRate: `${(commissionRate * 100).toFixed(0)}%`,
+      commission,
+      total,
+      technicianEarning
+    };
+
+    const now = new Date().toISOString();
+    db.prepare(`
+      UPDATE service_requests
+      SET laborCost = ?, travelCost = ?, partsCost = ?, inspectionFee = ?, totalAmount = ?, commission = ?, technicianEarning = ?,
+          priceBreakdown = ?, status = 'waiting_for_customer_approval', notes = ?, updatedAt = ?
+      WHERE id = ?
+    `).run(labor, travel, parts, inspection, total, commission, technicianEarning, JSON.stringify(priceBreakdown), notes || sr.notes, now, id);
+
+    logServiceRequest(id, 'PRICE_SUBMITTED', user.id, user.name, 'technician', `إجمالي: ${total} ج.م`);
+
+    // Notify customer with price breakdown
+    sendNotificationToUser(sr.customerId, '💰 تفاصيل سعر الخدمة', `الفني حدد إجمالي التكلفة: ${total} ج.م — انقر للموافقة أو الرفض`, 'price_submitted', { serviceRequestId: id, total, priceBreakdown });
+    (global as any).io?.to(`user_${sr.customerId}`).emit('service_request_update', {
+      serviceRequestId: id,
+      status: 'waiting_for_customer_approval',
+      priceBreakdown,
+      totalAmount: total
+    });
+
+    return res.json({ success: true, message: "تم إرسال السعر للعميل", priceBreakdown });
+  } catch (err: any) {
+    console.error('[SR] Price error:', err);
+    return res.status(500).json({ error: "خطأ في تحديد السعر" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/approve-price — Customer approves/rejects price
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/approve-price", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    const { decision } = req.body; // 'approve' | 'reject'
+
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (sr.customerId !== user.id) return res.status(403).json({ error: "غير مصرح" });
+    if (sr.status !== 'waiting_for_customer_approval') {
+      return res.status(400).json({ error: "الطلب ليس في انتظار موافقتك" });
+    }
+
+    const now = new Date().toISOString();
+
+    if (decision === 'approve') {
+      // Generate payment reference
+      const paymentRef = generateRef('PAY');
+      const payRefId = `pref_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
+
+      db.prepare(`INSERT INTO payment_references (id, referenceCode, serviceRequestId, amount, status, createdAt, expiresAt) VALUES (?, ?, ?, ?, 'pending', ?, ?)`).run(payRefId, paymentRef, id, sr.totalAmount, now, expiresAt);
+      db.prepare(`UPDATE service_requests SET status = 'payment_pending', paymentReference = ?, updatedAt = ? WHERE id = ?`).run(paymentRef, now, id);
+
+      logServiceRequest(id, 'PRICE_APPROVED', user.id, user.name, 'customer', `العميل وافق على السعر ${sr.totalAmount} ج.م`);
+
+      // Notify technician
+      sendNotificationToUser(sr.technicianId, '✅ العميل وافق على السعر', `العميل وافق على تكلفة الخدمة ${sr.totalAmount} ج.م. بانتظار الدفع`, 'price_approved', { serviceRequestId: id });
+      (global as any).io?.to(`user_${sr.technicianId}`).emit('service_request_update', { serviceRequestId: id, status: 'payment_pending' });
+
+      return res.json({
+        success: true,
+        message: "تمت الموافقة على السعر. يرجى إتمام الدفع",
+        paymentReference: paymentRef,
+        amount: sr.totalAmount,
+        expiresAt
+      });
+    } else {
+      // Customer rejected price
+      db.prepare(`UPDATE service_requests SET status = 'cancelled', cancelReason = ?, updatedAt = ? WHERE id = ?`).run('العميل رفض السعر المقترح', now, id);
+      logServiceRequest(id, 'PRICE_REJECTED', user.id, user.name, 'customer', 'العميل رفض السعر');
+
+      // Notify technician
+      sendNotificationToUser(sr.technicianId, '❌ رفض السعر', 'رفض العميل السعر المقترح. تم إلغاء الطلب', 'price_rejected', { serviceRequestId: id });
+      (global as any).io?.to(`user_${sr.technicianId}`).emit('service_request_update', { serviceRequestId: id, status: 'cancelled' });
+
+      return res.json({ success: true, message: "تم رفض السعر وإلغاء الطلب" });
+    }
+  } catch (err: any) {
+    console.error('[SR] Approve price error:', err);
+    return res.status(500).json({ error: "خطأ في الاستجابة للسعر" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/payment — Customer submits payment
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/payment", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    const { method, referenceCode, receiptImage } = req.body;
+
+    if (!method || !referenceCode) {
+      return res.status(400).json({ error: "طريقة الدفع ورقم المرجع مطلوبان" });
+    }
+
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (sr.customerId !== user.id) return res.status(403).json({ error: "غير مصرح" });
+    if (sr.status !== 'payment_pending') {
+      return res.status(400).json({ error: "الطلب ليس في انتظار الدفع" });
+    }
+
+    // Verify payment reference
+    const payRef = db.prepare(`SELECT * FROM payment_references WHERE referenceCode = ? AND serviceRequestId = ?`).get(referenceCode, id) as any;
+    if (!payRef) return res.status(400).json({ error: "رقم المرجع غير صحيح" });
+    if (payRef.status === 'used') return res.status(400).json({ error: "تم استخدام هذا المرجع مسبقاً" });
+    if (payRef.expiresAt && new Date(payRef.expiresAt) < new Date()) {
+      return res.status(400).json({ error: "انتهت صلاحية رقم المرجع" });
+    }
+
+    const now = new Date().toISOString();
+    const validMethods = ['visa', 'mastercard', 'wallet', 'instapay'];
+    if (!validMethods.includes(method.toLowerCase())) {
+      return res.status(400).json({ error: "طريقة دفع غير مدعومة. يُقبل: Visa, Mastercard, محفظة, InstaPay" });
+    }
+
+    // Mark payment reference as used
+    db.prepare(`UPDATE payment_references SET status = 'used', method = ?, usedAt = ? WHERE id = ?`).run(method, now, payRef.id);
+
+    // Update service request
+    db.prepare(`
+      UPDATE service_requests
+      SET status = 'paid', paymentMethod = ?, paymentStatus = 'paid', paidAt = ?, updatedAt = ?
+      WHERE id = ?
+    `).run(method, now, now, id);
+
+    // Create transaction record
+    const txId = `tx_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+    const customerInfo = db.prepare(`SELECT balance FROM users WHERE id = ?`).get(user.id) as any;
+    db.prepare(`INSERT INTO transactions (id, userId, type, amount, description, balanceBefore, balanceAfter, referenceId, status, createdAt) VALUES (?, ?, 'payment', ?, ?, ?, ?, ?, 'completed', ?)`).run(txId, user.id, sr.totalAmount, `دفع خدمة صيانة ${sr.referenceNumber}`, customerInfo?.balance || 0, customerInfo?.balance || 0, referenceCode, now);
+
+    logServiceRequest(id, 'PAYMENT_RECEIVED', user.id, user.name, 'customer', `${method}: ${sr.totalAmount} ج.م - مرجع: ${referenceCode}`);
+
+    // Notify technician to go to customer
+    sendNotificationToUser(sr.technicianId, '💳 تم الدفع — توجه للعميل', `العميل أكمل الدفع. يمكنك الآن التوجه لإتمام الخدمة`, 'payment_received', { serviceRequestId: id });
+    (global as any).io?.to(`user_${sr.technicianId}`).emit('service_request_update', { serviceRequestId: id, status: 'paid' });
+
+    // Notify customer
+    sendNotificationToUser(user.id, '✅ تم استلام الدفع', 'تم تأكيد دفعتك. الفني في الطريق إليك', 'payment_confirmed', { serviceRequestId: id });
+
+    return res.json({ success: true, message: "تم استلام الدفع بنجاح. الفني في الطريق إليك", status: 'paid' });
+  } catch (err: any) {
+    console.error('[SR] Payment error:', err);
+    return res.status(500).json({ error: "خطأ في معالجة الدفع" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/start — Technician starts work
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/start", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    if (normalizeRoleServer(user.role) !== 'technician') return res.status(403).json({ error: "غير مصرح" });
+
+    const { id } = req.params;
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (sr.technicianId !== user.id) return res.status(403).json({ error: "لست الفني المعين" });
+    if (sr.status !== 'paid') return res.status(400).json({ error: "يجب إتمام الدفع أولاً" });
+
+    const now = new Date().toISOString();
+    db.prepare(`UPDATE service_requests SET status = 'in_progress', startedAt = ?, updatedAt = ? WHERE id = ?`).run(now, now, id);
+    logServiceRequest(id, 'WORK_STARTED', user.id, user.name, 'technician', 'بدأ الفني العمل');
+
+    sendNotificationToUser(sr.customerId, '🔧 بدأ الفني العمل', 'الفني بدأ في صيانة جهازك', 'work_started', { serviceRequestId: id });
+    (global as any).io?.to(`user_${sr.customerId}`).emit('service_request_update', { serviceRequestId: id, status: 'in_progress' });
+
+    return res.json({ success: true, message: "تم بدء العمل" });
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في بدء العمل" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/complete — Technician marks done
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/complete", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    if (normalizeRoleServer(user.role) !== 'technician') return res.status(403).json({ error: "غير مصرح" });
+
+    const { id } = req.params;
+    const { diagnosis, repairAction, warrantyDays } = req.body;
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (sr.technicianId !== user.id) return res.status(403).json({ error: "لست الفني المعين" });
+    if (!['in_progress', 'waiting_for_part', 'part_received'].includes(sr.status)) {
+      return res.status(400).json({ error: "لا يمكن إتمام الطلب في الحالة الحالية" });
+    }
+
+    const now = new Date().toISOString();
+    const warranty = parseInt(warrantyDays) || 30;
+    db.prepare(`UPDATE service_requests SET status = 'completed', completedAt = ?, warrantyDays = ?, updatedAt = ? WHERE id = ?`).run(now, warranty, now, id);
+    logServiceRequest(id, 'COMPLETED', user.id, user.name, 'technician', `التشخيص: ${diagnosis || 'غير محدد'}`);
+
+    // Notify customer to confirm
+    sendNotificationToUser(sr.customerId, '✅ انتهت الصيانة', `انتهى الفني من صيانة جهازك. يرجى تأكيد الاستلام`, 'work_completed', { serviceRequestId: id });
+    (global as any).io?.to(`user_${sr.customerId}`).emit('service_request_update', { serviceRequestId: id, status: 'completed' });
+
+    return res.json({ success: true, message: "تم تسجيل اكتمال الخدمة. بانتظار تأكيد العميل" });
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في إتمام الطلب" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/confirm — Customer confirms completion
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/confirm", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (sr.customerId !== user.id) return res.status(403).json({ error: "غير مصرح" });
+    if (sr.status !== 'completed') return res.status(400).json({ error: "الطلب لم يكتمل بعد" });
+
+    const now = new Date().toISOString();
+    db.prepare(`UPDATE service_requests SET status = 'customer_confirmed', customerConfirmedAt = ?, updatedAt = ? WHERE id = ?`).run(now, now, id);
+    logServiceRequest(id, 'CUSTOMER_CONFIRMED', user.id, user.name, 'customer');
+
+    // Pay technician (add to balance)
+    db.prepare(`UPDATE users SET balance = balance + ? WHERE id = ?`).run(sr.technicianEarning, sr.technicianId);
+    const techBalance = (db.prepare(`SELECT balance FROM users WHERE id = ?`).get(sr.technicianId) as any)?.balance || 0;
+    const txId = `tx_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+    db.prepare(`INSERT INTO transactions (id, userId, type, amount, description, balanceBefore, balanceAfter, referenceId, status, createdAt) VALUES (?, ?, 'earning', ?, ?, ?, ?, ?, 'completed', ?)`).run(txId, sr.technicianId, sr.technicianEarning, `أرباح خدمة ${sr.referenceNumber}`, techBalance - sr.technicianEarning, techBalance, id, now);
+
+    sendNotificationToUser(sr.technicianId, '💰 تم تحويل الأرباح', `تم إضافة ${sr.technicianEarning} ج.م لمحفظتك`, 'earning_added', { serviceRequestId: id, amount: sr.technicianEarning });
+    (global as any).io?.to(`user_${sr.technicianId}`).emit('service_request_update', { serviceRequestId: id, status: 'customer_confirmed' });
+
+    return res.json({ success: true, message: "شكراً لتأكيدك. يمكنك الآن تقييم الخدمة", nextStep: 'rating' });
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في تأكيد الاستلام" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/rate — Customer rates technician
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/rate", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: "التقييم يجب أن يكون بين 1 و 5" });
+    }
+
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (sr.customerId !== user.id) return res.status(403).json({ error: "غير مصرح" });
+    if (!['customer_confirmed', 'rated'].includes(sr.status)) {
+      return res.status(400).json({ error: "يجب تأكيد الاستلام قبل التقييم" });
+    }
+    if (sr.rating) return res.status(400).json({ error: "تم تقييم هذه الخدمة مسبقاً" });
+
+    const now = new Date().toISOString();
+    const numRating = parseFloat(rating);
+
+    // Update service request
+    db.prepare(`UPDATE service_requests SET rating = ?, ratingComment = ?, status = 'rated', updatedAt = ? WHERE id = ?`).run(numRating, comment || null, now, id);
+
+    // Update technician overall rating (backend-authoritative)
+    const techStats = db.prepare(`SELECT rating, ratingCount FROM users WHERE id = ?`).get(sr.technicianId) as any;
+    const oldRating = techStats?.rating || 0;
+    const oldCount = techStats?.ratingCount || 0;
+    const newCount = oldCount + 1;
+    const newRating = ((oldRating * oldCount) + numRating) / newCount;
+    db.prepare(`UPDATE users SET rating = ?, ratingCount = ? WHERE id = ?`).run(Math.round(newRating * 10) / 10, newCount, sr.technicianId);
+
+    // Save review
+    const reviewId = `rev_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+    db.prepare(`INSERT INTO technician_reviews (id, technicianId, customerId, customerName, rating, comment, orderId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(reviewId, sr.technicianId, user.id, user.name, numRating, comment || null, id, now);
+
+    logServiceRequest(id, 'RATED', user.id, user.name, 'customer', `تقييم: ${numRating}/5`);
+    sendNotificationToUser(sr.technicianId, '⭐ تقييم جديد', `العميل قيّمك بـ ${numRating}/5 نجوم`, 'new_rating', { serviceRequestId: id, rating: numRating });
+
+    return res.json({ success: true, message: "شكراً على تقييمك" });
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في حفظ التقييم" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/spare-parts — Technician orders spare parts
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/spare-parts", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    if (normalizeRoleServer(user.role) !== 'technician') return res.status(403).json({ error: "فقط الفنيون يمكنهم طلب قطع الغيار" });
+
+    const { id } = req.params;
+    const { productId, productName, quantity, merchantId, notes } = req.body;
+
+    if (!productName || !quantity) {
+      return res.status(400).json({ error: "اسم القطعة والكمية مطلوبان" });
+    }
+
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+    if (sr.technicianId !== user.id) return res.status(403).json({ error: "لست الفني المعين" });
+
+    // Get product price and apply technician discount
+    let unitPrice = 0;
+    let merchantInfo: any = null;
+    if (productId) {
+      const product = db.prepare(`SELECT * FROM products WHERE id = ? AND isApproved = 1`).get(productId) as any;
+      if (product) {
+        unitPrice = product.price;
+        // Check stock
+        if (product.stock < (parseInt(quantity) || 1)) {
+          return res.status(400).json({ error: "الكمية المطلوبة غير متوفرة في المخزون" });
+        }
+        if (product.sellerId) {
+          merchantInfo = db.prepare(`SELECT id, name FROM users WHERE id = ?`).get(product.sellerId) as any;
+        }
+      }
+    }
+
+    const discountRate = getTechnicianDiscount();
+    const qty = parseInt(quantity) || 1;
+    const totalPrice = unitPrice * qty;
+    const discount = Math.round(totalPrice * discountRate);
+    const finalPrice = totalPrice - discount;
+
+    const orderId = `spo_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO spare_part_orders (id, serviceRequestId, technicianId, merchantId, merchantName, productId, productName, quantity, unitPrice, totalPrice, technicianDiscount, finalPrice, status, notes, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+    `).run(orderId, id, user.id, merchantInfo?.id || merchantId || null, merchantInfo?.name || null, productId || null, productName, qty, unitPrice, totalPrice, discount, finalPrice, notes || null, now, now);
+
+    // If product exists, reduce stock atomically
+    if (productId && unitPrice > 0) {
+      db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`).run(qty, productId, qty);
+    }
+
+    // Update service request status
+    db.prepare(`UPDATE service_requests SET status = 'waiting_for_part', updatedAt = ? WHERE id = ? AND status = 'in_progress'`).run(now, id);
+
+    logServiceRequest(id, 'SPARE_PART_ORDERED', user.id, user.name, 'technician', `${productName} x${qty} - ${finalPrice} ج.م`);
+
+    // Notify merchant if known
+    if (merchantInfo?.id) {
+      sendNotificationToUser(merchantInfo.id, '📦 طلب قطعة غيار جديد', `الفني ${user.name} يطلب: ${productName} x${qty}`, 'spare_part_order', { orderId, serviceRequestId: id });
+    }
+
+    // Notify customer
+    sendNotificationToUser(sr.customerId, '⏳ انتظار قطعة غيار', `الفني يطلب قطعة غيار لإكمال الصيانة`, 'waiting_for_part', { serviceRequestId: id });
+    (global as any).io?.to(`user_${sr.customerId}`).emit('service_request_update', { serviceRequestId: id, status: 'waiting_for_part' });
+
+    return res.status(201).json({
+      success: true,
+      order: { id: orderId, productName, quantity: qty, finalPrice, discount, status: 'pending' },
+      message: "تم طلب قطعة الغيار بنجاح"
+    });
+  } catch (err: any) {
+    console.error('[SR] Spare parts error:', err);
+    return res.status(500).json({ error: "خطأ في طلب قطعة الغيار" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/spare-part-orders/:orderId/status — Merchant/tech updates spare part order
+// ─────────────────────────────────────────────────────────────
+app.patch("/api/spare-part-orders/:orderId/status", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const { orderId } = req.params;
+    const { status } = req.body; // 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+
+    const order = db.prepare(`SELECT * FROM spare_part_orders WHERE id = ?`).get(orderId) as any;
+    if (!order) return res.status(404).json({ error: "الطلب غير موجود" });
+
+    const role = normalizeRoleServer(user.role);
+    const now = new Date().toISOString();
+    const validStatuses = ['confirmed', 'shipped', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: "حالة غير صحيحة" });
+    }
+
+    let updateData: any = { status, updatedAt: now };
+    if (status === 'delivered') updateData.deliveredAt = now;
+
+    db.prepare(`UPDATE spare_part_orders SET status = ?, updatedAt = ?, deliveredAt = ? WHERE id = ?`).run(status, now, updateData.deliveredAt || null, orderId);
+
+    // If delivered, update service request to allow continuation
+    if (status === 'delivered') {
+      db.prepare(`UPDATE service_requests SET status = 'part_received', updatedAt = ? WHERE id = ? AND status = 'waiting_for_part'`).run(now, order.serviceRequestId);
+      const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(order.serviceRequestId) as any;
+      if (sr) {
+        sendNotificationToUser(sr.technicianId, '📦 وصلت قطعة الغيار', `وصلت القطعة: ${order.productName}. يمكنك استكمال الصيانة`, 'part_received', { serviceRequestId: order.serviceRequestId });
+        (global as any).io?.to(`user_${sr.technicianId}`).emit('service_request_update', { serviceRequestId: order.serviceRequestId, status: 'part_received' });
+      }
+    }
+
+    return res.json({ success: true, message: "تم تحديث حالة الطلب" });
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في تحديث الطلب" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/service-requests/:id/cancel — Cancel request
+// ─────────────────────────────────────────────────────────────
+app.post("/api/service-requests/:id/cancel", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    const { reason } = req.body;
+    const role = normalizeRoleServer(user.role);
+
+    const sr = db.prepare(`SELECT * FROM service_requests WHERE id = ?`).get(id) as any;
+    if (!sr) return res.status(404).json({ error: "الطلب غير موجود" });
+
+    if (role === 'customer' && sr.customerId !== user.id) return res.status(403).json({ error: "غير مصرح" });
+    if (role === 'technician' && sr.technicianId !== user.id) return res.status(403).json({ error: "غير مصرح" });
+
+    const cancellableStatuses = ['new', 'waiting_for_technician', 'assigned', 'waiting_for_price', 'waiting_for_customer_approval'];
+    if (!cancellableStatuses.includes(sr.status) && !['owner', 'manager'].includes(role)) {
+      return res.status(400).json({ error: "لا يمكن إلغاء الطلب بعد إتمام الدفع" });
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(`UPDATE service_requests SET status = 'cancelled', cancelReason = ?, updatedAt = ? WHERE id = ?`).run(reason || 'إلغاء من المستخدم', now, id);
+    logServiceRequest(id, 'CANCELLED', user.id, user.name, role, reason || 'إلغاء');
+
+    if (sr.technicianId && sr.technicianId !== user.id) {
+      sendNotificationToUser(sr.technicianId, '❌ تم إلغاء الطلب', `تم إلغاء طلب الصيانة ${sr.referenceNumber}`, 'request_cancelled', { serviceRequestId: id });
+    }
+    if (sr.customerId !== user.id) {
+      sendNotificationToUser(sr.customerId, '❌ تم إلغاء الطلب', `تم إلغاء طلب الصيانة ${sr.referenceNumber}`, 'request_cancelled', { serviceRequestId: id });
+    }
+
+    return res.json({ success: true, message: "تم إلغاء الطلب" });
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في إلغاء الطلب" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/service-requests/:id/logs — Get audit log for request
+// ─────────────────────────────────────────────────────────────
+app.get("/api/service-requests/:id/logs", authenticateToken, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const role = normalizeRoleServer(req.user.role);
+    if (!['owner', 'manager', 'programmer', 'customer_support'].includes(role)) {
+      return res.status(403).json({ error: "غير مصرح" });
+    }
+    const logs = db.prepare(`SELECT * FROM service_request_logs WHERE serviceRequestId = ? ORDER BY createdAt ASC`).all(id);
+    return res.json(logs);
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في جلب السجل" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/price-rules — Get price rules (owner/manager sets, technicians read)
+// ─────────────────────────────────────────────────────────────
+app.get("/api/price-rules", authenticateToken, async (req: any, res) => {
+  const rules = db.prepare(`SELECT * FROM price_rules ORDER BY deviceType`).all();
+  return res.json(rules);
+});
+
+app.post("/api/price-rules", authenticateToken, async (req: any, res) => {
+  try {
+    const role = normalizeRoleServer(req.user.role);
+    if (!['owner', 'manager'].includes(role)) return res.status(403).json({ error: "غير مصرح" });
+
+    const { deviceType, minLaborCost, maxLaborCost, minTravelCost, maxTravelCost, inspectionFee } = req.body;
+    if (!deviceType) return res.status(400).json({ error: "نوع الجهاز مطلوب" });
+
+    const id = `pr_${Date.now()}`;
+    db.prepare(`INSERT OR REPLACE INTO price_rules (id, deviceType, minLaborCost, maxLaborCost, minTravelCost, maxTravelCost, inspectionFee, isActive, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`).run(id, deviceType, minLaborCost || 0, maxLaborCost || 10000, minTravelCost || 0, maxTravelCost || 500, inspectionFee || 50, new Date().toISOString());
+
+    return res.status(201).json({ success: true, message: "تم حفظ قاعدة السعر" });
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في حفظ القاعدة" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/device-types — Get supported device types
+// ─────────────────────────────────────────────────────────────
+app.get("/api/device-types", (req: any, res: any) => {
+  return res.json(HOME_APPLIANCE_TYPES);
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/governorates — Get Egyptian governorates
+// ─────────────────────────────────────────────────────────────
+app.get("/api/governorates", (req: any, res: any) => {
+  return res.json(EGYPTIAN_GOVERNORATES);
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/available-technicians — Find technicians for a governorate+device
+// ─────────────────────────────────────────────────────────────
+app.get("/api/available-technicians", authenticateToken, async (req: any, res) => {
+  const { governorate, deviceType } = req.query as any;
+  const techs = db.prepare(`
+    SELECT id, name, phone, governorate, rating, ratingCount, available, availabilityStatus, avatar, specialty
+    FROM users
+    WHERE role = 'technician'
+      AND (banned = 0 OR banned IS NULL)
+      AND (available = 1 OR available IS NULL)
+      AND status != 'banned'
+      ${governorate ? "AND (governorate = ? OR governorate IS NULL)" : ""}
+    ORDER BY rating DESC, ratingCount DESC
+    LIMIT 20
+  `).all(...(governorate ? [governorate] : []));
+  return res.json(techs);
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/service-stats — Stats for dashboards
+// ─────────────────────────────────────────────────────────────
+app.get("/api/service-stats", authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user;
+    const role = normalizeRoleServer(user.role);
+
+    if (role === 'technician') {
+      const stats = {
+        total: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE technicianId = ?`).get(user.id) as any)?.c || 0,
+        inProgress: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE technicianId = ? AND status IN ('in_progress','waiting_for_part','part_received')`).get(user.id) as any)?.c || 0,
+        completed: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE technicianId = ? AND status IN ('completed','customer_confirmed','rated')`).get(user.id) as any)?.c || 0,
+        pending: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE status IN ('new','waiting_for_technician')`).get() as any)?.c || 0,
+        earnings: (db.prepare(`SELECT COALESCE(SUM(technicianEarning),0) as s FROM service_requests WHERE technicianId = ? AND status IN ('customer_confirmed','rated')`).get(user.id) as any)?.s || 0,
+      };
+      return res.json(stats);
+    }
+
+    if (role === 'customer') {
+      const stats = {
+        total: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE customerId = ?`).get(user.id) as any)?.c || 0,
+        active: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE customerId = ? AND status NOT IN ('cancelled','rated','customer_confirmed')`).get(user.id) as any)?.c || 0,
+        completed: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE customerId = ? AND status IN ('customer_confirmed','rated')`).get(user.id) as any)?.c || 0,
+      };
+      return res.json(stats);
+    }
+
+    // Owner/Manager
+    const stats = {
+      totalRequests: (db.prepare(`SELECT COUNT(*) as c FROM service_requests`).get() as any)?.c || 0,
+      activeRequests: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE status NOT IN ('cancelled','rated','customer_confirmed')`).get() as any)?.c || 0,
+      completedToday: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE status IN ('customer_confirmed','rated') AND date(completedAt) = date('now')`).get() as any)?.c || 0,
+      totalRevenue: (db.prepare(`SELECT COALESCE(SUM(commission),0) as s FROM service_requests WHERE paymentStatus = 'paid'`).get() as any)?.s || 0,
+      pendingPayments: (db.prepare(`SELECT COUNT(*) as c FROM service_requests WHERE status = 'payment_pending'`).get() as any)?.c || 0,
+    };
+    return res.json(stats);
+  } catch (err: any) {
+    return res.status(500).json({ error: "خطأ في جلب الإحصائيات" });
+  }
+});
+
 // Serve the Mobile/Web App Frontend on any client-side routes (SPA fallback)
+
 app.get("*", (req: any, res: any, next: any) => {
   if (
     req.path.startsWith("/api") ||

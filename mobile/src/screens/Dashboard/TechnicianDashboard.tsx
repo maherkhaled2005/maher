@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, ScrollView, TouchableOpacity, Platform, Alert, Switch, RefreshControl, ActivityIndicator, AppState, Modal, StatusBar, useWindowDimensions } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import {
   Wrench,
   CheckCircle2,
@@ -67,6 +68,8 @@ const kpiCols = width >= 1280 ? 4 : width >= 768 ? 3 : 2;
   const [specialtyModalVisible, setSpecialtyModalVisible] = useState(false);
   const [editingSpecialties, setEditingSpecialties] = useState<string[]>([]);
   const [isSavingSpecs, setIsSavingSpecs] = useState(false);
+  const [serviceStats, setServiceStats] = useState<any>(null);
+  const [recentServiceRequests, setRecentServiceRequests] = useState<any[]>([]);
 
   const handleOpenSpecialtiesModal = () => {
     const current = user?.specialty
@@ -165,6 +168,14 @@ const kpiCols = width >= 1280 ? 4 : width >= 768 ? 3 : 2;
       } else {
         setIncomingRequests([]);
       }
+
+      // Fetch Service Stats
+      const statsRes = await api.get('/api/service-stats').catch(() => null);
+      if (statsRes?.data) setServiceStats(statsRes.data);
+
+      // Fetch Recent Service Requests
+      const sReqRes = await api.get('/api/service-requests?limit=3').catch(() => null);
+      if (sReqRes?.data) setRecentServiceRequests(sReqRes.data);
     } catch (e) {
       console.warn('Could not refresh tech data', e);
     } finally {
@@ -628,6 +639,48 @@ const kpiCols = width >= 1280 ? 4 : width >= 768 ? 3 : 2;
                 </View>
                 <ArrowUpRight size={18} color={colors.gray} />
               </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Service Requests Stats Section */}
+        <View style={{ marginTop: spacing.xl }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+            <TouchableOpacity onPress={() => navigation.navigate('ServiceRequestsList')}>
+              <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>الطلبات المتاحة</Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.white, fontSize: 16, fontWeight: '900', textAlign: 'right' }}>
+              🔧 طلبات الصيانة
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', backgroundColor: colors.darkCard, padding: spacing.md, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm }}>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ color: colors.gray, fontSize: 11 }}>قيد الانتظار</Text>
+              <Text style={{ color: colors.white, fontSize: 14, fontWeight: 'bold' }}>{serviceStats?.pending || 0}</Text>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ color: colors.gray, fontSize: 11 }}>قيد التنفيذ</Text>
+              <Text style={{ color: colors.white, fontSize: 14, fontWeight: 'bold' }}>{serviceStats?.inProgress || 0}</Text>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ color: colors.gray, fontSize: 11 }}>مكتملة</Text>
+              <Text style={{ color: colors.white, fontSize: 14, fontWeight: 'bold' }}>{serviceStats?.completed || 0}</Text>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ color: colors.gray, fontSize: 11 }}>الأرباح</Text>
+              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: 'bold' }}>{serviceStats?.earnings || 0} ج.م</Text>
+            </View>
+          </View>
+
+          <View style={{ gap: spacing.sm }}>
+            {recentServiceRequests.map((req, idx) => (
+              <View key={idx} style={{ backgroundColor: colors.darkCard, padding: spacing.md, borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.border }}>
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: colors.white, fontSize: 14, fontWeight: 'bold' }}>{req.title || req.deviceType || 'طلب صيانة'}</Text>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{req.status}</Text>
+                </View>
+              </View>
             ))}
           </View>
         </View>

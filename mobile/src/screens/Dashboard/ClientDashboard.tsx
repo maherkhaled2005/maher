@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Alert, RefreshControl, StatusBar, useWindowDimensions } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import {
   Search,
   ShoppingBag,
@@ -17,6 +18,7 @@ import {
   Sparkles,
   Headphones,
   Ticket,
+  Plus,
 } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
@@ -44,13 +46,17 @@ export default function ClientDashboard({ navigation }: any) {
   const [techniciansList, setTechniciansList] = useState<any[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [coursesList, setCoursesList] = useState<any[]>([]);
+  const [serviceStats, setServiceStats] = useState({ totalRequests: 0, activeRequests: 0, completedRequests: 0 });
+  const [activeRequestsList, setActiveRequestsList] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
     try {
-      const [techData, prodData, courseData] = await Promise.all([
+      const [techData, prodData, courseData, statsData, requestsData] = await Promise.all([
         fetchApi('/technicians').catch(() => []),
         fetchApi('/products').catch(() => []),
         fetchApi('/courses').catch(() => []),
+        fetchApi('/service-stats').catch(() => ({ totalRequests: 0, activeRequests: 0, completedRequests: 0 })),
+        fetchApi('/service-requests?status=&limit=3').catch(() => []),
       ]);
 
       if (Array.isArray(techData)) {
@@ -84,6 +90,19 @@ export default function ClientDashboard({ navigation }: any) {
           students: c.studentsCount || 0,
         }));
         setCoursesList(mapped);
+      }
+      
+      if (statsData) {
+        setServiceStats({
+          totalRequests: statsData.totalRequests || 0,
+          activeRequests: statsData.activeRequests || 0,
+          completedRequests: statsData.completedRequests || 0,
+        });
+      }
+      
+      if (Array.isArray(requestsData)) {
+        const active = requestsData.filter((r: any) => r.status !== 'cancelled' && r.status !== 'rated').slice(0, 3);
+        setActiveRequestsList(active);
       }
     } finally {
       setRefreshing(false);
@@ -174,6 +193,63 @@ export default function ClientDashboard({ navigation }: any) {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+        </View>
+
+        {/* Service Requests Section */}
+        <View style={{ marginBottom: spacing.xxl }}>
+          <Text style={{ color: colors.white, fontSize: typography.sizes.lg, fontWeight: '900', marginBottom: spacing.md, textAlign: 'right' }}>
+            🔧 خدمات الصيانة
+          </Text>
+
+          {/* Stats Row */}
+          <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: spacing.md, gap: spacing.sm }}>
+            <View style={{ flex: 1, backgroundColor: colors.darkCard, borderRadius: borderRadius.md, padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.primary, fontSize: typography.sizes.xl, fontWeight: 'bold' }}>{serviceStats.activeRequests}</Text>
+              <Text style={{ color: colors.gray, fontSize: typography.sizes.xs }}>طلبات نشطة</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: colors.darkCard, borderRadius: borderRadius.md, padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.primary, fontSize: typography.sizes.xl, fontWeight: 'bold' }}>{serviceStats.completedRequests}</Text>
+              <Text style={{ color: colors.gray, fontSize: typography.sizes.xs }}>طلبات مكتملة</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: colors.darkCard, borderRadius: borderRadius.md, padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.primary, fontSize: typography.sizes.xl, fontWeight: 'bold' }}>{serviceStats.totalRequests}</Text>
+              <Text style={{ color: colors.gray, fontSize: typography.sizes.xs }}>إجمالي الطلبات</Text>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={{ flexDirection: 'row-reverse', gap: spacing.sm, marginBottom: spacing.md }}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('CreateServiceRequest')}
+              style={{ flex: 1, backgroundColor: colors.primary, borderRadius: borderRadius.md, paddingVertical: spacing.sm, alignItems: 'center', flexDirection: 'row-reverse', justifyContent: 'center', gap: spacing.xs }}
+            >
+              <Plus color={colors.dark} size={18} />
+              <Text style={{ color: colors.dark, fontWeight: 'bold', fontSize: typography.sizes.sm }}>طلب صيانة جديدة</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ServiceRequestsList')}
+              style={{ flex: 1, backgroundColor: colors.darkCard, borderWidth: 1, borderColor: colors.primary, borderRadius: borderRadius.md, paddingVertical: spacing.sm, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: typography.sizes.sm }}>طلباتي</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Last 3 Active Requests */}
+          {activeRequestsList.length > 0 && (
+            <View style={{ gap: spacing.sm }}>
+              {activeRequestsList.map((req: any, index: number) => (
+                <View key={index} style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.darkCard, padding: spacing.sm, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border }}>
+                  <View>
+                    <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: typography.sizes.sm, textAlign: 'right' }}>{req.serviceType || 'طلب صيانة'}</Text>
+                    <Text style={{ color: colors.gray, fontSize: typography.sizes.xs, textAlign: 'right', marginTop: 2 }}>{new Date(req.createdAt).toLocaleDateString('ar-EG')}</Text>
+                  </View>
+                  <View style={{ backgroundColor: 'rgba(212,175,55,0.15)', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: borderRadius.sm }}>
+                    <Text style={{ color: colors.primary, fontSize: typography.sizes.xs, fontWeight: 'bold' }}>{req.status}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* 6 Quick Maintenance Services (Required by spec) */}
