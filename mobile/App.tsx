@@ -1,10 +1,14 @@
-import React, { Component, ErrorInfo, ReactNode, useEffect } from 'react';
+import React, { Component, ErrorInfo, ReactNode, useEffect, useState, useRef } from 'react';
 import {
   StatusBar,
   View,
   Text,
   TouchableOpacity,
   Platform,
+  Animated,
+  ActivityIndicator,
+  useWindowDimensions,
+  Easing,
   Alert,
 } from 'react-native';
 import { StripeProvider } from './src/components/StripeWrapper';
@@ -71,6 +75,19 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 function MainAppContent() {
   const { user, logout } = useAuthStore();
+  const [appReady, setAppReady] = useState(false);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const circleSize = Math.max(120, Math.min(Math.min(windowWidth * 0.45, windowHeight * 0.22), 160));
+
+  // Splash Screen Animation State
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const subtitleOpacity = useRef(new Animated.Value(0)).current;
+  const loadingOpacity = useRef(new Animated.Value(0)).current;
+  const splashContainerOpacity = useRef(new Animated.Value(1)).current;
+
+  const [typedText, setTypedText] = useState('');
+  const fullText = 'TecnoRexa';
 
   // Web layout styles
   useEffect(() => {
@@ -98,19 +115,93 @@ function MainAppContent() {
     }
   }, []);
 
+  // Splash Screen Sequence
+  useEffect(() => {
+    // 1. Logo fades in and scales smoothly
+    Animated.parallel([
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(logoScale, {
+        toValue: 1,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+
+    // 2. Typing 'TecnoRexa' text letter by letter
+    let typeIndex = 0;
+    let typeInterval: ReturnType<typeof setInterval>;
+    const typingDelay = setTimeout(() => {
+      typeInterval = setInterval(() => {
+        typeIndex++;
+        setTypedText(fullText.substring(0, typeIndex));
+        if (typeIndex >= fullText.length) {
+          clearInterval(typeInterval);
+        }
+      }, 55);
+    }, 200);
+
+    // 3. Subtitle text fades in
+    const subtitleTimer = setTimeout(() => {
+      Animated.timing(subtitleOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }, 600);
+
+    // 4. 'جاري التحميل...' badge fades in
+    const loadingTimer = setTimeout(() => {
+      Animated.timing(loadingOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    }, 850);
+
+    // 5. Smooth fade out transition to App
+    const transitionTimer = setTimeout(() => {
+      Animated.timing(splashContainerOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start(() => {
+        setAppReady(true);
+      });
+    }, 1600);
+
+    // Hard fallback safety timer to ensure progression
+    const safetyTimer = setTimeout(() => {
+      setAppReady(true);
+    }, 2200);
+
+    return () => {
+      clearTimeout(typingDelay);
+      clearInterval(typeInterval);
+      clearTimeout(subtitleTimer);
+      clearTimeout(loadingTimer);
+      clearTimeout(transitionTimer);
+      clearTimeout(safetyTimer);
+    };
+  }, []);
+
   // Background non-blocking push notification initialization
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
         const { usePushNotifications } = require('./src/hooks/usePushNotifications');
       } catch (e) {
-        console.warn('Background push notification init skipped:', e);
+        console.warn('Push notification init skipped:', e);
       }
-    }, 2000);
+    }, 2500);
     return () => clearTimeout(timer);
   }, []);
 
-  // Background non-blocking socket connection for live moderation
+  // Background socket connection for live moderation (after login)
   useEffect(() => {
     if (!user?.id) return;
     let socket: any = null;
@@ -158,6 +249,102 @@ function MainAppContent() {
       } catch {}
     };
   }, [user?.id]);
+
+  if (!appReady) {
+    return (
+      <Animated.View
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: '100%',
+          backgroundColor: '#070A0F',
+          justifyContent: 'center',
+          alignItems: 'center',
+          opacity: splashContainerOpacity,
+        }}
+      >
+        <StatusBar barStyle="light-content" backgroundColor="#070A0F" translucent />
+
+        <View style={{ alignItems: 'center', width: '100%', paddingHorizontal: 16 }}>
+          {/* Official TR Logo smoothly animated */}
+          <Animated.Image
+            source={require('./assets/tecnorexa_official_logo.jpg')}
+            resizeMode="cover"
+            style={{
+              width: circleSize,
+              height: circleSize,
+              borderRadius: circleSize / 2,
+              borderWidth: 2,
+              borderColor: '#D4AF37',
+              backgroundColor: '#000000',
+              marginBottom: 20,
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }],
+            }}
+          />
+
+          {/* Brand Typography in Royal Gold with Typing Effect */}
+          <Text
+            maxFontSizeMultiplier={1.15}
+            style={{
+              color: '#D4AF37',
+              fontSize: 32,
+              fontWeight: '900',
+              letterSpacing: 1,
+              marginBottom: 6,
+              textAlign: 'center',
+              minHeight: 40,
+            }}
+          >
+            {typedText.substring(0, 5)}
+            <Text style={{ color: '#F3E5AB' }}>{typedText.substring(5)}</Text>
+          </Text>
+
+          {/* Subtitle */}
+          <Animated.Text
+            maxFontSizeMultiplier={1.15}
+            numberOfLines={2}
+            style={{
+              opacity: subtitleOpacity,
+              color: '#D4AF37',
+              fontSize: 13,
+              fontWeight: '700',
+              letterSpacing: 0.5,
+              textAlign: 'center',
+              marginBottom: 22,
+              paddingHorizontal: 8,
+            }}
+          >
+            منصة TecnoRexa المتكاملة لصيانة الأجهزة المنزلية
+          </Animated.Text>
+
+          {/* Luxury Gold Loading Indicator */}
+          <Animated.View
+            style={{
+              opacity: loadingOpacity,
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              gap: 8,
+              backgroundColor: '#0B0E14',
+              paddingHorizontal: 18,
+              paddingVertical: 9,
+              borderRadius: 24,
+              borderWidth: 1.5,
+              borderColor: '#D4AF37',
+            }}
+          >
+            <ActivityIndicator size="small" color="#D4AF37" />
+            <Text
+              maxFontSizeMultiplier={1.15}
+              style={{ color: '#D4AF37', fontSize: 13, fontWeight: '900' }}
+            >
+              جاري التحميل...
+            </Text>
+          </Animated.View>
+        </View>
+      </Animated.View>
+    );
+  }
 
   return (
     <View style={[{ flex: 1, backgroundColor: '#0A0A0A' }, Platform.OS === 'web' && { height: '100%', maxHeight: '100%', overflow: 'hidden' } as any]}>
