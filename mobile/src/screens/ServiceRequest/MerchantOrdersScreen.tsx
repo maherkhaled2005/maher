@@ -80,7 +80,7 @@ const MerchantOrdersScreen = () => {
       case 'shipped': return { label: 'تم الشحن', color: '#8B5CF6', icon: Truck };
       case 'delivered': return { label: 'تم التسليم', color: '#10B981', icon: Package };
       case 'cancelled': return { label: 'ملغي', color: '#EF4444', icon: XCircle };
-      default: return { label: status, color: colors.text.secondary, icon: Package };
+      default: return { label: status, color: colors.grayMedium, icon: Package };
     }
   };
 
@@ -154,7 +154,7 @@ const MerchantOrdersScreen = () => {
               style={styles.actionButton}
               onPress={() => updateOrderStatus(item.id, 'confirmed')}
             >
-              <CheckCircle size={20} color={colors.background.primary} />
+              <CheckCircle size={20} color="#0A0A0A" />
               <Text style={styles.actionButtonText}>تأكيد الطلب</Text>
             </TouchableOpacity>
           )}
@@ -164,7 +164,7 @@ const MerchantOrdersScreen = () => {
               style={styles.actionButton}
               onPress={() => updateOrderStatus(item.id, 'shipped')}
             >
-              <Truck size={20} color={colors.background.primary} />
+              <Truck size={20} color="#0A0A0A" />
               <Text style={styles.actionButtonText}>إرسال</Text>
             </TouchableOpacity>
           )}
@@ -174,7 +174,7 @@ const MerchantOrdersScreen = () => {
               style={styles.actionButton}
               onPress={() => updateOrderStatus(item.id, 'delivered')}
             >
-              <Package size={20} color={colors.background.primary} />
+              <Package size={20} color="#0A0A0A" />
               <Text style={styles.actionButtonText}>تم التسليم</Text>
             </TouchableOpacity>
           )}
@@ -186,7 +186,7 @@ const MerchantOrdersScreen = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary.main} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -222,13 +222,13 @@ const MerchantOrdersScreen = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[colors.primary.main]}
-            tintColor={colors.primary.main}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
           />
         }
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
-            <Package size={48} color={colors.text.tertiary} />
+            <Package size={48} color={colors.grayDark} />
             <Text style={styles.emptyText}>لا توجد طلبات قطع غيار حالياً</Text>
           </View>
         )}
@@ -251,9 +251,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: typography.h2.fontSize,
-    fontFamily: typography.h2.fontFamily,
-    color: '#D4AF37', // colors.primary.main
+    fontSize: 22,
+    fontFamily: 'Cairo',
+    color: '#D4AF37',
     textAlign: 'center',
     paddingVertical: spacing.md,
     fontWeight: 'bold',
@@ -277,9 +277,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#D4AF37',
   },
   filterText: {
-    color: colors.text.secondary,
-    fontFamily: typography.body.fontFamily,
-    fontSize: typography.body.fontSize,
+    color: colors.grayMedium,
+    fontFamily: 'Cairo',
+    fontSize: 14,
   },
   activeFilterText: {
     color: '#0A0A0A',
@@ -312,23 +312,23 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   statusText: {
-    fontSize: typography.caption.fontSize,
-    fontFamily: typography.caption.fontFamily,
+    fontSize: 12,
+    fontFamily: 'Cairo',
     fontWeight: 'bold',
     marginRight: spacing.xs,
   },
   dateText: {
-    color: colors.text.tertiary,
-    fontSize: typography.caption.fontSize,
-    fontFamily: typography.caption.fontFamily,
+    color: colors.grayDark,
+    fontSize: 12,
+    fontFamily: 'Cairo',
   },
   orderDetails: {
     marginBottom: spacing.md,
   },
   productName: {
-    color: colors.text.primary,
-    fontSize: typography.h3.fontSize,
-    fontFamily: typography.h3.fontFamily,
+    color: colors.white,
+    fontSize: 18,
+    fontFamily: 'Cairo',
     fontWeight: 'bold',
     marginBottom: spacing.sm,
     textAlign: 'right', // RTL
@@ -339,14 +339,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   detailLabel: {
-    color: colors.text.secondary,
-    fontSize: typography.body.fontSize,
-    fontFamily: typography.body.fontFamily,
+    color: colors.grayMedium,
+    fontSize: 14,
+    fontFamily: 'Cairo',
   },
   detailValue: {
-    color: colors.text.primary,
-    fontSize: typography.body.fontSize,
-    fontFamily: typography.body.fontFamily,
+    color: colors.white,
+    fontSize: 14,
+    fontFamily: 'Cairo',
   },
   priceValue: {
     color: '#D4AF37',
@@ -367,9 +367,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   actionButtonText: {
-    color: colors.background.primary,
-    fontSize: typography.body.fontSize,
-    fontFamily: typography.body.fontFamily,
+    color: '#0A0A0A',
+    fontSize: 14,
+    fontFamily: 'Cairo',
     fontWeight: 'bold',
     marginRight: spacing.xs,
   },
@@ -379,9 +379,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl * 2,
   },
   emptyText: {
-    color: colors.text.secondary,
-    fontSize: typography.body.fontSize,
-    fontFamily: typography.body.fontFamily,
+    color: colors.grayMedium,
+    fontSize: 14,
+    fontFamily: 'Cairo',
     marginTop: spacing.md,
   },
 });

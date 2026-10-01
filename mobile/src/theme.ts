@@ -78,6 +78,7 @@ export const typography = {
     extrabold: '800' as const,
     black: '900' as const,
   },
+  body: { fontSize: 14, fontFamily: 'Cairo' },
   body1: { fontSize: 16, fontFamily: 'Cairo' },
   body2: { fontSize: 14, fontFamily: 'Cairo' },
   h1: { fontSize: 28, fontWeight: '700' as const, fontFamily: 'Cairo' },
