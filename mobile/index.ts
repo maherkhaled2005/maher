@@ -7,30 +7,7 @@ import App from './App';
 // the environment is set up appropriately
 registerRootComponent(App);
 
-/* ==========================================================================
-   GLOBAL TEXT SCALING LOCK
-   Phones with a large system "Display size / Font size" were blowing the whole
-   layout up: giant text, overflowing rows, unreadable chat. Clamp the scale so
-   the UI stays exactly as designed on every phone, tablet and desktop.
-   ========================================================================== */
-const MAX_FONT_MULTIPLIER = 1.15;
-const MIN_FONT_MULTIPLIER = 0.9;
 
-try {
-  (Text as any).defaultProps = {
-    ...((Text as any).defaultProps || {}),
-    maxFontSizeMultiplier: MAX_FONT_MULTIPLIER,
-    allowFontScaling: true,
-  };
-  (TextInput as any).defaultProps = {
-    ...((TextInput as any).defaultProps || {}),
-    maxFontSizeMultiplier: MAX_FONT_MULTIPLIER,
-    allowFontScaling: true,
-  };
-} catch (e) {
-  // Ignored safely if defaultProps is read-only or unsupported in React 19/Hermes
-}
-void MIN_FONT_MULTIPLIER;
 
 // On web, neutralize browser font inflation (iOS Safari / Chrome Android)
 if (Platform.OS === 'web' && typeof document !== 'undefined') {

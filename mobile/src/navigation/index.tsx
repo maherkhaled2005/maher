@@ -324,16 +324,17 @@ export default function AppNavigator() {
       onReady={updateActiveRoute}
       onStateChange={updateActiveRoute}
     >
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          cardStyle: {
-            flex: 1,
-            height: '100%',
-            overflow: 'hidden',
-          },
-        }}
-      >
+      <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            cardStyle: {
+              flex: 1,
+              height: '100%',
+              overflow: 'hidden',
+            },
+          }}
+        >
         {!isAuthenticated ? (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
@@ -419,6 +420,7 @@ export default function AppNavigator() {
       </Stack.Navigator>
       <OnboardingModal user={user} />
       <FloatingAIButton currentRoute={activeRoute} />
+      </View>
     </NavigationContainer>
   );
 }

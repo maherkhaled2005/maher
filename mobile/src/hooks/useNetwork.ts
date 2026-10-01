@@ -7,12 +7,25 @@ export const useNetwork = () => {
   const [isInternetReachable, setIsInternetReachable] = useState<boolean | null>(true);
 
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsConnected(state.isConnected);
-      setIsInternetReachable(state.isInternetReachable);
-    });
+    try {
+      if (typeof NetInfo?.addEventListener === 'function') {
+        const unsubscribe = NetInfo.addEventListener(state => {
+          try {
+            setIsConnected(state?.isConnected ?? true);
+            setIsInternetReachable(state?.isInternetReachable ?? true);
+          } catch {}
+        });
 
-    return () => unsubscribe();
+        return () => {
+          try {
+            if (typeof unsubscribe === 'function') unsubscribe();
+          } catch {}
+        };
+      }
+    } catch (e) {
+      console.warn('NetInfo addEventListener safe caught:', e);
+    }
+    return () => {};
   }, []);
 
   return { isConnected, isInternetReachable };
