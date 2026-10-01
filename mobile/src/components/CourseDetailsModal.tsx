@@ -96,7 +96,7 @@ export default function CourseDetailsModal({
           title: 'الدرس الأول: مقدمة وتشخيص أعطال البوردة والدوائر الكهرومغناطيسية',
           videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
           duration: '15:30د',
-          pdfUrl: 'https://tecnorexa.com/files/lesson1_notes.pdf',
+          pdfUrl: 'https://technorexa.com/files/lesson1_notes.pdf',
         },
         {
           id: 'les_2',
@@ -104,7 +104,7 @@ export default function CourseDetailsModal({
           title: 'الدرس الثاني: الفحص بالآفو ميتر وتحديد المكونات التالفة',
           videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
           duration: '22:10د',
-          pdfUrl: 'https://tecnorexa.com/files/lesson2_diagram.pdf',
+          pdfUrl: 'https://technorexa.com/files/lesson2_diagram.pdf',
         },
       ]);
       setEnrolled(course?.price === 0 || course?.price === null);

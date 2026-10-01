@@ -4,8 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const getBaseURL = (): string => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    if (envUrl.includes('tecnorexa.com') && !envUrl.includes('technorexa.com')) {
+      return envUrl.replace('tecnorexa.com', 'technorexa.com');
+    }
+    return envUrl;
   }
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1')) {
     return `${window.location.origin}/api`;
@@ -26,11 +30,12 @@ export const apiClient = api;
 export const getActiveBaseURL = (): string => api.defaults.baseURL as string || '';
 
 export const SOCKET_URL =
-  process.env.EXPO_PUBLIC_SOCKET_URL ||
+  (process.env.EXPO_PUBLIC_SOCKET_URL?.includes('tecnorexa.com') && !process.env.EXPO_PUBLIC_SOCKET_URL?.includes('technorexa.com')
+    ? process.env.EXPO_PUBLIC_SOCKET_URL.replace('tecnorexa.com', 'technorexa.com')
+    : process.env.EXPO_PUBLIC_SOCKET_URL) ||
   getBaseURL().replace(/\/api$/, '');
 
-export const getActiveSocketURL = (): string =>
-  process.env.EXPO_PUBLIC_SOCKET_URL || getBaseURL().replace(/\/api$/, '');
+export const getActiveSocketURL = (): string => SOCKET_URL;
 
 // Authentication interceptor
 api.interceptors.request.use(
