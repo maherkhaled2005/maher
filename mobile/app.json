@@ -8,16 +8,6 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#070A0F",
     "primaryColor": "#D4AF37",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#070A0F",
-      "dark": {
-        "image": "./assets/splash.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#070A0F"
-      }
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -28,16 +18,6 @@
       "adaptiveIcon": {
         "backgroundColor": "#070A0F",
         "foregroundImage": "./assets/android-icon-foreground.png"
-      },
-      "splash": {
-        "image": "./assets/splash.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#070A0F",
-        "dark": {
-          "image": "./assets/splash.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#070A0F"
-        }
       }
     },
     "web": {
@@ -56,10 +36,11 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": false
+            "usesCleartextTraffic": true
           }
         }
       ],
+      "expo-notifications",
       "expo-sharing",
       "./plugins/withDarkSplash",
       "expo-video"

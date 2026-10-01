@@ -96,16 +96,34 @@ export default function LoginScreen({ navigation }: any) {
           >
             {/* Header & Logo Section */}
             <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
-              <Image
-                source={require('../../../assets/login-logo.png')}
+              <View
                 style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 18,
+                  width: 80,
+                  height: 80,
+                  borderRadius: 22,
+                  borderWidth: 1.8,
+                  borderColor: '#D4AF37',
+                  overflow: 'hidden',
                   marginBottom: 12,
+                  backgroundColor: '#000000',
+                  shadowColor: '#D4AF37',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 10,
+                  elevation: 6,
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
-                resizeMode="contain"
-              />
+              >
+                <Image
+                  source={require('../../../assets/auth-header-logo.jpg')}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                  }}
+                  resizeMode="cover"
+                />
+              </View>
 
               <Text
                 style={{

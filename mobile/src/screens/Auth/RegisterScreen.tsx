@@ -307,16 +307,34 @@ export default function RegisterScreen({ navigation }: any) {
           >
             {/* Clean Header */}
             <View style={{ alignItems: 'center', marginBottom: spacing.md, marginTop: spacing.xs }}>
-              <Image
-                source={require('../../../assets/icon.png')}
+              <View
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 16,
-                  marginBottom: 10,
+                  width: 80,
+                  height: 80,
+                  borderRadius: 20,
+                  borderWidth: 1.8,
+                  borderColor: '#D4AF37',
+                  overflow: 'hidden',
+                  marginBottom: 12,
+                  backgroundColor: '#000000',
+                  shadowColor: '#D4AF37',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 10,
+                  elevation: 6,
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
-                resizeMode="contain"
-              />
+              >
+                <Image
+                  source={require('../../../assets/auth-header-logo.jpg')}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                  }}
+                  resizeMode="cover"
+                />
+              </View>
               <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 }}>
                 إنشاء حساب جديد
               </Text>

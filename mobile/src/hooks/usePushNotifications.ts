@@ -3,16 +3,20 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    } as any),
-  });
+try {
+  if (Platform.OS !== 'web' && typeof Notifications?.setNotificationHandler === 'function') {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      } as any),
+    });
+  }
+} catch (e) {
+  console.warn('Notifications handler init skipped:', e);
 }
 
 export function usePushNotifications() {
@@ -23,34 +27,60 @@ export function usePushNotifications() {
 
   useEffect(() => {
     if (Platform.OS === 'web') {
-      return; // Push notifications are mobile only
+      return;
     }
 
-    registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
+    try {
+      registerForPushNotificationsAsync()
+        .then(token => {
+          if (token) setExpoPushToken(token);
+        })
+        .catch(err => {
+          console.warn('Push registration skipped:', err);
+        });
+    } catch (err) {
+      console.warn('Push notification hook error:', err);
+    }
 
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      setNotification(notification);
-    });
+    try {
+      if (typeof Notifications?.addNotificationReceivedListener === 'function') {
+        notificationListener.current = Notifications.addNotificationReceivedListener(item => {
+          setNotification(item);
+        });
+      }
+    } catch (err) {
+      console.warn('addNotificationReceivedListener skipped:', err);
+    }
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('User tapped on notification:', response);
-    });
+    try {
+      if (typeof Notifications?.addNotificationResponseReceivedListener === 'function') {
+        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+          console.log('User tapped on notification:', response);
+        });
+      }
+    } catch (err) {
+      console.warn('addNotificationResponseReceivedListener skipped:', err);
+    }
 
     return () => {
-      if (notificationListener.current) {
-        if (typeof notificationListener.current.remove === 'function') {
-          notificationListener.current.remove();
-        } else if (typeof (Notifications as any).removeNotificationSubscription === 'function') {
-          (Notifications as any).removeNotificationSubscription(notificationListener.current);
+      try {
+        if (notificationListener.current) {
+          if (typeof notificationListener.current.remove === 'function') {
+            notificationListener.current.remove();
+          } else if (typeof (Notifications as any).removeNotificationSubscription === 'function') {
+            (Notifications as any).removeNotificationSubscription(notificationListener.current);
+          }
         }
-      }
-      if (responseListener.current) {
-        if (typeof responseListener.current.remove === 'function') {
-          responseListener.current.remove();
-        } else if (typeof (Notifications as any).removeNotificationSubscription === 'function') {
-          (Notifications as any).removeNotificationSubscription(responseListener.current);
+      } catch {}
+      try {
+        if (responseListener.current) {
+          if (typeof responseListener.current.remove === 'function') {
+            responseListener.current.remove();
+          } else if (typeof (Notifications as any).removeNotificationSubscription === 'function') {
+            (Notifications as any).removeNotificationSubscription(responseListener.current);
+          }
         }
-      }
+      } catch {}
     };
   }, []);
 
@@ -60,38 +90,42 @@ export function usePushNotifications() {
   };
 }
 
-async function registerForPushNotificationsAsync() {
-  if (Platform.OS === 'web') return;
-  let token;
+async function registerForPushNotificationsAsync(): Promise<string | undefined> {
+  if (Platform.OS === 'web') return undefined;
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      lightColor: '#FF231F7C',
-    });
+  try {
+    if (Platform.OS === 'android' && typeof Notifications?.setNotificationChannelAsync === 'function') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    if (Device.isDevice && typeof Notifications?.getPermissionsAsync === 'function') {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted' && typeof Notifications?.requestPermissionsAsync === 'function') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        return undefined;
+      }
+      
+      try {
+        const projectId = "151b9af2-362a-4101-9b46-c5d0c63f70af";
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+        return tokenData?.data;
+      } catch (error) {
+        console.warn('Expo token fetch skipped:', error);
+      }
+    }
+  } catch (error) {
+    console.warn('registerForPushNotificationsAsync error caught safely:', error);
   }
 
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    if (finalStatus !== 'granted') {
-      return;
-    }
-    
-    try {
-      const projectId = "12345678-1234-1234-1234-1234567890ab";
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    } catch (error) {
-      console.warn('Expo token fetch skipped:', error);
-    }
-  }
-
-  return token;
+  return undefined;
 }

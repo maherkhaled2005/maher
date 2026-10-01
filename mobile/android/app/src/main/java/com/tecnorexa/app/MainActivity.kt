@@ -19,14 +19,18 @@ class MainActivity : ReactActivity() {
     setTheme(R.style.AppTheme);
     super.onCreate(null)
 
-    // 🎨 Ensure window and decorView are solid dark (#070A0F) with zero white flash
-    window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#070A0F"))
+    try {
+      // 🎨 Ensure window and decorView are solid dark (#070A0F) with zero white flash
+      window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#070A0F"))
+    } catch (e: Exception) {}
 
-    // 🛡️ TecnoRexa Global Rule 7: Screenshot & Screen Recording Protection (FLAG_SECURE)
-    window.setFlags(
-      WindowManager.LayoutParams.FLAG_SECURE,
-      WindowManager.LayoutParams.FLAG_SECURE
-    )
+    try {
+      // 🛡️ TecnoRexa Global Rule 7: Screenshot & Screen Recording Protection (FLAG_SECURE)
+      window.setFlags(
+        WindowManager.LayoutParams.FLAG_SECURE,
+        WindowManager.LayoutParams.FLAG_SECURE
+      )
+    } catch (e: Exception) {}
   }
 
   /**

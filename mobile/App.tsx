@@ -261,12 +261,18 @@ export default function App() {
       });
     }, 1600);
 
+    // Stage 6: Hard fallback safety timer to ensure app always opens
+    const safetyTimer = setTimeout(() => {
+      setAppReady(true);
+    }, 2200);
+
     return () => {
       clearTimeout(typingDelay);
       clearInterval(typeInterval);
       clearTimeout(subtitleTimer);
       clearTimeout(loadingTimer);
       clearTimeout(transitionTimer);
+      clearTimeout(safetyTimer);
     };
   }, []);
 

@@ -16,16 +16,20 @@ registerRootComponent(App);
 const MAX_FONT_MULTIPLIER = 1.15;
 const MIN_FONT_MULTIPLIER = 0.9;
 
-(Text as any).defaultProps = {
-  ...(Text as any).defaultProps,
-  maxFontSizeMultiplier: MAX_FONT_MULTIPLIER,
-  allowFontScaling: true,
-};
-(TextInput as any).defaultProps = {
-  ...(TextInput as any).defaultProps,
-  maxFontSizeMultiplier: MAX_FONT_MULTIPLIER,
-  allowFontScaling: true,
-};
+try {
+  (Text as any).defaultProps = {
+    ...((Text as any).defaultProps || {}),
+    maxFontSizeMultiplier: MAX_FONT_MULTIPLIER,
+    allowFontScaling: true,
+  };
+  (TextInput as any).defaultProps = {
+    ...((TextInput as any).defaultProps || {}),
+    maxFontSizeMultiplier: MAX_FONT_MULTIPLIER,
+    allowFontScaling: true,
+  };
+} catch (e) {
+  // Ignored safely if defaultProps is read-only or unsupported in React 19/Hermes
+}
 void MIN_FONT_MULTIPLIER;
 
 // On web, neutralize browser font inflation (iOS Safari / Chrome Android)
