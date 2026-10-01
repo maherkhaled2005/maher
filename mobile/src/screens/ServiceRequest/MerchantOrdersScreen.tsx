@@ -24,7 +24,7 @@ interface SparePartOrder {
 
 type FilterTab = 'all' | 'pending' | 'confirmed' | 'shipped' | 'delivered';
 
-export const MerchantOrdersScreen = () => {
+const MerchantOrdersScreen = () => {
   const [orders, setOrders] = useState<SparePartOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -236,6 +236,8 @@ export const MerchantOrdersScreen = () => {
     </SafeAreaView>
   );
 };
+
+export default MerchantOrdersScreen;
 
 const styles = StyleSheet.create({
   container: {

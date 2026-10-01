@@ -7,7 +7,7 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
 
-export const CreateServiceRequestScreen = () => {
+const CreateServiceRequestScreen = () => {
   const navigation = useNavigation();
   const { user } = useAuthStore();
   
@@ -265,6 +265,8 @@ export const CreateServiceRequestScreen = () => {
     </SafeAreaView>
   );
 };
+
+export default CreateServiceRequestScreen;
 
 const styles = StyleSheet.create({
   container: {
