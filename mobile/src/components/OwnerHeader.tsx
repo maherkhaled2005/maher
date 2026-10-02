@@ -108,7 +108,7 @@ export default function OwnerHeader({
 
   return (
     <>
-      <SafeAreaView style={{ backgroundColor: '#0A0A0A', zIndex: 10 }}>
+      <View style={{ backgroundColor: '#0A0A0A', zIndex: 10 }}>
         <View style={[styles.container, { borderBottomColor: activeColor + '33' }]}>
           {/* Right side (RTL Start): ☰ Hamburger Button, Role Badge & Official TR Logo */}
           <View style={[styles.sideGroup, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
@@ -210,7 +210,7 @@ export default function OwnerHeader({
             )}
           </View>
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Embedded Role-Aware Side Drawer */}
       <OwnerSideDrawer
@@ -239,15 +239,15 @@ export default function OwnerHeader({
   );
 }
 
-const STATUSBAR_HEIGHT = Platform.OS === 'web' ? 6 : 4;
+const STATUSBAR_HEIGHT = Platform.OS === 'web' ? 4 : 0;
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 6,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    paddingBottom: 6,
     backgroundColor: '#0A0A0A',
     borderBottomWidth: 1,
     borderBottomColor: '#1F1F1F',

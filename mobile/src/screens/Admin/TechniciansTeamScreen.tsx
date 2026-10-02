@@ -280,8 +280,29 @@ export default function TechniciansTeamScreen({ route, navigation }: any) {
   };
 
   // Direct Chat
-  const handleChat = (tech: TechItem) => {
-    navigation.navigate('ChatList', { peerId: tech.id, peerName: tech.name });
+  const handleChat = async (tech: TechItem) => {
+    try {
+      const res = await api.post('/conversations', {
+        name: tech.name,
+        type: 'direct',
+        participants: [tech.id],
+      });
+      navigation.navigate('ChatScreen', {
+        chatId: res.data?.id || `conv_${tech.id}`,
+        userName: tech.name,
+        recipientId: tech.id,
+        phone: tech.phone,
+        isOnline: true,
+      });
+    } catch {
+      navigation.navigate('ChatScreen', {
+        chatId: `conv_${tech.id}`,
+        userName: tech.name,
+        recipientId: tech.id,
+        phone: tech.phone,
+        isOnline: true,
+      });
+    }
   };
 
   // Report Tech (Support)

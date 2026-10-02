@@ -14,12 +14,16 @@ import {
   Clock,
   User,
   Plus,
+  Headphones,
+  Code,
+  MessageSquare,
 } from 'lucide-react-native';
-import { fetchApi } from '../../api/client';
+import { fetchApi, api } from '../../api/client';
 import { colors, spacing, borderRadius, MAX_CHAT_WIDTH } from '../../theme';
 import OwnerHeader from '../../components/OwnerHeader';
 import { useAuthStore } from '../../store/authStore';
 import { maskConversationName, maskPhoneNumbers } from '../../utils/conversationPrivacy';
+import { normalizeRole } from '../../utils/permissions';
 import useSocket from '../../hooks/useSocket';
 
 interface ConvItem {
@@ -211,6 +215,79 @@ export default function ChatListScreen({ navigation }: any) {
     }
   };
 
+  const handleOpenSupportChat = async () => {
+    try {
+      setLoading(true);
+      const res = await api.post('/conversations', {
+        name: 'خدمة العملاء والدعم الفني 🎧',
+        avatar: '🎧',
+        type: 'direct',
+        participants: ['support_official'],
+      });
+      const conv = res.data;
+      navigation.navigate('ChatScreen', {
+        chatId: conv.id,
+        userName: 'خدمة العملاء والدعم الفني 🎧',
+        recipientId: 'support_official',
+        isOnline: true,
+      });
+    } catch {
+      navigation.navigate('ChatScreen', {
+        chatId: 'support_official',
+        userName: 'خدمة العملاء والدعم الفني 🎧',
+        recipientId: 'support_official',
+        isOnline: true,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getRoleHeader = () => {
+    const role = normalizeRole(user?.role || '');
+    switch (role) {
+      case 'owner':
+      case 'manager':
+        return {
+          title: 'محادثات المنصة والرقابة',
+          subtitle: `سجل الرقابة والمحادثات (${conversations.length} محادثة)`,
+        };
+      case 'customer':
+        return {
+          title: 'المحادثات والرسائل 💬',
+          subtitle: 'تواصل مع الفنيين وخدمة العملاء',
+        };
+      case 'technician':
+        return {
+          title: 'محادثات الصيانة 💬',
+          subtitle: 'تواصل مع أصحاب الأجهزة والموردين',
+        };
+      case 'merchant':
+        return {
+          title: 'محادثات المتجر 💬',
+          subtitle: 'تواصل مع الفنيين والمشترين والدعم',
+        };
+      case 'customer_support':
+      case 'support':
+        return {
+          title: 'مركز المحادثات المباشرة 🎧',
+          subtitle: 'خدمة العملاء والدعم الفني',
+        };
+      case 'programmer':
+        return {
+          title: 'شات المطورين وفريق العمل 💻',
+          subtitle: 'غرفة النقاش التقني المباشر',
+        };
+      default:
+        return {
+          title: 'المحادثات 💬',
+          subtitle: 'المحادثات الفورية',
+        };
+    }
+  };
+
+  const headerInfo = getRoleHeader();
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.dark }}
@@ -218,8 +295,8 @@ export default function ChatListScreen({ navigation }: any) {
     >
       {/* ☰ Owner Header with Drawer navigation */}
       <OwnerHeader
-        title="الشات والرقابة الأمنية"
-        subtitle={`وضع المراقب السري (${conversations.length} محادثة)`}
+        title={headerInfo.title}
+        subtitle={headerInfo.subtitle}
         sectionNumber={9}
         navigation={navigation}
         currentScreen="ChatList"
@@ -284,13 +361,75 @@ export default function ChatListScreen({ navigation }: any) {
         </View>
       ) : filteredConversations.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}>
-          <MessageCircle size={48} color={colors.gray} />
-          <Text style={{ color: colors.white, fontSize: 16, fontWeight: 'bold', marginTop: spacing.md }}>
-            لا توجد محادثات نشطة
+          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(212, 175, 55, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
+            <MessageCircle size={44} color={colors.primary} />
+          </View>
+          <Text style={{ color: colors.white, fontSize: 18, fontWeight: '900', marginTop: spacing.xs, textAlign: 'center' }}>
+            {isObserver ? 'لا توجد محادثات مسجلة حالياً' : 'لا توجد محادثات نشطة'}
           </Text>
-          <Text style={{ color: colors.gray, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-            المحادثات المتبادلة بين العملاء، الفنيين، والتجار تظهر هنا للرقابة الأمنية
+          <Text style={{ color: colors.gray, fontSize: 13, marginTop: 8, textAlign: 'center', maxWidth: 320, lineHeight: 20 }}>
+            {isObserver
+              ? 'المحادثات المتبادلة بين العملاء، الفنيين، والتجار تظهر هنا للرقابة الأمنية والإدارية.'
+              : 'يمكنك بدء محادثة جديدة الآن للتواصل مع الفنيين أو خدمة العملاء والدعم الفني فوراً.'}
           </Text>
+
+          <View style={{ width: '100%', maxWidth: 300, gap: 10, marginTop: 24 }}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('NewChat')}
+              style={{
+                backgroundColor: colors.primary,
+                paddingVertical: 12,
+                borderRadius: borderRadius.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <Plus size={18} color="#0A0A0A" />
+              <Text style={{ color: '#0A0A0A', fontWeight: '900', fontSize: 14 }}>بدء محادثة جديدة</Text>
+            </TouchableOpacity>
+
+            {user?.role !== 'customer_support' && user?.role !== 'support' && (
+              <TouchableOpacity
+                onPress={handleOpenSupportChat}
+                style={{
+                  backgroundColor: '#1E1E1E',
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  paddingVertical: 12,
+                  borderRadius: borderRadius.md,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                <Headphones size={18} color={colors.primary} />
+                <Text style={{ color: colors.white, fontWeight: '800', fontSize: 13 }}>تواصل فوري مع الدعم الفني 🎧</Text>
+              </TouchableOpacity>
+            )}
+
+            {(user?.role === 'programmer' || user?.role === 'owner') && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('DevChat')}
+                style={{
+                  backgroundColor: '#7C3AED22',
+                  borderWidth: 1,
+                  borderColor: '#7C3AED',
+                  paddingVertical: 12,
+                  borderRadius: borderRadius.md,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                <Code size={18} color="#A855F7" />
+                <Text style={{ color: '#A855F7', fontWeight: '800', fontSize: 13 }}>شات فريق التطوير 💻</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ) : (
         <FlatList
@@ -303,7 +442,29 @@ export default function ChatListScreen({ navigation }: any) {
             <TouchableOpacity
               onPress={() => {
                 if (isObserver) {
-                  openObserverMode(item);
+                  Alert.alert(
+                    'خيارات المحادثة 💬',
+                    `محادثة: ${item.name}`,
+                    [
+                      {
+                        text: 'دخول المحادثة والرد كإدارة 💬',
+                        onPress: () => {
+                          navigation.navigate('ChatScreen', {
+                            chatId: item.id,
+                            userName: item.name,
+                            userRole: (item as any).otherUserRole,
+                            isOnline: Boolean(item.isOnline),
+                            isGroup: item.type === 'group',
+                          });
+                        },
+                      },
+                      {
+                        text: 'وضع المراقب (تحذير / تجميد) 👁️',
+                        onPress: () => openObserverMode(item),
+                      },
+                      { text: 'إلغاء', style: 'cancel' },
+                    ]
+                  );
                 } else {
                   navigation.navigate('ChatScreen', {
                     chatId: item.id,

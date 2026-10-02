@@ -155,7 +155,7 @@ export default function ServiceRequestsListScreen() {
           
           {(item.totalAmount && item.totalAmount > 0) ? (
             <View style={styles.amountContainer}>
-              <Text style={styles.amountText}>{item.totalAmount} ر.س</Text>
+              <Text style={styles.amountText}>{item.totalAmount} ج.م</Text>
             </View>
           ) : null}
         </View>

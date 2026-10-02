@@ -243,6 +243,8 @@ export default function ChatScreen({ route, navigation }: any) {
     try {
       const res = await api.post('/messages', {
         conversationId: chatId,
+        recipientId: params.recipientId,
+        conversationName: displayName,
         content: text,
         type: 'text',
       });
@@ -274,7 +276,7 @@ export default function ChatScreen({ route, navigation }: any) {
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.dark }}
-      edges={['top', 'bottom']}
+      edges={['top']}
     >
       <KeyboardAvoidingView
         style={{ flex: 1, width: '100%', maxWidth: '100%' }}

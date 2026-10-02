@@ -18,6 +18,8 @@ import {
   TrendingUp,
   Award,
   Headphones,
+  ShoppingBag,
+  MessageCircle,
 } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
@@ -287,7 +289,9 @@ const kpiCols = width >= 1280 ? 4 : width >= 768 ? 3 : 2;
 
   // Technician Sections
   const technicianSections = [
-    { label: 'طلبات الصيانة الواردة', desc: 'استعراض والرد على طلبات العملاء وإتمام الصيانة', icon: Package, screen: 'Orders', color: '#F59E0B' },
+    { label: 'طلبات الصيانة الواردة 🔧', desc: 'استعراض والرد على طلبات العملاء وإتمام الصيانة', icon: Wrench, screen: 'ServiceRequestsList', color: '#F59E0B' },
+    { label: 'سوق قطع الغيار للأجهزة 🏪', desc: 'شراء قطع الغيار الأصلية بأسعار خاصة', icon: ShoppingBag, screen: 'Marketplace', color: colors.primary },
+    { label: 'محادثات العملاء المباشرة 💬', desc: 'التواصل الفوري مع أصحاب الأجهزة ومسؤولي الصيانة', icon: MessageCircle, screen: 'ChatList', color: '#06B6D4' },
     { label: 'الدعم الفني والمساعدة 🎧', desc: 'تواصل مع خدمة العملاء لحل أي استفسار أو مشكلة بالطلبات', icon: Headphones, screen: 'Tickets', color: '#0D9488' },
     { label: 'إدارة الكورسات والشروحات', desc: 'نشر كورسات مدفوعة وتحقيق أرباح إضافية', icon: BookOpen, screen: 'Courses', color: '#10B981' },
     { label: 'المحفظة وسحب الأرباح', desc: 'تحويل الأرباح إلى فودافون كاش أو إنستاباي', icon: Wallet, screen: 'Wallet', color: colors.primary },

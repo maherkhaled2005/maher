@@ -151,9 +151,13 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   };
 
   const handleContactSeller = () => {
+    const sId = product.seller.id || (product.seller.phone ? `user_${product.seller.phone}` : 'support_official');
     navigation.navigate('ChatScreen', {
-      recipientId: product.seller.name,
+      chatId: `conv_prod_${product.id}`,
+      recipientId: sId,
       recipientName: product.seller.name,
+      userName: product.seller.name,
+      phone: product.seller.phone,
     });
   };
 

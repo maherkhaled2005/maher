@@ -59,6 +59,9 @@ api.interceptors.request.use(
         console.warn('[API] Failed to load auth token', error);
       }
     }
+    if (config.url && config.url.startsWith('/api/')) {
+      config.url = config.url.substring(4);
+    }
     return config;
   },
   (error) => Promise.reject(error),

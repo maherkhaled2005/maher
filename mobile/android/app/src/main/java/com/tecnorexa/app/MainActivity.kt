@@ -24,13 +24,7 @@ class MainActivity : ReactActivity() {
       window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#070A0F"))
     } catch (e: Exception) {}
 
-    try {
-      // 🛡️ TecnoRexa Global Rule 7: Screenshot & Screen Recording Protection (FLAG_SECURE)
-      window.setFlags(
-        WindowManager.LayoutParams.FLAG_SECURE,
-        WindowManager.LayoutParams.FLAG_SECURE
-      )
-    } catch (e: Exception) {}
+    // Screen capture enabled for review and inspection (FLAG_SECURE removed)
   }
 
   /**

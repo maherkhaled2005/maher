@@ -644,7 +644,15 @@ export default function OwnerDashboard({ navigation }: any) {
               stats.topTechnicians.map((t: any, idx: number) => (
                 <View key={t.id || idx} style={[styles.tableRow, idx === stats.topTechnicians.length - 1 && { borderBottomWidth: 0 }]}>
                   <TouchableOpacity
-                    onPress={() => navigation.navigate('NewChat')}
+                    onPress={() => {
+                      navigation.navigate('ChatScreen', {
+                        chatId: `conv_${t.id}`,
+                        userName: t.name,
+                        recipientId: t.id,
+                        phone: t.phone,
+                        isOnline: true,
+                      });
+                    }}
                     style={styles.chatActionBtn}
                   >
                     <MessageCircle size={14} color={colors.dark} />

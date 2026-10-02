@@ -2562,7 +2562,7 @@ app.get("/api/finance/revenue", async (req, res) => {
         courses: 0,
       }
     });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -7745,10 +7745,10 @@ app.get("/api/orders/:id", authenticateToken,async (req: any, res) => {
       serviceReport = db.prepare("SELECT * FROM service_reports WHERE orderId = ? LIMIT 1").get(order.id);
     } catch {}
 
-    let tech = null;
+    let tech: any = null;
     if (order.technicianId) {
       try {
-        tech = db.prepare("SELECT id, name, phone, specialty, rating, ratingCount, avatar FROM users WHERE id = ?").get(order.technicianId);
+        tech = db.prepare("SELECT id, name, phone, specialty, rating, ratingCount, avatar FROM users WHERE id = ?").get(order.technicianId) as any;
       } catch {}
     }
 
@@ -8119,13 +8119,40 @@ app.post("/api/messages", authenticateToken,async (req: any, res) => {
   const messageId = `msg_${Date.now()}`;
   const now = new Date().toISOString();
   try {
-    // Find receiver
-    const participant = db
+    // Find receiver or use passed recipientId
+    let participant = db
       .prepare(
         "SELECT userId FROM conversation_participants WHERE conversationId = ? AND userId != ?",
       )
       .get(conversationId, req.user.id) as any;
-    const receiverId = participant?.userId || null;
+    let receiverId = participant?.userId || req.body.receiverId || req.body.recipientId || null;
+
+    // Check if conversation exists
+    let conv = db.prepare("SELECT * FROM conversations WHERE id = ?").get(conversationId) as any;
+    if (!conv) {
+      // Auto-create conversation so it's registered in the system
+      let convName = req.body.conversationName || "محادثة مباشرة 💬";
+      if (receiverId) {
+        try {
+          const recUser = db.prepare("SELECT name FROM users WHERE id = ?").get(receiverId) as any;
+          if (recUser?.name) convName = recUser.name;
+        } catch {}
+      }
+      db.prepare(
+        "INSERT OR IGNORE INTO conversations (id, name, avatar, type, createdAt, lastMessage, lastMessageTime) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).run(conversationId, convName, "💬", "direct", now, content, now);
+
+      db.prepare("INSERT OR IGNORE INTO conversation_participants (conversationId, userId) VALUES (?, ?)").run(conversationId, req.user.id);
+      if (receiverId) {
+        db.prepare("INSERT OR IGNORE INTO conversation_participants (conversationId, userId) VALUES (?, ?)").run(conversationId, receiverId);
+      }
+    } else {
+      // Ensure participants are registered
+      db.prepare("INSERT OR IGNORE INTO conversation_participants (conversationId, userId) VALUES (?, ?)").run(conversationId, req.user.id);
+      if (receiverId) {
+        db.prepare("INSERT OR IGNORE INTO conversation_participants (conversationId, userId) VALUES (?, ?)").run(conversationId, receiverId);
+      }
+    }
 
     db.prepare(
       `INSERT INTO messages (id, conversationId, senderId, receiverId, content, encrypted, type, createdAt)

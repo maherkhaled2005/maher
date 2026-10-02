@@ -69,11 +69,11 @@ export default function LoginScreen({ navigation }: any) {
           style={[{ flex: 1, width: '100%' }, Platform.OS === 'web' && ({ overflowY: 'auto' } as any)]}
           contentContainerStyle={{
             paddingHorizontal: spacing.md,
-            paddingTop: Platform.OS === 'web' ? 40 : spacing.lg,
-            paddingBottom: 100,
+            paddingTop: Platform.OS === 'web' ? 32 : spacing.md,
+            paddingBottom: 40,
             flexGrow: 1,
             alignItems: 'center',
-            justifyContent: Platform.OS === 'web' ? 'flex-start' : 'center',
+            justifyContent: 'flex-start',
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={Platform.OS === 'web'}
